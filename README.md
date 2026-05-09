@@ -6,16 +6,8 @@
 
 ## インストール
 
-crates.io 公開後:
-
 ```bash
 cargo install sqlite-fleet --locked
-```
-
-ローカルビルド:
-
-```bash
-cargo install --path . --locked
 ```
 
 単一バイナリとして組み込みたい場合は、CIで `cargo build --release` を実行し、`target/release/sqlite-fleet` をデプロイ成果物に含めます。
