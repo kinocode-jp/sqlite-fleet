@@ -1,0 +1,42 @@
+[package]
+name = "sqlite-fleet"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Manage migrations across fleets of SQLite databases"
+readme = "README.md"
+documentation = "https://docs.rs/sqlite-fleet"
+keywords = ["sqlite", "migration", "multitenant", "cli"]
+categories = ["command-line-utilities", "database"]
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "src/**",
+    "tests/**",
+]
+
+[lib]
+name = "sqlite_fleet"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sqlite-fleet"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+glob = "0.3"
+rayon = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+toml = "0.8"
+
+[dev-dependencies]
+assert_cmd = "2"
+tempfile = "3"
