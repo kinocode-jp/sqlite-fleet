@@ -6,6 +6,8 @@ use sqlite_fleet::{
 };
 use std::path::{Path, PathBuf};
 
+mod gui;
+
 #[derive(Debug, Parser)]
 #[command(name = "sqlite-fleet")]
 #[command(about = "複数のSQLite DBに対するマイグレーションを管理します")]
@@ -36,6 +38,12 @@ enum Commands {
     },
     Check,
     Doctor,
+    Gui {
+        #[arg(long, default_value = "127.0.0.1")]
+        host: String,
+        #[arg(long, default_value_t = 8765)]
+        port: u16,
+    },
 }
 
 fn main() -> Result<()> {
@@ -240,6 +248,10 @@ fn main() -> Result<()> {
                 bail!("doctor で問題を検出しました");
             }
         }
+        Commands::Gui { host, port } => {
+            let config = load_config_with_overrides(&config, parallel)?;
+            gui::serve(config, &host, port)?;
+        }
     }
 
     Ok(())
@@ -281,5 +293,43 @@ fn fail_if_report_write_failed(error: Option<Error>) -> Result<()> {
         Err(error)
     } else {
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn gui_command_uses_documented_defaults() {
+        let cli = Cli::parse_from(["sqlite-fleet", "gui"]);
+
+        match cli.command {
+            Commands::Gui { host, port } => {
+                assert_eq!(host, "127.0.0.1");
+                assert_eq!(port, 8765);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gui_command_accepts_host_and_port_overrides() {
+        let cli = Cli::parse_from([
+            "sqlite-fleet",
+            "gui",
+            "--host",
+            "localhost",
+            "--port",
+            "18782",
+        ]);
+
+        match cli.command {
+            Commands::Gui { host, port } => {
+                assert_eq!(host, "localhost");
+                assert_eq!(port, 18782);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
     }
 }

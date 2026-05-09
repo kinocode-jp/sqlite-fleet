@@ -21,6 +21,7 @@ sqlite-fleet discover
 sqlite-fleet migrate --dry-run
 sqlite-fleet migrate
 sqlite-fleet status
+sqlite-fleet gui
 ```
 
 本番適用前は、少なくとも `doctor`、`plan`、`migrate --dry-run` を通してください。
@@ -46,6 +47,8 @@ sqlite-fleet --parallel 8 migrate --continue-on-error
 sqlite-fleet check
 sqlite-fleet doctor
 sqlite-fleet --json doctor
+sqlite-fleet gui
+sqlite-fleet gui --host 127.0.0.1 --port 8765
 ```
 
 `--config`、`--json`、`--parallel` はグローバルオプションです。サブコマンドより前に指定します。
@@ -54,6 +57,18 @@ sqlite-fleet --json doctor
 sqlite-fleet --config sqlite-fleet.toml --json status
 sqlite-fleet --config sqlite-fleet.toml --parallel 8 migrate
 ```
+
+## GUI
+
+ローカルブラウザでDB管理画面を開くには `gui` を実行します。
+
+```bash
+sqlite-fleet --config sqlite-fleet.toml gui
+```
+
+デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、`--host` にはループバックアドレスだけ指定できます。画面上で対象DB、適用済み件数、未適用migration、checksum不一致などを確認でき、`check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate` を実行できます。
+
+GUIにはSQL ConsoleとSchema Editorも含まれます。SQLファイルを読み込んで内容を確認・編集し、選択DBに対してSQL dry-runまたは適用を実行できます。Schema Editorでは現在のテーブル、ビュー、インデックス、トリガー、カラム情報を読み込み、CREATE TABLE、制約、generated columns、ALTER TABLE、DROP、VIEW、INDEX、TRIGGER、RETURNING、PRAGMA、VACUUM、VACUUM INTO、ANALYZE、REINDEX、EXPLAIN、SAVEPOINT、ATTACH DATABASEなどのSQLite SQLテンプレートを生成・編集してSQLファイルとして保存できます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` は単独SQLとしてだけ適用でき、外部DBへ影響する `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
 ## 設定例
 
@@ -164,8 +179,12 @@ fn main() -> Result<()> {
 - 対象DBが存在しない場合、`migrate` はDBファイルを自動作成しません
 - `status`、`plan`、`check`、`migrate --dry-run` は対象DBに管理テーブルを作成しません
 - migration SQL 内の明示的な transaction 制御は拒否します
-- `ATTACH`、`DETACH`、`VACUUM` は拒否します
-- 危険な `PRAGMA writable_schema` と `PRAGMA journal_mode=OFF` は拒否します
+- migration SQL 内の `ATTACH`、`DETACH`、`VACUUM` は拒否します
+- migration SQL とGUI SQLでは危険な `PRAGMA writable_schema` と `PRAGMA journal_mode=OFF` は拒否します
+- GUI SQLでは `PRAGMA foreign_keys=OFF` と `PRAGMA ignore_check_constraints=ON` も拒否します
+- GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします
+- GUI SQLでは明示的な transaction 制御と、外部DBへ影響しうる `ATTACH` / `DETACH` は拒否します
+- GUI SQL dry-runでは外部ファイルへ影響しうる `VACUUM INTO` は拒否し、applyでは `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` を単独SQLとしてだけ許可します
 - migration 管理テーブルへの直接変更やDDLは拒否します
 - discovery query は読み取り専用の `SELECT` / `WITH` 系だけを許可します
 - TOML 設定の未知フィールドは拒否します
