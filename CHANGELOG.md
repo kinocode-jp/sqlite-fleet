@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3](https://github.com/0809android/sqlite-fleet/compare/v0.1.1...v0.1.3) - 2026-05-09
+
+### Other
+
+- release v0.1.3
+- Add local GUI database manager
+
 ## [0.1.1](https://github.com/0809android/sqlite-fleet/compare/v0.1.0...v0.1.1) - 2026-05-09
 
 ### Other
