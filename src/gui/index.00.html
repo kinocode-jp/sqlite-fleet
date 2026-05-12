@@ -336,7 +336,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>マイグレーション一覧</h2>
-            <p class="panel-description">読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。</p>
+            <p class="panel-description">読み込まれているマイグレーションをバージョン順に確認し、グループとchecksumを確認します。</p>
           </div>
           <button id="openMigrationFileModal" class="primary">新規作成</button>
           <button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>
@@ -357,8 +357,7 @@
             <button id="closeMigrationFileModal" type="button" aria-label="Close">×</button>
           </div>
           <div class="modal-body migration-file-form">
-            <label class="field"><span class="field-label">Version</span><input id="newMigrationVersion" placeholder="005"></label>
-            <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
+            <label class="field"><span class="field-label">File name</span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>
             <label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>
             <div class="field wide sql-editor">
               <div class="sql-control-row">
@@ -671,6 +670,8 @@
       'このDBで適用対象にするマイグレーショングループです。複数指定できます。未指定DBはmainを使います。': 'Migration Groups that apply to this DB. Multiple groups are allowed. Unassigned DBs use main.',
       '割当を保存': 'Save assignment',
       '登録済みルール': 'Saved rules',
+      'Version': 'Version',
+      'File name': 'File name',
       'DB一覧': 'Databases',
       'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。': 'Check status, assigned Migration Groups, and pending migrations per database.',
       'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
@@ -678,7 +679,7 @@
       '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
       'DBを追加': 'Add DB',
       'マイグレーション一覧': 'Migrations',
-      '読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。': 'Review every loaded migration by version, group, and checksum.',
+      '読み込まれているマイグレーションをバージョン順に確認し、グループとchecksumを確認します。': 'Review every loaded migration by version, group, and checksum.',
       '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
       'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
@@ -775,8 +776,9 @@
       'Migration files': 'マイグレーションファイル',
       'New DB path': '新規DBパス',
       'Add to DB group': 'DBグループへ追加',
-      'Version': 'Version',
+      'Version': 'バージョン',
       'Name': '名前',
+      'File name': 'ファイル名',
       'Add to migration group': 'マイグレーショングループへ追加',
       'Target DB': '対象DB',
       'SQL file': 'SQLファイル',
@@ -846,6 +848,7 @@
         pendingDb: 'Pending DB',
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'Migration files',
+        fileNameLabel: 'File name',
         targetDbLabel: 'Target DB',
         assignedGroupsLabel: 'Applied Migration Groups',
         selectorsLabel: 'Selectors',

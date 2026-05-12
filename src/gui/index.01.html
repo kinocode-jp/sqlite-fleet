@@ -10,6 +10,7 @@
         pendingDb: '未適用DB',
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'マイグレーションファイル',
+        fileNameLabel: 'ファイル名',
         targetDbLabel: '対象DB',
         assignedGroupsLabel: '適用マイグレーショングループ',
         selectorsLabel: 'セレクタ',
@@ -491,12 +492,12 @@
     function openMigrationFileModal() {
       renderMigrationFileGroupOptions();
       renderMigrationSnippets();
-      $('newMigrationVersion').value = '';
-      $('newMigrationName').value = '';
+      $('newMigrationFilename').value = nextMigrationFileName();
       $('newMigrationSql').value = '';
       updateNewMigrationSqlMeta();
       $('migrationFileModal').hidden = false;
-      $('newMigrationVersion').focus();
+      $('newMigrationFilename').focus();
+      $('newMigrationFilename').select();
     }
     function closeMigrationFileModal() {
       $('migrationFileModal').hidden = true;
@@ -523,9 +524,10 @@
     }
     async function createMigrationFile() {
       try {
+        const filenameParts = parseMigrationFilename($('newMigrationFilename').value);
         await postAdmin('/api/admin/migration-file', {
-          version: $('newMigrationVersion').value,
-          name: $('newMigrationName').value,
+          version: filenameParts.version,
+          name: filenameParts.name,
           group: $('newMigrationGroup').value,
           sql: $('newMigrationSql').value,
         });
@@ -533,6 +535,29 @@
       } catch (error) {
         message(error.message, true);
       }
+    }
+    function nextMigrationFileName() {
+      const versions = uniqueMigrationsByVersion(state && state.migrations ? state.migrations : [])
+        .map((migration) => String(migration.version || ''))
+        .filter((version) => /^[0-9]+$/.test(version));
+      const width = Math.max(3, ...versions.map((version) => version.length));
+      const maxVersion = versions.reduce((max, version) => Math.max(max, Number(version)), 0);
+      return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`;
+    }
+    function parseMigrationFilename(value) {
+      const filename = String(value || '').trim();
+      if (!filename) throw new Error(t('required', t('fileNameLabel')));
+      if (!filename.endsWith('.sql')) throw new Error('migration file name は .sql で終わる必要があります');
+      const stem = filename.slice(0, -4);
+      const separator = stem.indexOf('_');
+      if (separator <= 0 || separator === stem.length - 1) {
+        throw new Error('migration file name は <version>_<name>.sql 形式で入力してください');
+      }
+      const version = stem.slice(0, separator);
+      const name = stem.slice(separator + 1);
+      if (!/^[0-9]+$/.test(version)) throw new Error('migration version はASCII数字のみ使用できます');
+      if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error('migration name は英数字、_、- のみ使用できます');
+      return { version, name };
     }
     async function createDatabaseFile() {
       try {

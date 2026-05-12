@@ -174,6 +174,8 @@
         assert!(INDEX_HTML.contains("'グループ分け': 'Split into groups'"));
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
+        assert!(INDEX_HTML.contains("'Version': 'Version'"));
+        assert!(INDEX_HTML.contains("'File name': 'File name'"));
         assert!(INDEX_HTML.contains("'テンプレート': 'Template'"));
         assert!(INDEX_HTML.contains("'スニペット': 'Snippet'"));
         assert!(INDEX_HTML.contains("'フォーマット': 'Format'"));
@@ -186,6 +188,9 @@
         assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
         assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
         assert!(INDEX_HTML.contains("'New migration': '新規マイグレーション'"));
+        assert!(INDEX_HTML.contains("'Version': 'バージョン'"));
+        assert!(INDEX_HTML.contains("'File name': 'ファイル名'"));
+        assert!(!INDEX_HTML.contains("'バージョン': 'Version'"));
         assert!(INDEX_HTML.contains("'Template': 'テンプレート'"));
         assert!(INDEX_HTML.contains("'Format': 'フォーマット'"));
         assert!(INDEX_HTML.contains("'Clear': 'クリア'"));
@@ -265,7 +270,7 @@
         assert!(INDEX_HTML.contains(r#"id="migrationFileModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
-        assert!(INDEX_HTML.contains(r#"<input id="newMigrationVersion" placeholder="005">"#));
+        assert!(INDEX_HTML.contains(r#"<label class="field"><span class="field-label">File name</span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
         assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>"#));
         assert!(INDEX_HTML.contains(r#"<span class="field-label">テンプレート</span>"#));
         assert!(INDEX_HTML.contains(r#"<input id="newMigrationTemplateSearch" list="newMigrationTemplateOptions" placeholder="テンプレート検索" aria-label="SQL template">"#));
@@ -290,6 +295,8 @@
         assert!(INDEX_HTML.contains("function openMigrationFileModal()"));
         assert!(INDEX_HTML.contains("function closeMigrationFileModal()"));
         assert!(INDEX_HTML.contains("function renderMigrationFileGroupOptions()"));
+        assert!(INDEX_HTML.contains("function nextMigrationFileName()"));
+        assert!(INDEX_HTML.contains("function parseMigrationFilename(value)"));
         assert!(INDEX_HTML.contains("function insertNewMigrationTemplate()"));
         assert!(INDEX_HTML.contains("function formatNewMigrationSql()"));
         assert!(INDEX_HTML.contains("function updateNewMigrationSqlMeta()"));
@@ -301,8 +308,12 @@
         assert!(INDEX_HTML.contains("function confirmDeleteMigrationSnippet()"));
         assert!(INDEX_HTML.contains("const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets'"));
         assert!(INDEX_HTML.contains(": `<option value=\"\">${escapeHtml(t('noSnippets'))}</option>`"));
+        assert!(INDEX_HTML.contains("$('newMigrationFilename').value = nextMigrationFileName()"));
+        assert!(INDEX_HTML.contains("const filenameParts = parseMigrationFilename($('newMigrationFilename').value)"));
+        assert!(INDEX_HTML.contains("return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`"));
         assert!(INDEX_HTML.contains("$('newMigrationGroup').value = names.includes('main') ? 'main' : names[0]"));
-        assert!(!INDEX_HTML.contains("openMigrationFileModal() {\n      renderMigrationFileGroupOptions();\n      $('newMigrationVersion').value = '';\n      $('newMigrationName').value = '';\n      $('newMigrationGroup').value = 'main';"));
+        assert!(!INDEX_HTML.contains("newMigrationVersion"));
+        assert!(!INDEX_HTML.contains("newMigrationName"));
         assert!(INDEX_HTML.contains("$('newMigrationGroupField').hidden = names.length <= 1 && names[0] === 'main'"));
         assert!(INDEX_HTML.contains("$('openMigrationFileModal').addEventListener('click', openMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal)"));
