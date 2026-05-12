@@ -2581,8 +2581,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     <main class="content">
       <header class="topbar">
         <div class="page-title">
-          <h2>実行計画から管理するSQLite fleet</h2>
-          <p>「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。</p>
+          <h2 id="pageHeading">実行計画</h2>
         </div>
         <p id="message" class="message muted">読み込み中...</p>
       </header>
@@ -2906,8 +2905,6 @@ const INDEX_HTML: &str = r#"<!doctype html>
       'ヘルプ': 'Help',
       '主要操作': 'Primary actions',
       '更新': 'Refresh',
-      '実行計画から管理するSQLite fleet': 'SQLite fleet administration by run plan',
-      '「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。': 'Review what will run and where it will run before applying changes across your database fleet.',
       '読み込み中...': 'Loading...',
       '状態サマリー': 'Status summary',
       'DBグループ、個別DB、limitを組み合わせて操作対象を決めます。': 'Choose targets with DB groups, individual DB overrides, and optional limits.',
@@ -3178,6 +3175,28 @@ const INDEX_HTML: &str = r#"<!doctype html>
         table: 'table',
       },
     };
+    const pageTitles = {
+      en: {
+        execute: 'Run plan',
+        groups: 'Group management',
+        databases: 'Database management',
+        migrations: 'Migration management',
+        sql: 'SQL workspace',
+        schema: 'Schema builder',
+        settings: 'Settings / permissions',
+        help: 'Help',
+      },
+      ja: {
+        execute: '実行計画',
+        groups: 'グループ管理',
+        databases: 'DB管理',
+        migrations: 'Migration管理',
+        sql: 'SQL作業',
+        schema: 'Schema作成',
+        settings: '設定/権限',
+        help: 'ヘルプ',
+      },
+    };
 
     function t(key, ...args) {
       const value = (localeText[currentLocale] && localeText[currentLocale][key]) || localeText.en[key] || key;
@@ -3222,6 +3241,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
       currentLocale = locale === 'ja' ? 'ja' : 'en';
       localStorage.setItem('sqlite-fleet-locale', currentLocale);
       translateStaticDom();
+      updatePageHeading(activePage());
       renderSqlTemplates();
       if (state) render();
       else message(currentLocale === 'en' ? staticTranslations['読み込み中...'] : '読み込み中...');
@@ -3243,9 +3263,23 @@ const INDEX_HTML: &str = r#"<!doctype html>
       el.textContent = text;
       el.className = `message ${isError ? 'error' : 'muted'}`;
     }
+    function activePage() {
+      const active = document.querySelector('.page.active[data-page]');
+      return active ? active.dataset.page : 'execute';
+    }
+    function pageFromHash() {
+      const hash = window.location.hash;
+      const link = hash ? document.querySelector(`[data-page-link][href="${CSS.escape(hash)}"]`) : null;
+      return link ? link.dataset.pageLink : 'execute';
+    }
+    function updatePageHeading(page) {
+      const titles = pageTitles[currentLocale] || pageTitles.en;
+      $('pageHeading').textContent = titles[page] || titles.execute;
+    }
     function openPage(page) {
       document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
       document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
+      updatePageHeading(page);
     }
     async function api(path, options = {}) {
       setBusy(true);
@@ -3735,6 +3769,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     document.querySelectorAll('[data-page-link]').forEach((link) => link.addEventListener('click', (event) => {
       event.preventDefault();
       openPage(link.dataset.pageLink);
+      history.replaceState(null, '', link.getAttribute('href'));
     }));
     $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
     $('saveDbGroup').addEventListener('click', saveDbGroup);
@@ -3799,6 +3834,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
       }
     });
     translateStaticDom();
+    openPage(pageFromHash());
     renderSqlTemplates();
     load();
   </script>
@@ -5948,6 +5984,13 @@ mod tests {
         assert!(INDEX_HTML.contains(r#"<main class="content">"#));
         assert!(INDEX_HTML.contains("grid-template-columns:272px minmax(0, 1fr)"));
         assert!(INDEX_HTML.contains(r#"<header class="topbar">"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">実行計画</h2>"#));
+        assert!(!INDEX_HTML.contains("実行計画から管理するSQLite fleet"));
+        assert!(!INDEX_HTML.contains(
+            "「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。"
+        ));
+        assert!(INDEX_HTML.contains("const pageTitles = {"));
+        assert!(INDEX_HTML.contains("function updatePageHeading(page)"));
         assert!(INDEX_HTML
             .contains(r#"<section class="summary page active" data-page="execute" id="summary""#));
         assert!(INDEX_HTML.contains(
@@ -5991,9 +6034,9 @@ mod tests {
         assert!(INDEX_HTML.contains(
             "button.addEventListener('click', () => setLocale(button.dataset.localeButton))"
         ));
-        assert!(
-            INDEX_HTML.contains("translateStaticDom();\n    renderSqlTemplates();\n    load();")
-        );
+        assert!(INDEX_HTML.contains(
+            "translateStaticDom();\n    openPage(pageFromHash());\n    renderSqlTemplates();\n    load();"
+        ));
     }
 
     #[test]
