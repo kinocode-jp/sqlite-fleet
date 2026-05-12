@@ -1,5 +1,6 @@
         createdMigrationFile: 'Migrationファイルを登録しました',
         createdDatabaseFile: 'DBを登録しました',
+        duplicateMigrationGroup: (name) => `Migration Groupは既に存在します: ${name}`,
         migrationGroupsLabel: 'Migrationグループ',
         dbGroupsLabel: 'DBグループ',
         upToDate: '最新',
@@ -372,13 +373,26 @@
     }
     async function saveMigrationGroup() {
       try {
+        const name = requireValue('manageMigrationGroupName', 'Group name');
+        if ((state.migration_groups || []).some((group) => group.name === name)) {
+          throw new Error(t('duplicateMigrationGroup', name));
+        }
         await postAdmin('/api/admin/migration-group', {
-          name: $('manageMigrationGroupName').value,
-          versions: csvList($('manageMigrationGroupVersions').value),
+          name,
+          versions: state.migrations.map((migration) => migration.version),
         });
+        closeMigrationGroupModal();
       } catch (error) {
         message(error.message, true);
       }
+    }
+    function openMigrationGroupModal() {
+      $('manageMigrationGroupName').value = '';
+      $('migrationGroupModal').hidden = false;
+      $('manageMigrationGroupName').focus();
+    }
+    function closeMigrationGroupModal() {
+      $('migrationGroupModal').hidden = true;
     }
     async function saveDbGroup() {
       try {
@@ -654,6 +668,15 @@
       history.replaceState(null, '', link.getAttribute('href'));
     }));
     $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
+    $('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal);
+    $('closeMigrationGroupModal').addEventListener('click', closeMigrationGroupModal);
+    $('cancelMigrationGroup').addEventListener('click', closeMigrationGroupModal);
+    $('migrationGroupModal').addEventListener('click', (event) => {
+      if (event.target === $('migrationGroupModal')) closeMigrationGroupModal();
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !$('migrationGroupModal').hidden) closeMigrationGroupModal();
+    });
     $('saveDbGroup').addEventListener('click', saveDbGroup);
     $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
     $('createMigrationFile').addEventListener('click', createMigrationFile);

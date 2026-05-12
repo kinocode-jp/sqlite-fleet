@@ -189,6 +189,23 @@
     }
 
     #[test]
+    fn html_uses_modal_for_migration_group_creation() {
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModal" class="primary">新規グループ作成</button>"#));
+        assert!(INDEX_HTML.contains(r#"id="migrationGroupModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"role="dialog" aria-modal="true" aria-labelledby="migrationGroupModalTitle""#));
+        assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupName" placeholder="premium">"#));
+        assert!(INDEX_HTML.contains("function openMigrationGroupModal()"));
+        assert!(INDEX_HTML.contains("function closeMigrationGroupModal()"));
+        assert!(INDEX_HTML.contains("$('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal)"));
+        assert!(INDEX_HTML.contains("const name = requireValue('manageMigrationGroupName', 'Group name')"));
+        assert!(INDEX_HTML.contains("(state.migration_groups || []).some((group) => group.name === name)"));
+        assert!(INDEX_HTML.contains("throw new Error(t('duplicateMigrationGroup', name))"));
+        assert!(INDEX_HTML.contains("duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`"));
+        assert!(INDEX_HTML.contains("versions: state.migrations.map((migration) => migration.version)"));
+        assert!(!INDEX_HTML.contains("manageMigrationGroupVersions"));
+    }
+
+    #[test]
     fn html_includes_contextual_tooltips_for_admin_fields() {
         assert!(INDEX_HTML.contains(r#"class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどこへ適用するか"#));

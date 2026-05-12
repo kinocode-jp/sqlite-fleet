@@ -44,6 +44,8 @@
     .panel-heading { display:grid; gap:3px; }
     .panel h2 { margin:0; font-size:16px; line-height:1.3; }
     .panel-description { margin:0; color:var(--muted); font-size:13px; }
+    .section-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+    .section-header h3 { margin:0; font-size:14px; }
     .table-wrap { width:100%; overflow:auto; }
     table { width:100%; border-collapse:collapse; min-width:720px; }
     th, td { padding:11px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
@@ -100,6 +102,13 @@
     .help h3 { margin:0 0 8px; font-size:14px; }
     .help p, .help ul { margin:0; }
     .help ul { padding-left:20px; }
+    .modal-backdrop { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:18px; background:rgba(16,24,32,.48); }
+    .modal-backdrop[hidden] { display:none; }
+    .modal { width:min(460px, 100%); border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:0 20px 60px rgba(16,24,40,.22); overflow:hidden; }
+    .modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:15px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+    .modal-header h2 { margin:0; font-size:16px; }
+    .modal-body { display:grid; gap:14px; padding:16px; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:0 16px 16px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid { grid-template-columns:1fr; } }
     @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help { grid-template-columns:1fr; } .form-grid .wide { grid-column:auto; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
@@ -181,11 +190,9 @@
         </div>
         <div class="topology-grid">
           <section>
-            <h3>Migration Groups</h3>
-            <div class="info-card">
-              <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
-              <label class="field"><span class="field-label">Versions</span><input id="manageMigrationGroupVersions" placeholder="001, 002, 101"></label>
-              <button id="saveMigrationGroup" class="primary">Migration Group保存</button>
+            <div class="section-header">
+              <h3>Migration Groups</h3>
+              <button id="openMigrationGroupModal" class="primary">新規グループ作成</button>
             </div>
             <div id="migrationGroupCards" class="card-list"></div>
           </section>
@@ -200,6 +207,22 @@
           </section>
         </div>
       </section>
+
+      <div id="migrationGroupModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="migrationGroupModalTitle">
+          <div class="modal-header">
+            <h2 id="migrationGroupModalTitle">新規Migrationグループ</h2>
+            <button id="closeMigrationGroupModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelMigrationGroup" type="button">キャンセル</button>
+            <button id="saveMigrationGroup" class="primary">作成</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel page" data-page="db-groups" id="db-groups-panel">
         <div class="panel-header">
@@ -491,6 +514,10 @@
       '対象へ適用': 'Apply to targets',
       'どのmigrationをどのグループとして扱うか、DBごとの割当と合わせて管理します。': 'Manage which migrations belong to each group together with DB assignments.',
       'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
+      '新規グループ作成': 'Create group',
+      '新規Migrationグループ': 'New Migration Group',
+      'キャンセル': 'Cancel',
+      '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
       'DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in the run plan.',
       'Migration Group保存': 'Save Migration Group',
@@ -573,6 +600,10 @@
       'Limit': 'Limit',
       'Resolved target': '解決済み対象',
       'Migration Groups': 'Migrationグループ',
+      'Create group': '新規グループ作成',
+      'New Migration Group': '新規Migrationグループ',
+      'Cancel': 'キャンセル',
+      'Create': '作成',
       'DB Groups': 'DBグループ',
       'Group name': 'グループ名',
       'Versions': 'Versions',
@@ -623,6 +654,7 @@
         savedDatabaseRule: 'DB assignment saved',
         createdMigrationFile: 'Migration file registered',
         createdDatabaseFile: 'DB registered',
+        duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
         migrationGroupsLabel: 'Migration Groups',
         dbGroupsLabel: 'DB Groups',
         upToDate: 'Up to date',
