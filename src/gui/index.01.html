@@ -11,6 +11,8 @@
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'マイグレーションファイル',
         fileNameLabel: 'ファイル名',
+        latestMigrationFilename: (filename) => `最新のファイル名は${filename}です`,
+        noLatestMigrationFilename: 'マイグレーションファイルはまだありません',
         targetDbLabel: '対象DB',
         assignedGroupsLabel: '適用マイグレーショングループ',
         selectorsLabel: 'セレクタ',
@@ -138,6 +140,7 @@
       translateStaticDom();
       updatePageHeading(activePage());
       renderSqlTemplates();
+      renderLatestMigrationFilename();
       if (state) render();
       else message(currentLocale === 'en' ? staticTranslations['読み込み中...'] : '読み込み中...');
     }
@@ -492,6 +495,7 @@
     function openMigrationFileModal() {
       renderMigrationFileGroupOptions();
       renderMigrationSnippets();
+      renderLatestMigrationFilename();
       $('newMigrationFilename').value = nextMigrationFileName();
       $('newMigrationSql').value = '';
       updateNewMigrationSqlMeta();
@@ -543,6 +547,24 @@
       const width = Math.max(3, ...versions.map((version) => version.length));
       const maxVersion = versions.reduce((max, version) => Math.max(max, Number(version)), 0);
       return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`;
+    }
+    function latestMigrationFileName() {
+      const migrations = uniqueMigrationsByVersion(state && state.migrations ? state.migrations : [])
+        .filter((migration) => /^[0-9]+$/.test(String(migration.version || '')));
+      if (!migrations.length) return null;
+      const latest = migrations.reduce((current, migration) => {
+        const currentNumber = Number(current.version);
+        const nextNumber = Number(migration.version);
+        if (nextNumber > currentNumber) return migration;
+        if (nextNumber === currentNumber && String(migration.version).length > String(current.version).length) return migration;
+        return current;
+      });
+      return `${latest.version}_${latest.name}.sql`;
+    }
+    function renderLatestMigrationFilename() {
+      const el = $('newMigrationLatestFilename');
+      const latest = latestMigrationFileName();
+      el.textContent = latest ? t('latestMigrationFilename', latest) : t('noLatestMigrationFilename');
     }
     function parseMigrationFilename(value) {
       const filename = String(value || '').trim();
