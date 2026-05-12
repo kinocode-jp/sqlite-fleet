@@ -2631,11 +2631,11 @@ const INDEX_HTML: &str = r#"<!doctype html>
             <div id="migrationGroupCards" class="card-list"></div>
           </section>
           <section>
-            <h3>DB -> Migration Groups</h3>
+            <h3>DBごとの適用グループ</h3>
             <div class="info-card">
-              <label class="field"><span class="field-label">DB selector</span><input id="manageRuleSelector" placeholder="tenant-a"></label>
-              <label class="field"><span class="field-label">Migration groups</span><input id="manageRuleGroups" placeholder="core, premium"></label>
-              <button id="saveDatabaseRule" class="primary">割当保存</button>
+              <label class="field"><span class="field-label">DB selector <span class="tool-tip" tabindex="0" data-tip="DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。">?</span></span><input id="manageRuleSelector" placeholder="tenant-a"></label>
+              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするMigration Groupです。複数指定できます。">?</span></span><input id="manageRuleGroups" placeholder="core, premium"></label>
+              <button id="saveDatabaseRule" class="primary">適用グループ保存</button>
             </div>
             <div id="databaseRules" class="card-list"></div>
           </section>
@@ -2936,7 +2936,11 @@ const INDEX_HTML: &str = r#"<!doctype html>
       'DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in the run plan.',
       'Migration Group保存': 'Save Migration Group',
       'DB Group保存': 'Save DB Group',
-      '割当保存': 'Save assignment',
+      'DBごとの適用グループ': 'Per-DB Migration Groups',
+      'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
+      'Applied Migration Groups': 'Applied Migration Groups',
+      'このDBで適用対象にするMigration Groupです。複数指定できます。': 'Migration Groups that apply to this DB. Multiple groups are allowed.',
+      '適用グループ保存': 'Save applied groups',
       'DBマトリクス': 'Database matrix',
       'DBごとの状態、対象Migration Group、未適用内容を比較します。': 'Compare status, assigned Migration Groups, and pending migrations per database.',
       'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
@@ -3011,12 +3015,12 @@ const INDEX_HTML: &str = r#"<!doctype html>
       'Resolved target': '解決済み対象',
       'Migration Groups': 'Migrationグループ',
       'DB Groups': 'DBグループ',
-      'DB -> Migration Groups': 'DB -> Migrationグループ',
       'Group name': 'グループ名',
       'Versions': 'Versions',
       'DB selectors': 'DBセレクタ',
       'DB selector': 'DBセレクタ',
       'Migration groups': 'Migrationグループ',
+      'Applied Migration Groups': '適用Migrationグループ',
       'New DB path': '新規DBパス',
       'Add to DB group': 'DBグループへ追加',
       'Version': 'Version',
@@ -3050,7 +3054,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
         noMigrations: 'No migrations',
         noMigrationGroups: 'No migration groups',
         noDbGroups: 'No DB groups',
-        noRules: 'No explicit rules. Unassigned DBs resolve automatically in core/default/all-groups order.',
+        noRules: 'No per-DB assignments. Unassigned DBs resolve automatically in core/default/all-groups order.',
         noTables: 'No tables',
         selectDbForSchema: 'Select a DB and load schema',
         unset: 'Unset',
@@ -3066,6 +3070,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
         pendingDb: 'Pending DB',
         migrationsLabel: 'Migrations',
         targetDbLabel: 'Target DB',
+        assignedGroupsLabel: 'Applied Migration Groups',
         selectorsLabel: 'Selectors',
         previewLabel: 'Preview',
         allowed: 'allowed',
@@ -3126,7 +3131,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
         noMigrations: 'migration はありません',
         noMigrationGroups: 'migration group はありません',
         noDbGroups: 'DB group はありません',
-        noRules: '明示ルールなし。未指定DBは core/default/全グループの順で自動解決されます。',
+        noRules: 'DBごとの指定はありません。未指定DBは core/default/全グループの順で自動解決されます。',
         noTables: 'テーブルはありません',
         selectDbForSchema: 'DBを選択してSchemaを読み込んでください',
         unset: '未設定',
@@ -3142,6 +3147,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
         pendingDb: '未適用DB',
         migrationsLabel: 'Migrations',
         targetDbLabel: '対象DB',
+        assignedGroupsLabel: '適用Migrationグループ',
         selectorsLabel: 'セレクタ',
         previewLabel: 'プレビュー',
         allowed: '許可',
@@ -3394,7 +3400,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
 
       $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
         <strong>${escapeHtml(rule.selector)}</strong>
-        <div>${chips(rule.migration_groups)}</div>
+        <div><span class="label">${escapeHtml(t('assignedGroupsLabel'))}</span><div>${chips(rule.migration_groups)}</div></div>
       </article>`).join('') || `<p class="muted">${escapeHtml(t('noRules'))}</p>`;
 
       renderSettings();
