@@ -1,0 +1,328 @@
+#[derive(Serialize)]
+struct StateData {
+    project: Option<String>,
+    status: sqlite_fleet::StatusReport,
+    databases: Vec<sqlite_fleet::Database>,
+    migrations: Vec<sqlite_fleet::Migration>,
+    migration_groups: Vec<MigrationGroupData>,
+    db_groups: Vec<DbGroupData>,
+    database_migration_rules: Vec<DatabaseMigrationRuleData>,
+    gui_permissions: GuiPermissionData,
+    settings: SettingsData,
+}
+
+#[derive(Serialize)]
+struct MigrationGroupData {
+    name: String,
+    migrations: Vec<sqlite_fleet::MigrationSummary>,
+    databases: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DbGroupData {
+    name: String,
+    selectors: Vec<String>,
+    database_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DatabaseMigrationRuleData {
+    selector: String,
+    migration_groups: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct GuiPermissionData {
+    allow_check: bool,
+    allow_migrate: bool,
+    allow_backup: bool,
+    allow_restore: bool,
+    allow_sql_apply: bool,
+    allow_migration_edit: bool,
+}
+
+impl GuiPermissionData {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            allow_check: config.gui.allow_check,
+            allow_migrate: config.gui.allow_migrate,
+            allow_backup: config.gui.allow_backup,
+            allow_restore: config.gui.allow_restore,
+            allow_sql_apply: config.gui.allow_sql_apply,
+            allow_migration_edit: config.gui.allow_migration_edit,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SettingsData {
+    discovery: String,
+    migrations_dir: String,
+    migrations_table: String,
+    backup_dir: String,
+    backup_before_migrate: bool,
+    backup_keep_last: usize,
+    audit_path: Option<String>,
+    report_path: Option<String>,
+    report_format: String,
+    parallel: usize,
+    lock_timeout_ms: u64,
+    continue_on_error: bool,
+}
+
+impl SettingsData {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            discovery: config.databases.discovery.clone(),
+            migrations_dir: config.migrations.dir.clone(),
+            migrations_table: config.migrations.table.clone(),
+            backup_dir: config.backup.dir.clone(),
+            backup_before_migrate: config.backup.before_migrate,
+            backup_keep_last: config.backup.keep_last,
+            audit_path: config.audit.path.clone(),
+            report_path: config.report.path.clone(),
+            report_format: config.report.format.clone(),
+            parallel: config.execution.parallel,
+            lock_timeout_ms: config.execution.lock_timeout_ms,
+            continue_on_error: config.execution.continue_on_error,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SchemaData {
+    database: sqlite_fleet::Database,
+    tables: Vec<TableInfo>,
+    objects: Vec<SchemaObject>,
+}
+
+#[derive(Serialize)]
+struct TableInfo {
+    #[serde(rename = "type")]
+    object_type: String,
+    name: String,
+    columns: Vec<ColumnInfo>,
+}
+
+struct SchemaRelation {
+    object_type: String,
+    name: String,
+}
+
+#[derive(Serialize)]
+struct SchemaObject {
+    #[serde(rename = "type")]
+    object_type: String,
+    name: String,
+    table_name: String,
+    sql: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ColumnInfo {
+    cid: i64,
+    name: String,
+    #[serde(rename = "type")]
+    column_type: String,
+    not_null: bool,
+    default_value: Option<String>,
+    primary_key: bool,
+    hidden: i64,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SqlRequest {
+    sql: String,
+}
+
+#[derive(Serialize)]
+struct SqlResult {
+    database: String,
+    dry_run: bool,
+    changed: u64,
+    message: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationGroupRequest {
+    name: String,
+    versions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DbGroupRequest {
+    name: String,
+    selectors: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatabaseMigrationGroupRequest {
+    selector: String,
+    groups: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationFileRequest {
+    version: String,
+    name: String,
+    group: Option<String>,
+    sql: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatabaseFileRequest {
+    path: String,
+    db_group: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AdminResult {
+    message: String,
+}
+
+impl AdminResult {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+fn locked_config(state: &ServerState) -> Result<Config> {
+    state
+        .config
+        .lock()
+        .map(|config| config.clone())
+        .map_err(|_| anyhow::anyhow!("GUI設定状態が壊れています"))
+}
+
+fn persist_config(state: &ServerState, config: Config) -> Result<()> {
+    config.validate()?;
+    let text = toml::to_string_pretty(&config).context("設定をTOMLへ変換できません")?;
+    let tmp = state.config_path.with_extension("toml.tmp");
+    std::fs::write(&tmp, text)
+        .with_context(|| format!("設定ファイルを書き込めません: {}", tmp.display()))?;
+    std::fs::rename(&tmp, &state.config_path).with_context(|| {
+        format!(
+            "設定ファイルを置き換えられません: {}",
+            state.config_path.display()
+        )
+    })?;
+    *state
+        .config
+        .lock()
+        .map_err(|_| anyhow::anyhow!("GUI設定状態が壊れています"))? = config;
+    Ok(())
+}
+
+fn clean_name(value: &str, label: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("{label} は空にできません");
+    }
+    if value.chars().any(char::is_whitespace) {
+        bail!("{label} に空白は使用できません");
+    }
+    Ok(value.to_string())
+}
+
+fn clean_list(values: Vec<String>, label: &str) -> Result<Vec<String>> {
+    if values.is_empty() {
+        bail!("{label} は1件以上必要です");
+    }
+    let mut cleaned = Vec::new();
+    for value in values {
+        let value = clean_name(&value, label)?;
+        if !cleaned.contains(&value) {
+            cleaned.push(value);
+        }
+    }
+    Ok(cleaned)
+}
+
+fn clean_version(value: &str) -> Result<String> {
+    let value = clean_name(value, "version")?;
+    if !value.chars().all(|ch| ch.is_ascii_digit()) {
+        bail!("version はASCII数字だけ使用できます: {value}");
+    }
+    Ok(value)
+}
+
+fn clean_file_stem(value: &str, label: &str) -> Result<String> {
+    let value = clean_name(value, label)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        bail!("{label} は英数字、_、- だけ使用できます: {value}");
+    }
+    Ok(value)
+}
+
+fn clean_relative_path(value: &str, label: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("{label} は空にできません");
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        bail!("{label} は相対パスで指定してください");
+    }
+    if path
+        .components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        bail!("{label} に .. は使用できません");
+    }
+    Ok(value.to_string())
+}
+
+fn resolve_existing_or_creatable_dir(config: &Config, value: &str) -> Result<PathBuf> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("directory は空にできません");
+    }
+    let path = config.resolve_path(value);
+    validate_path_stays_in_base(config, &path, "directory")?;
+    Ok(path)
+}
+
+fn validate_path_stays_in_base(config: &Config, path: &Path, label: &str) -> Result<()> {
+    let base = std::fs::canonicalize(&config.base_dir)
+        .with_context(|| format!("base_dir を解決できません: {}", config.base_dir.display()))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("{label} の親ディレクトリが必要です"))?;
+    let canonical_parent = if parent.exists() {
+        std::fs::canonicalize(parent).with_context(|| {
+            format!(
+                "{label} の親ディレクトリを解決できません: {}",
+                parent.display()
+            )
+        })?
+    } else {
+        let mut existing = parent;
+        while !existing.exists() {
+            existing = existing
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("{label} の親ディレクトリを解決できません"))?;
+        }
+        std::fs::canonicalize(existing).with_context(|| {
+            format!(
+                "{label} の既存親ディレクトリを解決できません: {}",
+                existing.display()
+            )
+        })?
+    };
+    if !canonical_parent.starts_with(&base) {
+        bail!(
+            "{label} は設定ディレクトリ外を指せません: {}",
+            path.display()
+        );
+    }
+    Ok(())
+}

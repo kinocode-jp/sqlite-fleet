@@ -1,0 +1,700 @@
+        createdMigrationFile: 'Migrationファイルを登録しました',
+        createdDatabaseFile: 'DBを登録しました',
+        migrationGroupsLabel: 'Migrationグループ',
+        dbGroupsLabel: 'DBグループ',
+        upToDate: '最新',
+        pendingDb: '未適用DB',
+        migrationsLabel: 'Migrations',
+        targetDbLabel: '対象DB',
+        assignedGroupsLabel: '適用Migrationグループ',
+        selectorsLabel: 'セレクタ',
+        previewLabel: 'プレビュー',
+        allowed: '許可',
+        disabled: '無効',
+        lockTimeout: 'lock timeout',
+        continueOnError: 'エラー時に続行',
+        backupBeforeMigrate: 'migrate前backup',
+        backupKeepLast: 'backup保持数',
+        column: 'カラム',
+        type: '型',
+        notNull: 'NOT NULL',
+        defaultValue: 'デフォルト',
+        pk: 'PK',
+        hidden: 'Hidden',
+        objectDefinitions: 'Object定義',
+        name: '名前',
+        tableHeader: 'Table',
+        unknownMigration: '不明なmigration',
+        chooseDb: 'DBを選択してください',
+        schemaLoaded: (database) => `schema 読み込み完了: ${database}`,
+        enterSql: 'SQLを入力してください',
+        sqlNul: 'SQLにNUL文字は指定できません',
+        sqlTooLarge: 'SQLが大きすぎます。2MiB以下にしてください',
+        sqlRequestTooLarge: 'SQLリクエストが大きすぎます。引用符や改行を減らすかSQLを分割してください',
+        confirmSqlApply: '選択DBへSQLを適用します。続行しますか？',
+        sqlDone: (mode, changed) => `${mode} 完了: changed=${changed}`,
+        chooseTemplate: 'SQLテンプレートを選択してください',
+        templateInserted: (name) => `${name} テンプレートを挿入しました。内容を確認・編集してください`,
+        enterSqlToSave: '保存するSQLを入力してください',
+        sqlFileSaved: (filename) => `SQLファイルを保存しました: ${filename}`,
+        sqlGenerated: 'SQLを生成しました。dry-run後に適用してください',
+        required: (label) => `${label} を入力してください`,
+        allDbTarget: '全DB',
+        confirmMigrate: (target) => `${target} へmigrationを適用します。続行しますか？`,
+        migrateDone: (mode, processed, failed) => `${mode} 完了: processed=${processed}, failed=${failed}`,
+        checkDone: (ok, failed) => `check 完了: ok=${ok}, failed=${failed}`,
+        confirmBackup: (target) => `${target} のbackupを作成します。続行しますか？`,
+        backupDone: (success, failed) => `backup 完了: success=${success}, failed=${failed}`,
+        fileTooLarge: 'SQLファイルが大きすぎます。2MiB以下にしてください',
+        fileUtf8: (error) => `SQLファイルをUTF-8として読み込めません: ${error}`,
+        fileNul: 'SQLファイルにNUL文字は指定できません',
+        fileLoaded: (name) => `SQLファイルを読み込みました: ${name}`,
+        apply: '適用',
+        yes: 'yes',
+        no: 'no',
+        table: 'table',
+      },
+    };
+    const pageTitles = {
+      en: {
+        execute: 'Run plan',
+        'migration-groups': 'Migration Groups',
+        'db-groups': 'DB Groups',
+        databases: 'Database management',
+        migrations: 'Migration management',
+        sql: 'SQL workspace',
+        schema: 'Schema builder',
+        settings: 'Settings / permissions',
+        help: 'Help',
+      },
+      ja: {
+        execute: '実行計画',
+        'migration-groups': 'Migrationグループ',
+        'db-groups': 'DBグループ',
+        databases: 'DB管理',
+        migrations: 'Migration管理',
+        sql: 'SQL作業',
+        schema: 'Schema作成',
+        settings: '設定/権限',
+        help: 'ヘルプ',
+      },
+    };
+
+    function t(key, ...args) {
+      const value = (localeText[currentLocale] && localeText[currentLocale][key]) || localeText.en[key] || key;
+      return typeof value === 'function' ? value(...args) : value;
+    }
+    function translateStaticDom() {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+          return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+      });
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach((node) => {
+        if (!textNodeSources.has(node)) textNodeSources.set(node, node.nodeValue);
+        const original = textNodeSources.get(node);
+        const trimmed = original.trim();
+        const translated = currentLocale === 'en' ? staticTranslations[trimmed] : staticJapaneseTranslations[trimmed] || trimmed;
+        if (!translated) return;
+        node.nodeValue = original.replace(trimmed, translated);
+      });
+      document.querySelectorAll('[data-tip], [placeholder], [aria-label]').forEach((el) => {
+        ['data-tip', 'placeholder', 'aria-label'].forEach((attr) => {
+          if (!el.hasAttribute(attr)) return;
+          const sourceAttr = `data-l10n-${attr}`;
+          if (!el.hasAttribute(sourceAttr)) el.setAttribute(sourceAttr, el.getAttribute(attr));
+          const original = el.getAttribute(sourceAttr);
+          const translated = currentLocale === 'en' ? staticTranslations[original] : staticJapaneseTranslations[original] || original;
+          if (translated) el.setAttribute(attr, translated);
+        });
+      });
+      document.documentElement.lang = currentLocale;
+      document.querySelectorAll('[data-locale-button]').forEach((button) => {
+        const active = button.dataset.localeButton === currentLocale;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    }
+    function setLocale(locale) {
+      currentLocale = locale === 'ja' ? 'ja' : 'en';
+      localStorage.setItem('sqlite-fleet-locale', currentLocale);
+      translateStaticDom();
+      updatePageHeading(activePage());
+      renderSqlTemplates();
+      if (state) render();
+      else message(currentLocale === 'en' ? staticTranslations['読み込み中...'] : '読み込み中...');
+    }
+
+    function setBusy(value) {
+      activeRequests = value ? activeRequests + 1 : Math.max(0, activeRequests - 1);
+      syncControlState();
+    }
+    function syncControlState() {
+      const disabled = activeRequests > 0;
+      document.querySelectorAll('button, input, select, textarea').forEach((control) => control.disabled = disabled);
+      if (!disabled && state && state.status && state.status.plans.length === 0) {
+        $('sqlDatabase').disabled = true;
+      }
+    }
+    function message(text, isError = false) {
+      const el = $('message');
+      el.textContent = text;
+      el.className = `message ${isError ? 'error' : 'muted'}`;
+    }
+    function activePage() {
+      const active = document.querySelector('.page.active[data-page]');
+      return active ? active.dataset.page : 'execute';
+    }
+    function pageFromHash() {
+      const hash = window.location.hash;
+      const link = hash ? document.querySelector(`[data-page-link][href="${CSS.escape(hash)}"]`) : null;
+      return link ? link.dataset.pageLink : 'execute';
+    }
+    function updatePageHeading(page) {
+      const titles = pageTitles[currentLocale] || pageTitles.en;
+      $('pageHeading').textContent = titles[page] || titles.execute;
+    }
+    function openPage(page) {
+      document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
+      document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
+      updatePageHeading(page);
+    }
+    async function api(path, options = {}) {
+      setBusy(true);
+      try {
+        const { headers: optionHeaders = {}, ...fetchOptions } = options;
+        const headers = Object.assign({}, optionHeaders);
+        headers['X-SQLite-Fleet-Token'] = apiToken;
+        const response = await fetch(path, Object.assign({}, fetchOptions, { headers }));
+        const contentType = response.headers.get('content-type') || '';
+        const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
+        if (mediaType !== 'application/json') {
+          throw new Error(`GUI API returned HTTP ${response.status}`);
+        }
+        const text = await response.text();
+        let payload;
+        try {
+          payload = JSON.parse(text);
+        } catch (_error) {
+          throw new Error('GUI API response is not valid JSON');
+        }
+        if (!payload || typeof payload.ok !== 'boolean') {
+          throw new Error('GUI API response envelope is invalid');
+        }
+        if (!payload.ok) throw new Error(payload.error || 'request failed');
+        return payload.data;
+      } finally {
+        setBusy(false);
+      }
+    }
+    async function load(options = {}) {
+      const showLoadedMessage = options.showLoadedMessage !== false;
+      try {
+        state = await api('/api/state');
+        render();
+        if (showLoadedMessage) message(t('loaded'));
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    function render() {
+      const project = state.project || 'sqlite-fleet';
+      $('title').textContent = project;
+      const s = state.status;
+      renderDatabaseSelectors(s.plans);
+      renderTargetSelectors(s.plans);
+      $('summary').innerHTML = [
+        [t('dbCount'), s.database_count],
+        [t('migrationGroupsLabel'), state.migration_groups.length],
+        [t('dbGroupsLabel'), state.db_groups.length],
+        [t('upToDate'), s.up_to_date],
+        [t('pendingDb'), s.pending],
+        [t('failed'), s.failed],
+        [t('corruptMissing'), s.corrupt + s.missing],
+      ].map(([label, value]) => `<div class="metric"><span class="label">${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join('');
+
+      $('databases').innerHTML = s.plans.map((plan) => {
+        const pending = plan.pending.length;
+        const status = plan.error ? `<span class="pill bad">error</span>` :
+          plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
+          pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
+        const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
+        return `<tr>
+          <td><code>${escapeHtml(plan.database.id)}</code></td>
+          <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
+          <td>${chips(plan.migration_groups)}</td>
+          <td>${escapeHtml(plan.applied_count)}</td>
+          <td>${pending ? escapeHtml(plan.pending.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+          <td><code>${escapeHtml(plan.database.path)}</code></td>
+          <td class="actions">
+            <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
+            <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
+            <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">${escapeHtml(t('apply'))}</button>
+          </td>
+        </tr>`;
+      }).join('');
+
+      $('migrations').innerHTML = state.migrations.map((migration) => `<tr>
+        <td><code>${escapeHtml(migration.version)}</code></td>
+        <td>${escapeHtml(migration.name)}</td>
+        <td>${chips([migration.group])}</td>
+        <td><code>${escapeHtml(migration.checksum)}</code></td>
+      </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+
+      $('migrationGroupCards').innerHTML = state.migration_groups.map((group) => `<article class="info-card">
+        <strong>${escapeHtml(group.name)}</strong>
+        <div><span class="label">${escapeHtml(t('migrationsLabel'))}</span><div>${group.migrations.length ? escapeHtml(group.migrations.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</div></div>
+        <div><span class="label">${escapeHtml(t('targetDbLabel'))}</span><div>${chips(group.databases)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
+
+      $('dbGroupCards').innerHTML = state.db_groups.map((group) => `<article class="info-card">
+        <strong>${escapeHtml(group.name)}</strong>
+        <div><span class="label">${escapeHtml(t('selectorsLabel'))}</span><div>${chips(group.selectors)}</div></div>
+        <div><span class="label">${escapeHtml(t('previewLabel'))}</span><div>${chips(group.database_ids)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noDbGroups'))}</p>`;
+
+      $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
+        <strong>${escapeHtml(rule.selector)}</strong>
+        <div><span class="label">${escapeHtml(t('assignedGroupsLabel'))}</span><div>${chips(rule.migration_groups)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noRules'))}</p>`;
+
+      renderSettings();
+      updateTargetPreview();
+    }
+    function renderDatabaseSelectors(plans) {
+      const current = $('sqlDatabase').value;
+      if (!plans.length) {
+        $('sqlDatabase').innerHTML = `<option value="">${escapeHtml(t('noDb'))}</option>`;
+        $('sqlDatabase').disabled = true;
+        clearSchema();
+        return;
+      }
+      $('sqlDatabase').disabled = activeRequests > 0;
+      $('sqlDatabase').innerHTML = plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('');
+      if (current && plans.some((plan) => plan.database.id === current)) {
+        $('sqlDatabase').value = current;
+      } else if (current) {
+        clearSchema();
+      }
+      const selected = $('sqlDatabase').value;
+      if (schemaState && schemaState.database && schemaState.database.id !== selected) {
+        clearSchema();
+      }
+    }
+    function renderTargetSelectors(plans) {
+      const currentGroup = $('targetGroup').value;
+      const currentDatabase = $('targetDatabase').value;
+      $('targetGroup').innerHTML = `<option value="">${escapeHtml(t('allDb'))}</option>` + state.db_groups.map((group) => `<option value="${escapeHtml(group.name)}">${escapeHtml(group.name)}</option>`).join('');
+      $('targetDatabase').innerHTML = `<option value="">${escapeHtml(t('noSelection'))}</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('');
+      if (currentGroup && state.db_groups.some((group) => group.name === currentGroup)) $('targetGroup').value = currentGroup;
+      if (currentDatabase && plans.some((plan) => plan.database.id === currentDatabase)) $('targetDatabase').value = currentDatabase;
+    }
+    function renderSettings() {
+      const permissions = state.gui_permissions;
+      $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `<article class="info-card"><strong>${escapeHtml(key)}</strong><span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span></article>`).join('');
+      const settings = state.settings;
+      $('runtimeSettings').innerHTML = keyItems([
+        ['discovery', settings.discovery],
+        ['parallel', settings.parallel],
+        [t('lockTimeout'), `${settings.lock_timeout_ms} ms`],
+        [t('continueOnError'), settings.continue_on_error ? 'true' : 'false'],
+        [t('backupBeforeMigrate'), settings.backup_before_migrate ? 'true' : 'false'],
+        [t('backupKeepLast'), settings.backup_keep_last],
+      ]);
+      $('pathSettings').innerHTML = keyItems([
+        ['migrations.dir', settings.migrations_dir],
+        ['migrations.table', settings.migrations_table],
+        ['backup.dir', settings.backup_dir],
+        ['report', settings.report_path || `(${settings.report_format})`],
+        ['audit.path', settings.audit_path || t('unset')],
+      ]);
+    }
+    function keyItems(entries) {
+      return entries.map(([key, value]) => `<div class="key-item"><span>${escapeHtml(key)}</span><code>${escapeHtml(value)}</code></div>`).join('');
+    }
+    function chips(values) {
+      const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
+      return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function selectedTargetQuery() {
+      const params = new URLSearchParams();
+      const group = $('targetGroup').value;
+      const database = $('targetDatabase').value;
+      const limit = $('targetLimit').value.trim();
+      if (group) params.set('group', group);
+      if (database) params.set('database', database);
+      if (limit) params.set('limit', limit);
+      return params;
+    }
+    function resolveTargetPlans(group, database, limit) {
+      let plans = state && state.status ? state.status.plans.slice() : [];
+      if (group) {
+        const dbGroup = state.db_groups.find((item) => item.name === group);
+        const databaseIds = dbGroup ? dbGroup.database_ids : [];
+        const planById = new Map(plans.map((plan) => [plan.database.id, plan]));
+        plans = databaseIds.map((id) => planById.get(id)).filter(Boolean);
+      }
+      if (database) plans = plans.filter((plan) => plan.database.id === database);
+      const parsedLimit = Number.parseInt(limit, 10);
+      if (Number.isInteger(parsedLimit) && parsedLimit > 0) plans = plans.slice(0, parsedLimit);
+      return plans;
+    }
+    function updateTargetPreview() {
+      if (!state) return;
+      const plans = resolveTargetPlans($('targetGroup').value, $('targetDatabase').value, $('targetLimit').value.trim());
+      $('targetPreview').innerHTML = plans.length ? chips(plans.map((plan) => plan.database.id)) : `<span class="bad">${escapeHtml(t('noTargetDb'))}</span>`;
+    }
+    function csvList(value) {
+      return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    function adminSuccessMessage(path, fallback) {
+      const messages = {
+        '/api/admin/migration-group': 'savedMigrationGroup',
+        '/api/admin/db-group': 'savedDbGroup',
+        '/api/admin/database-migration-group': 'savedDatabaseRule',
+        '/api/admin/migration-file': 'createdMigrationFile',
+        '/api/admin/database-file': 'createdDatabaseFile',
+      };
+      return messages[path] ? t(messages[path]) : (fallback || t('saved'));
+    }
+    async function postAdmin(path, payload) {
+      const result = await api(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      message(adminSuccessMessage(path, result.message));
+      await load({ showLoadedMessage: false });
+    }
+    async function saveMigrationGroup() {
+      try {
+        await postAdmin('/api/admin/migration-group', {
+          name: $('manageMigrationGroupName').value,
+          versions: csvList($('manageMigrationGroupVersions').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveDbGroup() {
+      try {
+        await postAdmin('/api/admin/db-group', {
+          name: $('manageDbGroupName').value,
+          selectors: csvList($('manageDbGroupSelectors').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveDatabaseRule() {
+      try {
+        await postAdmin('/api/admin/database-migration-group', {
+          selector: $('manageRuleSelector').value,
+          groups: csvList($('manageRuleGroups').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function createMigrationFile() {
+      try {
+        await postAdmin('/api/admin/migration-file', {
+          version: $('newMigrationVersion').value,
+          name: $('newMigrationName').value,
+          group: $('newMigrationGroup').value,
+          sql: $('newMigrationSql').value,
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function createDatabaseFile() {
+      try {
+        await postAdmin('/api/admin/database-file', {
+          path: $('newDatabasePath').value,
+          db_group: $('newDatabaseGroup').value,
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    function renderSqlTemplates() {
+      $('sqlTemplate').innerHTML = Object.entries(sqlTemplates)
+        .map(([key, template]) => `<option value="${escapeHtml(key)}">${escapeHtml(template[0])}</option>`)
+        .join('');
+    }
+    async function loadSchema(options = {}) {
+      const showLoadedMessage = options.showLoadedMessage !== false;
+      const database = $('sqlDatabase').value;
+      if (!database) {
+        message(t('chooseDb'), true);
+        return;
+      }
+      try {
+        const nextSchemaState = await api(`/api/schema?database=${encodeURIComponent(database)}`);
+        if ($('sqlDatabase').value !== database) return;
+        if (!nextSchemaState || !nextSchemaState.database || nextSchemaState.database.id !== database) {
+          clearSchema();
+          throw new Error('schema response database does not match selected DB');
+        }
+        schemaState = nextSchemaState;
+        renderSchema();
+        if (showLoadedMessage) message(t('schemaLoaded', database));
+      } catch (error) {
+        if ($('sqlDatabase').value === database) clearSchema();
+        message(error.message, true);
+      }
+    }
+    function renderSchema() {
+      const tables = schemaState && schemaState.tables ? schemaState.tables : [];
+      const objects = schemaState && schemaState.objects ? schemaState.objects : [];
+      const tableHtml = tables.map((table) => `<section class="schema-table">
+        <h3><code>${escapeHtml(table.type || t('table'))}</code> ${escapeHtml(table.name)}</h3>
+        <table>
+          <thead><tr><th>${escapeHtml(t('column'))}</th><th>${escapeHtml(t('type'))}</th><th>${escapeHtml(t('notNull'))}</th><th>${escapeHtml(t('defaultValue'))}</th><th>${escapeHtml(t('pk'))}</th><th>${escapeHtml(t('hidden'))}</th></tr></thead>
+          <tbody>${table.columns.map((column) => `<tr>
+            <td><code>${escapeHtml(column.name)}</code></td>
+            <td><code>${escapeHtml(column.type || '')}</code></td>
+            <td>${column.not_null ? escapeHtml(t('yes')) : escapeHtml(t('no'))}</td>
+            <td><code>${escapeHtml(column.default_value || '')}</code></td>
+            <td>${column.primary_key ? escapeHtml(t('yes')) : escapeHtml(t('no'))}</td>
+            <td>${column.hidden ? escapeHtml(hiddenColumnLabel(column.hidden)) : escapeHtml(t('no'))}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </section>`).join('') || `<p class="muted">${escapeHtml(t('noTables'))}</p>`;
+      const objectHtml = objects.length ? `<section class="schema-table">
+        <h3>${escapeHtml(t('objectDefinitions'))}</h3>
+        <table>
+          <thead><tr><th>${escapeHtml(t('type'))}</th><th>${escapeHtml(t('name'))}</th><th>${escapeHtml(t('tableHeader'))}</th><th>SQL</th></tr></thead>
+          <tbody>${objects.map((object) => `<tr>
+            <td><code>${escapeHtml(object.type)}</code></td>
+            <td><code>${escapeHtml(object.name)}</code></td>
+            <td><code>${escapeHtml(object.table_name || '')}</code></td>
+            <td><pre class="schema-sql"><code>${escapeHtml(object.sql || '')}</code></pre></td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </section>` : '';
+      $('schema').innerHTML = `${tableHtml}${objectHtml}`;
+    }
+    function clearSchema() {
+      schemaState = null;
+      $('schema').innerHTML = `<p class="muted">${escapeHtml(t('selectDbForSchema'))}</p>`;
+    }
+    function hiddenColumnLabel(hidden) {
+      if (hidden === 1) return 'hidden';
+      if (hidden === 2) return 'generated virtual';
+      if (hidden === 3) return 'generated stored';
+      return String(hidden);
+    }
+    async function runSql(dryRun) {
+      const database = $('sqlDatabase').value;
+      const sql = $('sqlInput').value;
+      if (!database) {
+        message(t('chooseDb'), true);
+        return;
+      }
+      if (!sql.trim()) {
+        message(t('enterSql'), true);
+        return;
+      }
+      if (sql.includes('\u0000')) {
+        message(t('sqlNul'), true);
+        return;
+      }
+      if (new TextEncoder().encode(sql).length > maxSqlBytes) {
+        message(t('sqlTooLarge'), true);
+        return;
+      }
+      const sqlBody = JSON.stringify({ sql });
+      if (new TextEncoder().encode(sqlBody).length > maxSqlRequestBytes) {
+        message(t('sqlRequestTooLarge'), true);
+        return;
+      }
+      if (!dryRun && !confirm(t('confirmSqlApply'))) return;
+      try {
+        const result = await api(`/api/sql?dry_run=${dryRun}&database=${encodeURIComponent(database)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: sqlBody,
+        });
+        message(t('sqlDone', dryRun ? 'SQL dry-run' : 'SQL apply', result.changed));
+        await refreshAfterSqlRun(database, dryRun);
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function refreshAfterSqlRun(database, dryRun) {
+      if (dryRun) return;
+      await load({ showLoadedMessage: false });
+      if ($('sqlDatabase').value === database) {
+        await loadSchema({ showLoadedMessage: false });
+      }
+    }
+    function quoteIdent(name) {
+      return `"${String(name).replace(/"/g, '""')}"`;
+    }
+    function setSql(sql) {
+      $('sqlInput').value = sql;
+      $('sqlInput').focus();
+    }
+    function insertSelectedTemplate() {
+      const template = sqlTemplates[$('sqlTemplate').value];
+      if (!template) {
+        message(t('chooseTemplate'), true);
+        return;
+      }
+      setSql(template[1]);
+      message(t('templateInserted', template[0]));
+    }
+    function downloadSqlFile() {
+      const sql = $('sqlInput').value;
+      if (!sql.trim()) {
+        message(t('enterSqlToSave'), true);
+        return;
+      }
+      const filename = sanitizeSqlFileName($('sqlFileName').value);
+      const blob = new Blob([sql], { type: 'text/sql;charset=utf-8' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      message(t('sqlFileSaved', filename));
+    }
+    function sanitizeSqlFileName(value) {
+      const fallback = 'sqlite-fleet-change.sql';
+      const sanitized = String(value || '')
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, '_')
+        .replace(/^\.+$/, '')
+        .replace(/^_+$/, '');
+      const name = sanitized || fallback;
+      return name.toLowerCase().endsWith('.sql') ? name : `${name}.sql`;
+    }
+    function requireValue(id, label) {
+      const value = $(id).value.trim();
+      if (!value) throw new Error(t('required', label));
+      return value;
+    }
+    function generateSql(builder) {
+      try {
+        setSql(builder());
+        message(t('sqlGenerated'));
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function runMigrate(database, dryRun) {
+      const params = database ? new URLSearchParams([['database', database]]) : selectedTargetQuery();
+      const targetText = database || Array.from(params.entries()).map(([key, value]) => `${key}=${value}`).join(', ') || t('allDbTarget');
+      if (!dryRun && !confirm(t('confirmMigrate', targetText))) return;
+      try {
+        params.set('dry_run', String(dryRun));
+        const report = await api(`/api/migrate?${params.toString()}`, { method: 'POST' });
+        message(t('migrateDone', dryRun ? 'dry run' : 'migrate', report.processed_databases, report.failed_databases));
+        await load({ showLoadedMessage: false });
+        const selectedDatabase = $('sqlDatabase').value;
+        if (!dryRun && selectedDatabase && (!database || selectedDatabase === database)) {
+          await loadSchema({ showLoadedMessage: false });
+        }
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function runCheck() {
+      try {
+        const report = await api('/api/check', { method: 'POST' });
+        message(t('checkDone', report.ok, report.failed));
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function runBackup(database) {
+      const params = database ? new URLSearchParams([['database', database]]) : selectedTargetQuery();
+      const targetText = database || Array.from(params.entries()).map(([key, value]) => `${key}=${value}`).join(', ') || t('allDbTarget');
+      if (!confirm(t('confirmBackup', targetText))) return;
+      try {
+        const query = params.toString();
+        const report = await api(`/api/backup${query ? `?${query}` : ''}`, { method: 'POST' });
+        message(t('backupDone', report.backed_up, report.failed));
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+    }
+    $('refresh').addEventListener('click', load);
+    $('check').addEventListener('click', runCheck);
+    $('dryRun').addEventListener('click', () => runMigrate('', true));
+    $('backupAll').addEventListener('click', () => runBackup(''));
+    $('migrateAll').addEventListener('click', () => runMigrate('', false));
+    $('loadSchema').addEventListener('click', loadSchema);
+    $('insertTemplate').addEventListener('click', insertSelectedTemplate);
+    $('downloadSql').addEventListener('click', downloadSqlFile);
+    $('sqlDryRun').addEventListener('click', () => runSql(true));
+    $('sqlApply').addEventListener('click', () => runSql(false));
+    $('sqlDatabase').addEventListener('change', clearSchema);
+    $('targetGroup').addEventListener('change', updateTargetPreview);
+    $('targetDatabase').addEventListener('change', updateTargetPreview);
+    $('targetLimit').addEventListener('input', updateTargetPreview);
+    document.querySelectorAll('[data-locale-button]').forEach((button) => {
+      button.addEventListener('click', () => setLocale(button.dataset.localeButton));
+    });
+    document.querySelectorAll('[data-page-link]').forEach((link) => link.addEventListener('click', (event) => {
+      event.preventDefault();
+      openPage(link.dataset.pageLink);
+      history.replaceState(null, '', link.getAttribute('href'));
+    }));
+    $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
+    $('saveDbGroup').addEventListener('click', saveDbGroup);
+    $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
+    $('createMigrationFile').addEventListener('click', createMigrationFile);
+    $('createDatabaseFile').addEventListener('click', createDatabaseFile);
+    $('sqlFile').addEventListener('change', async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      if (file.size > maxSqlBytes) {
+        event.target.value = '';
+        message(t('fileTooLarge'), true);
+        return;
+      }
+      let sql;
+      try {
+        const bytes = await file.arrayBuffer();
+        sql = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch (error) {
+        event.target.value = '';
+        message(t('fileUtf8', error.message || error), true);
+        return;
+      }
+      if (sql.includes('\u0000')) {
+        event.target.value = '';
+        message(t('fileNul'), true);
+        return;
+      }
+      $('sqlInput').value = sql;
+      $('sqlFileName').value = sanitizeSqlFileName(file.name);
+      message(t('fileLoaded', file.name));
+    });
+    $('generateCreateTable').addEventListener('click', () => generateSql(() => {
+      const table = requireValue('newTableName', 'New table');
+      const columns = requireValue('newTableColumns', 'Columns');
+      return `CREATE TABLE ${quoteIdent(table)} (${columns});`;
+    }));
+    $('generateAddColumn').addEventListener('click', () => generateSql(() => {
+      const table = requireValue('alterTableName', 'Table');
+      const column = requireValue('newColumnName', 'New column');
+      const definition = requireValue('newColumnDefinition', 'Column definition');
+      return `ALTER TABLE ${quoteIdent(table)} ADD COLUMN ${quoteIdent(column)} ${definition};`;
+    }));
+    $('generateRenameTable').addEventListener('click', () => generateSql(() => {
+      const from = requireValue('renameTableFrom', 'Rename table from');
+      const to = requireValue('renameTableTo', 'Rename table to');

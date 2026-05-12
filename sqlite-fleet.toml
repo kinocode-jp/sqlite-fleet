@@ -1,0 +1,52 @@
+[project]
+name = "sqlite-fleet-project"
+
+[databases]
+discovery = "glob"
+path_glob = "./data/**/*.db"
+
+[migrations]
+dir = "./migrations"
+table = "_sqlite_fleet_migrations"
+
+[migration_groups]
+core = ["001", "002", "003", "004"]
+
+[database_migration_groups]
+tenant_empty = ["core"]
+tenant_partial = ["core"]
+tenant_all = ["core"]
+
+[execution]
+parallel = 4
+lock_timeout_ms = 5000
+continue_on_error = false
+
+[report]
+format = "json"
+path = "./sqlite-fleet-report.json"
+
+[backup]
+dir = "./backups"
+before_migrate = false
+keep_last = 10
+
+[audit]
+
+[gui]
+allow_check = true
+allow_migrate = true
+allow_backup = true
+allow_restore = true
+allow_sql_apply = true
+allow_migration_edit = true
+
+[groups]
+
+[db_groups]
+demo = [
+    "tenant_all",
+    "tenant_partial",
+    "tenant_empty",
+]
+canary = ["tenant_partial"]

@@ -1,0 +1,25 @@
+      return `ALTER TABLE ${quoteIdent(from)} RENAME TO ${quoteIdent(to)};`;
+    }));
+    $('generateRenameColumn').addEventListener('click', () => generateSql(() => {
+      const table = requireValue('renameColumnTable', 'Rename column table');
+      const from = requireValue('renameColumnFrom', 'Rename column from');
+      const to = requireValue('renameColumnTo', 'Rename column to');
+      return `ALTER TABLE ${quoteIdent(table)} RENAME COLUMN ${quoteIdent(from)} TO ${quoteIdent(to)};`;
+    }));
+    $('databases').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      if (button.dataset.action === 'backup') {
+        runBackup(button.dataset.database || '');
+      } else if (button.dataset.action === 'migrate') {
+        runMigrate(button.dataset.database || '', button.dataset.dryRun === 'true');
+      }
+    });
+    translateStaticDom();
+    openPage(pageFromHash());
+    renderSqlTemplates();
+    load();
+  </script>
+</body>
+</html>"#;
+
