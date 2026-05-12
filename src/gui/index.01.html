@@ -62,23 +62,23 @@
     };
     const pageTitles = {
       en: {
-        execute: 'Run plan',
+        execute: 'Run',
         'migration-groups': 'Migration Groups',
         'db-groups': 'DB Groups',
         databases: 'Database management',
         migrations: 'Migration management',
-        sql: 'SQL workspace',
+        sql: 'SQL runner',
         schema: 'Schema builder',
         settings: 'Settings / permissions',
         help: 'Help',
       },
       ja: {
-        execute: '実行計画',
+        execute: '実行',
         'migration-groups': 'Migrationグループ',
         'db-groups': 'DBグループ',
         databases: 'DB管理',
         migrations: 'Migration管理',
-        sql: 'SQL作業',
+        sql: 'SQL実行',
         schema: 'Schema作成',
         settings: '設定/権限',
         help: 'ヘルプ',
@@ -171,6 +171,19 @@
       document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
       updatePageHeading(page);
     }
+    function updateConditionalNav() {
+      if (!state) return;
+      const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main');
+      const hasDbGroups = (state.db_groups || []).some((group) => group.name !== 'all');
+      const visibility = { 'migration-groups': hasMigrationGroups, 'db-groups': hasDbGroups };
+      document.querySelectorAll('[data-conditional-nav]').forEach((link) => {
+        link.hidden = !visibility[link.dataset.conditionalNav];
+      });
+      $('openMigrationGroupModalFromMigrations').hidden = hasMigrationGroups;
+      const page = activePage();
+      if (page === 'migration-groups' && !hasMigrationGroups) openPage('migrations');
+      if (page === 'db-groups' && !hasDbGroups) openPage('databases');
+    }
     async function api(path, options = {}) {
       setBusy(true);
       try {
@@ -213,6 +226,7 @@
       const project = state.project || 'sqlite-fleet';
       $('title').textContent = project;
       const s = state.status;
+      updateConditionalNav();
       renderDatabaseSelectors(s.plans);
       renderTargetSelectors(s.plans);
       $('summary').innerHTML = [
@@ -749,6 +763,7 @@
     });
     $('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal);
     $('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal);
+    $('openMigrationGroupModalFromMigrations').addEventListener('click', openMigrationGroupModal);
     $('closeMigrationGroupModal').addEventListener('click', closeMigrationGroupModal);
     $('cancelMigrationGroup').addEventListener('click', closeMigrationGroupModal);
     $('migrationGroupModal').addEventListener('click', (event) => {

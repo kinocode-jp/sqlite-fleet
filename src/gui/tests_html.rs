@@ -108,7 +108,8 @@
         assert!(INDEX_HTML.contains(r#"<main class="content">"#));
         assert!(INDEX_HTML.contains("grid-template-columns:272px minmax(0, 1fr)"));
         assert!(INDEX_HTML.contains(r#"<header class="topbar">"#));
-        assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">実行計画</h2>"#));
+        assert!(INDEX_HTML.contains(".sidebar-nav a[hidden] { display:none; }"));
+        assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">実行</h2>"#));
         assert!(!INDEX_HTML.contains("実行計画から管理するSQLite fleet"));
         assert!(!INDEX_HTML.contains(
             "「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。"
@@ -120,9 +121,11 @@
         assert!(INDEX_HTML.contains(
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
-        assert!(INDEX_HTML
-            .contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups">"#));
-        assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups">"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
+        assert!(INDEX_HTML.contains("function updateConditionalNav()"));
+        assert!(INDEX_HTML.contains("const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main')"));
         assert!(INDEX_HTML.contains(
             r#"<section class="panel page" data-page="migration-groups" id="migration-groups-panel">"#
         ));
@@ -156,7 +159,10 @@
         assert!(INDEX_HTML.contains("let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en'"));
         assert!(INDEX_HTML.contains("function translateStaticDom()"));
         assert!(INDEX_HTML.contains("function setLocale(locale)"));
-        assert!(INDEX_HTML.contains("'実行計画': 'Run plan'"));
+        assert!(INDEX_HTML.contains("'実行': 'Run'"));
+        assert!(INDEX_HTML.contains("'グループに分ける': 'Split into groups'"));
+        assert!(INDEX_HTML.contains("'Run': '実行'"));
+        assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
         assert!(INDEX_HTML.contains("'Migration Groups': 'Migrationグループ'"));
@@ -204,12 +210,15 @@
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループに分ける</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループに分ける</button>"#));
         assert!(INDEX_HTML.contains(r#"<div id="migrationAssignmentEditor" class="migration-assignment-editor">"#));
         assert!(INDEX_HTML.contains(r#"id="migrationGroupSimpleNote" class="simple-mode-note" hidden"#));
         assert!(INDEX_HTML.contains("const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0"));
         assert!(INDEX_HTML.contains(r#"<button id="saveDatabaseRule" class="primary">適用グループ保存</button>"#));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal)"));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal)"));
+        assert!(INDEX_HTML.contains("$('openMigrationGroupModalFromMigrations').addEventListener('click', openMigrationGroupModal)"));
+        assert!(INDEX_HTML.contains("$('openMigrationGroupModalFromMigrations').hidden = hasMigrationGroups"));
         assert!(INDEX_HTML.contains("$('migrationGroupCards').addEventListener('click', (event) =>"));
         assert!(INDEX_HTML.contains("const name = requireValue('manageMigrationGroupName', 'Group name')"));
         assert!(INDEX_HTML.contains("(state.migration_groups || []).some((group) => group.name === name)"));

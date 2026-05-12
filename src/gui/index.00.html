@@ -16,6 +16,7 @@
     .subtitle { color:#a9b7c5; font-size:12px; }
     .sidebar-nav { display:grid; gap:4px; margin:0 0 18px; }
     .sidebar-nav a { display:flex; align-items:center; gap:9px; min-height:36px; color:#d7e3ed; text-decoration:none; padding:8px 10px; border-radius:6px; font-weight:650; }
+    .sidebar-nav a[hidden] { display:none; }
     .sidebar-nav a:hover, .sidebar-nav a:focus-visible { background:#1d2a36; color:#fff; outline:0; }
     .nav-icon { flex:0 0 30px; text-align:center; color:#8bd3e6; }
     .side-card { display:grid; gap:10px; margin:16px 0; padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:#172331; }
@@ -141,12 +142,12 @@
         <div class="subtitle">Fleet migration control plane</div>
       </div>
       <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
-        <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行計画</a>
-        <a href='#migration-groups-panel' data-page-link="migration-groups"><span class="nav-icon">MIG</span>Migrationグループ</a>
-        <a href='#db-groups-panel' data-page-link="db-groups"><span class="nav-icon">MAP</span>DBグループ</a>
+        <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行</a>
+        <a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups"><span class="nav-icon">MAP</span>DBグループ</a>
         <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
+        <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>Migrationグループ</a>
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>Migration管理</a>
-        <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL作業</a>
+        <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL実行</a>
         <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>Schema作成</a>
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定/権限</a>
         <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
@@ -169,7 +170,7 @@
     <main class="content">
       <header class="topbar">
         <div class="page-title">
-          <h2 id="pageHeading">実行計画</h2>
+          <h2 id="pageHeading">実行</h2>
         </div>
         <p id="message" class="message muted">読み込み中...</p>
       </header>
@@ -178,7 +179,7 @@
       <section class="panel page active" data-page="execute" id="command-center">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>実行計画</h2>
+            <h2>実行</h2>
             <p class="panel-description">DBグループ、個別DB、limitを組み合わせて操作対象を決めます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="DBグループはどこへ適用するか、Migration Groupは各DBに何を適用するかを決めます。">?</span>
@@ -263,7 +264,7 @@
             <h2>DBグループ</h2>
             <p class="panel-description">カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。">?</span>
+          <span class="tool-tip" tabindex="0" data-tip="DB GroupはどのDBへ操作するかを決める対象セットです。実行のDB groupで選択できます。">?</span>
         </div>
         <div class="topology-grid">
           <section>
@@ -305,6 +306,7 @@
             <h2>Migration台帳</h2>
             <p class="panel-description">全migrationをversion順に確認し、所属グループとchecksumを追跡します。</p>
           </div>
+          <button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループに分ける</button>
           <span class="tool-tip" tabindex="0" data-tip="履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。">?</span>
         </div>
         <div class="form-grid">
@@ -325,7 +327,7 @@
       <section class="panel page" data-page="sql" id="sql-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>SQL作業</h2>
+            <h2>SQL実行</h2>
             <p class="panel-description">migration履歴に残さない作業用SQLを、dry-runで確認してから適用できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。">?</span>
@@ -524,12 +526,12 @@
     const textNodeSources = new WeakMap();
     const staticTranslations = {
       '管理画面ナビゲーション': 'Admin navigation',
-      '実行計画': 'Run plan',
+      '実行': 'Run',
       'Migrationグループ': 'Migration Groups',
       'DBグループ': 'DB Groups',
       'DB管理': 'Database management',
       'Migration管理': 'Migration management',
-      'SQL作業': 'SQL workspace',
+      'SQL実行': 'SQL runner',
       'Schema作成': 'Schema builder',
       '設定/権限': 'Settings / permissions',
       'ヘルプ': 'Help',
@@ -549,12 +551,13 @@
       '通常はグループを意識せず、全DBに同じmigrationを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
       'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
       '新規グループ作成': 'Create group',
+      'グループに分ける': 'Split into groups',
       '新規Migrationグループ': 'New Migration Group',
       '全DBに適用されるmigrationファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
-      'DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in the run plan.',
+      'DB GroupはどのDBへ操作するかを決める対象セットです。実行のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in Run.',
       'Migration Group保存': 'Save Migration Group',
       'DB Group保存': 'Save DB Group',
       'DBごとの適用グループ': 'Per-DB Migration Groups',
@@ -669,6 +672,8 @@
       'Not null': 'NOT NULL',
       'Default': 'デフォルト',
       'Hidden': 'Hidden',
+      'Run': '実行',
+      'SQL runner': 'SQL実行',
     };
     const localeText = {
       en: {
