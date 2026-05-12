@@ -223,6 +223,8 @@
     #[test]
     fn html_includes_contextual_tooltips_for_admin_fields() {
         assert!(INDEX_HTML.contains(r#"class="tool-tip""#));
+        assert!(INDEX_HTML.contains(".panel { margin-bottom:18px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); overflow:visible; }"));
+        assert!(INDEX_HTML.contains(".tool-tip:hover, .tool-tip:focus { z-index:40; }"));
         assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどこへ適用するか"#));
         assert!(INDEX_HTML.contains(r#"data-tip="db_groups/groups に定義した対象DBのまとまりです"#));
         assert!(INDEX_HTML
