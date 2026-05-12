@@ -311,7 +311,7 @@
         assert!(INDEX_HTML.contains("const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets'"));
         assert!(INDEX_HTML.contains(": `<option value=\"\">${escapeHtml(t('noSnippets'))}</option>`"));
         assert!(INDEX_HTML.contains("latestMigrationFilename: (filename) => `Latest file name is ${filename}`"));
-        assert!(INDEX_HTML.contains("latestMigrationFilename: (filename) => `最新のファイル名は${filename}です`"));
+        assert!(INDEX_HTML.contains("latestMigrationFilename: (filename) => `現在の最新ファイル名は ${filename} です`"));
         assert!(INDEX_HTML.contains("el.textContent = latest ? t('latestMigrationFilename', latest) : t('noLatestMigrationFilename')"));
         assert!(INDEX_HTML.contains("renderLatestMigrationFilename();"));
         assert!(INDEX_HTML.contains("$('newMigrationFilename').value = nextMigrationFileName()"));
