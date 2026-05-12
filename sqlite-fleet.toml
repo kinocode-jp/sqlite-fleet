@@ -10,12 +10,12 @@ dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
 [migration_groups]
-core = ["001", "002", "003", "004"]
+main = ["001", "002", "003", "004"]
 
 [database_migration_groups]
-tenant_empty = ["core"]
-tenant_partial = ["core"]
-tenant_all = ["core"]
+tenant_empty = ["main"]
+tenant_partial = ["main"]
+tenant_all = ["main"]
 
 [execution]
 parallel = 4

@@ -195,7 +195,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Migrationグループ</h2>
-            <p class="panel-description">どのmigrationをどのグループとして扱うか、DBごとの割当と合わせて管理します。</p>
+            <p class="panel-description">標準では全migrationがmainグループに入り、必要なDBだけ別グループへ分岐できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。">?</span>
         </div>
@@ -220,7 +220,7 @@
             <h3>DBごとの適用グループ</h3>
             <div class="info-card">
               <label class="field"><span class="field-label">DB selector <span class="tool-tip" tabindex="0" data-tip="DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。">?</span></span><input id="manageRuleSelector" placeholder="tenant-a"></label>
-              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするMigration Groupです。複数指定できます。">?</span></span><input id="manageRuleGroups" placeholder="core, premium"></label>
+              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするMigration Groupです。複数指定できます。未指定DBはmainを使います。">?</span></span><input id="manageRuleGroups" placeholder="main, premium"></label>
               <button id="saveDatabaseRule" class="primary">適用グループ保存</button>
             </div>
           </section>
@@ -300,7 +300,7 @@
         <div class="form-grid">
           <label class="field"><span class="field-label">Version</span><input id="newMigrationVersion" placeholder="005"></label>
           <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
-          <label class="field wide"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="core"></label>
+          <label class="field wide"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="main"></label>
           <label class="field wide"><span class="field-label">SQL</span><textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea></label>
           <div class="actions wide"><button id="createMigrationFile" class="primary">Migrationファイル登録</button></div>
         </div>
@@ -406,9 +406,9 @@
             <h3>基本の考え方</h3>
             <ul>
               <li>migrationファイルは <code>migrations.dir</code> の固定ディレクトリに置きます。</li>
-              <li><code>[migration_groups]</code> はversionリストで所属を管理します。同じmigrationを複数グループに含められます。</li>
-              <li><code>[database_migration_groups]</code> はDBごとに対象マイグレーショングループを指定します。</li>
-              <li><code>[db_groups]</code> はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。</li>
+              <li><code>[migration_groups]</code> はversionリストで所属を管理します。未設定時は全migrationが <code>main</code> に入ります。</li>
+              <li><code>[database_migration_groups]</code> はDBごとに対象マイグレーショングループを指定します。未指定DBは <code>main</code> を使います。</li>
+              <li><code>[db_groups]</code> はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の <code>all</code> は全DBです。</li>
             </ul>
           </section>
           <section>
@@ -416,7 +416,7 @@
             <ul>
               <li>DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。</li>
               <li>Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。</li>
-              <li>Migration Groupsでは各グループに属するmigrationと、そのグループの対象DBを確認します。</li>
+              <li>Migration Groupsではmainから分岐した各グループのmigrationをチェックボックスで編集できます。</li>
             </ul>
           </section>
           <section>
@@ -536,7 +536,7 @@
       '対象をDry run': 'Dry run targets',
       '対象をBackup': 'Back up targets',
       '対象へ適用': 'Apply to targets',
-      'どのmigrationをどのグループとして扱うか、DBごとの割当と合わせて管理します。': 'Manage which migrations belong to each group together with DB assignments.',
+      '標準では全migrationがmainグループに入り、必要なDBだけ別グループへ分岐できます。': 'By default, all migrations belong to main; branch specific DBs into separate groups when needed.',
       'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
       '新規グループ作成': 'Create group',
       '新規Migrationグループ': 'New Migration Group',
@@ -550,7 +550,7 @@
       'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
       'Applied Migration Groups': 'Applied Migration Groups',
       'Migration files': 'Migration files',
-      'このDBで適用対象にするMigration Groupです。複数指定できます。': 'Migration Groups that apply to this DB. Multiple groups are allowed.',
+      'このDBで適用対象にするMigration Groupです。複数指定できます。未指定DBはmainを使います。': 'Migration Groups that apply to this DB. Multiple groups are allowed. Unassigned DBs use main.',
       '適用グループ保存': 'Save applied groups',
       'DBマトリクス': 'Database matrix',
       'DBごとの状態、対象Migration Group、未適用内容を比較します。': 'Compare status, assigned Migration Groups, and pending migrations per database.',
@@ -598,12 +598,15 @@
       '安全設定と監査ログ': 'Safety settings and audit log',
       'migrationファイルは': 'Migration files are stored in',
       'の固定ディレクトリに置きます。': '.',
-      'はversionリストで所属を管理します。同じmigrationを複数グループに含められます。': 'assigns migrations by version list. The same migration can belong to multiple groups.',
-      'はDBごとに対象マイグレーショングループを指定します。': 'assigns target Migration Groups per DB.',
-      'はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。': 'defines DB Groups for canaries and other target sets.',
+      'はversionリストで所属を管理します。未設定時は全migrationが': 'assigns migrations by version list. When unset, all migrations belong to',
+      'に入ります。': '.',
+      'はDBごとに対象マイグレーショングループを指定します。未指定DBは': 'assigns target Migration Groups per DB. Unassigned DBs use',
+      'を使います。': '.',
+      'はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の': 'defines DB Groups for canaries and other target sets. The built-in',
+      'は全DBです。': 'means all DBs.',
       'DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。': 'Databases shows applied counts, pending migrations, and inconsistencies per DB.',
       'Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
-      'Migration Groupsでは各グループに属するmigrationと、そのグループの対象DBを確認します。': 'Migration Groups shows which migrations belong to each group and which DBs target it.',
+      'Migration Groupsではmainから分岐した各グループのmigrationをチェックボックスで編集できます。': 'Migration Groups edits migrations for each group branched from main with checkboxes.',
       'CheckはDB状態、checksum、不明な適用履歴を検査します。': 'Check verifies DB state, checksums, and unknown applied history.',
       'Dry runは対象DBの未適用migrationを読み取り確認します。DBは変更しません。': 'Dry run inspects pending migrations for target DBs without changing them.',
       '適用は対象DBの未適用migrationをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。': 'Apply runs all pending migrations for the target DBs in version order. It is not a one-file-only apply action.',
@@ -670,7 +673,7 @@
         noMigrations: 'No migrations',
         noMigrationGroups: 'No migration groups',
         noDbGroups: 'No DB groups',
-        noRules: 'No per-DB assignments. Unassigned DBs resolve automatically in core/default/all-groups order.',
+        noRules: 'No per-DB assignments. Unassigned DBs use the main Migration Group.',
         noTables: 'No tables',
         selectDbForSchema: 'Select a DB and load schema',
         unset: 'Unset',
@@ -749,7 +752,7 @@
         noMigrations: 'migration はありません',
         noMigrationGroups: 'migration group はありません',
         noDbGroups: 'DB group はありません',
-        noRules: 'DBごとの指定はありません。未指定DBは core/default/全グループの順で自動解決されます。',
+        noRules: 'DBごとの指定はありません。未指定DBはmain Migration Groupを使います。',
         noTables: 'テーブルはありません',
         selectDbForSchema: 'DBを選択してSchemaを読み込んでください',
         unset: '未設定',

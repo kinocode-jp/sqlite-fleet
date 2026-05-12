@@ -107,7 +107,7 @@ fn legacy_dir_migration_groups_do_not_require_default_migrations_dir() {
 }
 
 #[test]
-fn empty_core_group_does_not_disable_default_migrations_for_unassigned_databases() {
+fn empty_side_group_does_not_disable_main_migrations_for_unassigned_databases() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("data")).unwrap();
     fs::create_dir_all(dir.path().join("migrations")).unwrap();
@@ -120,7 +120,7 @@ fn empty_core_group_does_not_disable_default_migrations_for_unassigned_databases
     .unwrap();
     let mut config = base_config(&dir);
     config.migration_groups = HashMap::from([(
-        "core".to_string(),
+        "side".to_string(),
         MigrationGroupConfig::versions(Vec::new()),
     )]);
 
@@ -144,9 +144,9 @@ fn empty_migration_group_can_be_assigned_to_database() {
     fs::create_dir_all(dir.path().join("data")).unwrap();
     fs::create_dir_all(dir.path().join("migrations")).unwrap();
     let empty_db = dir.path().join("data").join("tenant-empty.db");
-    let default_db = dir.path().join("data").join("tenant-default.db");
+    let main_db = dir.path().join("data").join("tenant-main.db");
     create_db(&empty_db, "base_items");
-    create_db(&default_db, "base_items");
+    create_db(&main_db, "base_items");
     fs::write(
         dir.path().join("migrations").join("001_create_items.sql"),
         "CREATE TABLE items(id INTEGER PRIMARY KEY);",
@@ -154,11 +154,11 @@ fn empty_migration_group_can_be_assigned_to_database() {
     .unwrap();
     let mut config = base_config(&dir);
     config.migration_groups = HashMap::from([(
-        "core".to_string(),
+        "side".to_string(),
         MigrationGroupConfig::versions(Vec::new()),
     )]);
     config.database_migration_groups =
-        HashMap::from([("tenant-empty".to_string(), vec!["core".to_string()])]);
+        HashMap::from([("tenant-empty".to_string(), vec!["side".to_string()])]);
 
     let report = migrate_with_options(
         &config,
@@ -172,7 +172,7 @@ fn empty_migration_group_can_be_assigned_to_database() {
 
     assert_eq!(report.applied_databases, 1);
     assert!(!table_exists(&empty_db, "items"));
-    assert!(table_exists(&default_db, "items"));
+    assert!(table_exists(&main_db, "items"));
 }
 
 #[test]

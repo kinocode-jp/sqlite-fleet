@@ -326,7 +326,7 @@
     function renderTargetSelectors(plans) {
       const currentGroup = $('targetGroup').value;
       const currentDatabase = $('targetDatabase').value;
-      $('targetGroup').innerHTML = `<option value="">${escapeHtml(t('allDb'))}</option>` + state.db_groups.map((group) => `<option value="${escapeHtml(group.name)}">${escapeHtml(group.name)}</option>`).join('');
+      $('targetGroup').innerHTML = `<option value="">${escapeHtml(t('allDb'))}</option>` + state.db_groups.filter((group) => group.name !== 'all').map((group) => `<option value="${escapeHtml(group.name)}">${escapeHtml(group.name)}</option>`).join('');
       $('targetDatabase').innerHTML = `<option value="">${escapeHtml(t('noSelection'))}</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('');
       if (currentGroup && state.db_groups.some((group) => group.name === currentGroup)) $('targetGroup').value = currentGroup;
       if (currentDatabase && plans.some((plan) => plan.database.id === currentDatabase)) $('targetDatabase').value = currentDatabase;

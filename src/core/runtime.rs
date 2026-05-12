@@ -98,14 +98,16 @@ fn validate_runtime_config(config: &Config) -> Result<()> {
 fn select_databases(config: &Config, selection: &DatabaseSelection) -> Result<Vec<Database>> {
     let mut databases = discover_databases(config)?;
     if let Some(group) = selection.group.as_deref() {
-        let selectors = config
-            .effective_db_groups()
-            .get(group)
-            .cloned()
-            .ok_or_else(|| anyhow::anyhow!("指定されたDB groupが見つかりません: {group}"))?;
-        databases = select_group_databases(config, &databases, &selectors)?;
-        if databases.is_empty() {
-            bail!("DB group に一致するDBが見つかりません: {group}");
+        if group != crate::ALL_DB_GROUP {
+            let selectors = config
+                .effective_db_groups()
+                .get(group)
+                .cloned()
+                .ok_or_else(|| anyhow::anyhow!("指定されたDB groupが見つかりません: {group}"))?;
+            databases = select_group_databases(config, &databases, &selectors)?;
+            if databases.is_empty() {
+                bail!("DB group に一致するDBが見つかりません: {group}");
+            }
         }
     }
     if let Some(selector) = selection.database.as_deref() {

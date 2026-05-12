@@ -98,12 +98,12 @@ dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
 [migration_groups]
-core = ["001", "002"]
+main = ["001", "002"]
 premium = ["001", "002", "101"]
 
 [database_migration_groups]
-tenant-a = ["core", "premium"]
-tenant-b = ["core"]
+tenant-a = ["main", "premium"]
+tenant-b = ["main"]
 
 [execution]
 parallel = 4
@@ -168,11 +168,11 @@ migrations/
 
 ```toml
 [migration_groups]
-core = ["001", "002"]
+main = ["001", "002"]
 premium = ["001", "002", "101"]
 ```
 
-`[migration_groups]` を使わない既存設定では、従来通り `migrations.dir` が `default` グループとして扱われます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + version リスト形式を推奨します。
+`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + version リスト形式を推奨します。
 
 各DBには `_sqlite_fleet_migrations` が作成され、適用済み version、name、checksum、適用時刻、実行時間が保存されます。
 
@@ -206,9 +206,9 @@ sqlite-fleet restore --database tenant-a --from ./backups/tenant-a/1770000000000
 
 ## マイグレーショングループ、DBグループ、カナリア
 
-`[migration_groups]` で「どのmigration versionがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `core` があれば `core`、なければ全マイグレーショングループが対象です。
+`[migration_groups]` で「どのmigration versionがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `main` が対象です。
 
-`[db_groups]` でDB IDまたはDBパスselectorのまとまりを定義できます。`--limit` と組み合わせるとカナリア適用に使えます。旧設定名 `[groups]` も互換のため読み込めます。
+`[db_groups]` でDB IDまたはDBパスselectorのまとまりを定義できます。DB Groupの標準は全DBを表す `all` です。`--limit` と組み合わせるとカナリア適用に使えます。旧設定名 `[groups]` も互換のため読み込めます。
 
 ```bash
 sqlite-fleet migrate --group canary --limit 1 --backup
@@ -218,12 +218,12 @@ sqlite-fleet migrate --group canary --backup
 この場合、「何を適用するか」はマイグレーショングループ、「どこへ適用するか」はDBグループで分かれます。
 
 ```text
-tenant-a -> core + premium
-tenant-b -> core
+tenant-a -> main + premium
+tenant-b -> main
 canary   -> tenant-a, tenant-b
 ```
 
-注意: 現在の履歴テーブルは `version` を主キーにするため、複数のマイグレーショングループを使う場合も migration version は全体で一意にしてください。例えば `core/001_...sql` と `premium/001_...sql` の同時使用は拒否されます。
+注意: 現在の履歴テーブルは `version` を主キーにするため、複数のマイグレーショングループを使う場合も migration version は全体で一意にしてください。例えば `main` と `premium` で別内容の `001_...sql` を同時使用する構成は拒否されます。
 
 ## スキーマdrift
 

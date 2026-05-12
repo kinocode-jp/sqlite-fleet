@@ -581,7 +581,7 @@ fn migration_summary_input(
 ) -> Migration {
     let sql = format!("CREATE TABLE {name}(id);");
     Migration {
-        group: "default".to_string(),
+        group: "main".to_string(),
         version: version.to_string(),
         version_number,
         name: name.to_string(),

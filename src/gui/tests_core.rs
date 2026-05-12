@@ -377,10 +377,12 @@
 
         let groups = api_db_groups(&config, &databases);
 
-        assert_eq!(groups.len(), 1);
-        assert_eq!(groups[0].name, "canary");
-        assert_eq!(groups[0].selectors, vec!["data/tenant.db"]);
-        assert_eq!(groups[0].database_ids, vec!["tenant"]);
+        assert_eq!(groups.len(), 2);
+        let group = groups.iter().find(|group| group.name == "canary").unwrap();
+        assert_eq!(group.selectors, vec!["data/tenant.db"]);
+        assert_eq!(group.database_ids, vec!["tenant"]);
+        let all = groups.iter().find(|group| group.name == "all").unwrap();
+        assert_eq!(all.database_ids, vec!["tenant"]);
     }
 
     #[test]
@@ -417,7 +419,8 @@
 
         let groups = api_db_groups(&config, &databases);
 
-        assert_eq!(groups[0].database_ids, vec!["db2", "db1"]);
+        let group = groups.iter().find(|group| group.name == "canary").unwrap();
+        assert_eq!(group.database_ids, vec!["db2", "db1"]);
     }
 
     #[test]
@@ -452,7 +455,7 @@
     }
 
     #[test]
-    fn api_save_empty_migration_group_preserves_implicit_default_migrations() {
+    fn api_save_new_migration_group_branches_from_implicit_main_migrations() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");
         std::fs::create_dir(&migration_dir).unwrap();
@@ -482,23 +485,61 @@
         assert_eq!(
             config
                 .migration_groups
-                .get("default")
+                .get("main")
                 .unwrap()
                 .migrations,
             vec!["001", "002"]
         );
+        assert_eq!(
+            config
+                .migration_groups
+                .get("premium")
+                .unwrap()
+                .migrations,
+            vec!["001", "002"]
+        );
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .filter(|migration| migration.group == "main")
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["001", "002"]);
+    }
+
+    #[test]
+    fn api_save_existing_migration_group_allows_empty_membership() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migration_groups.insert(
+            "premium".to_string(),
+            MigrationGroupConfig::versions(vec!["001".to_string()]),
+        );
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_save_migration_group(
+            &state,
+            br#"{"name":"premium","versions":[]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
         assert!(config
             .migration_groups
             .get("premium")
             .unwrap()
             .migrations
             .is_empty());
-        let migrations = load_migrations(&config).unwrap();
-        let versions = migrations
-            .iter()
-            .map(|migration| migration.version.as_str())
-            .collect::<Vec<_>>();
-        assert_eq!(versions, vec!["001", "002"]);
     }
 
     #[test]
@@ -519,7 +560,7 @@
         let config = state.config.lock().unwrap();
         assert!(config
             .migration_groups
-            .get("default")
+            .get("main")
             .unwrap()
             .migrations
             .is_empty());
@@ -585,7 +626,7 @@
     }
 
     #[test]
-    fn api_create_migration_file_preserves_implicit_default_group() {
+    fn api_create_migration_file_preserves_implicit_main_group() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");
         std::fs::create_dir(&migration_dir).unwrap();
@@ -602,11 +643,11 @@
 
         api_create_migration_file(
             &state,
-            br#"{"version":"005","name":"default_item","group":"default","sql":"CREATE TABLE default_item(id INTEGER);"}"#.to_vec(),
+            br#"{"version":"005","name":"main_item","group":"main","sql":"CREATE TABLE main_item(id INTEGER);"}"#.to_vec(),
         )
         .unwrap();
 
-        assert!(migration_dir.join("005_default_item.sql").exists());
+        assert!(migration_dir.join("005_main_item.sql").exists());
         let config = state.config.lock().unwrap();
         assert!(config.migration_groups.is_empty());
         let migrations = load_migrations(&config).unwrap();
@@ -672,7 +713,7 @@
 
         let result = api_create_migration_file(
             &state,
-            br#"{"version":"001","name":"duplicate","group":"default","sql":"CREATE TABLE duplicate(id INTEGER);"}"#.to_vec(),
+            br#"{"version":"001","name":"duplicate","group":"main","sql":"CREATE TABLE duplicate(id INTEGER);"}"#.to_vec(),
         );
         assert!(result.is_err());
 
@@ -701,7 +742,7 @@
 
         api_create_migration_file(
             &state,
-            br#"{"version":"005","name":"absolute_dir","group":"default","sql":"CREATE TABLE absolute_dir(id INTEGER);"}"#.to_vec(),
+            br#"{"version":"005","name":"absolute_dir","group":"main","sql":"CREATE TABLE absolute_dir(id INTEGER);"}"#.to_vec(),
         )
         .unwrap();
 

@@ -101,6 +101,13 @@ fn api_db_groups(config: &Config, databases: &[sqlite_fleet::Database]) -> Vec<D
             }
         })
         .collect::<Vec<_>>();
+    if !groups.iter().any(|group| group.name == ALL_DB_GROUP) {
+        groups.push(DbGroupData {
+            name: ALL_DB_GROUP.to_string(),
+            selectors: vec!["*".to_string()],
+            database_ids: databases.iter().map(|database| database.id.clone()).collect(),
+        });
+    }
     groups.sort_by(|left, right| left.name.cmp(&right.name));
     groups
 }
@@ -274,10 +281,11 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     let request: MigrationGroupRequest =
         serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
     let name = clean_name(&request.name, "Migration group name")?;
-    let versions = clean_version_list(request.versions)?;
+    let mut versions = clean_version_list(request.versions)?;
     let mut config = locked_config(state)?;
-    if config.migration_groups.is_empty() && name != "default" {
-        let default_versions = if config.resolve_path(&config.migrations.dir).exists() {
+    let existed = config.migration_groups.contains_key(&name);
+    if config.migration_groups.is_empty() && name != MAIN_MIGRATION_GROUP {
+        let main_versions = if config.resolve_path(&config.migrations.dir).exists() {
             load_migrations(&config)?
                 .into_iter()
                 .map(|migration| migration.version)
@@ -286,9 +294,16 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
             Vec::new()
         };
         config.migration_groups.insert(
-            "default".to_string(),
-            MigrationGroupConfig::versions(default_versions),
+            MAIN_MIGRATION_GROUP.to_string(),
+            MigrationGroupConfig::versions(main_versions),
         );
+    }
+    if !existed && name != MAIN_MIGRATION_GROUP && versions.is_empty() {
+        versions = config
+            .migration_groups
+            .get(MAIN_MIGRATION_GROUP)
+            .map(|group| group.migrations.clone())
+            .unwrap_or_default();
     }
     match config.migration_groups.get_mut(&name) {
         Some(group) => group.migrations = versions,
@@ -384,9 +399,9 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
     }
     std::fs::write(&path, sql)
         .with_context(|| format!("migration file を作成できません: {}", path.display()))?;
-    let preserves_implicit_default =
-        config.migration_groups.is_empty() && target_group.as_deref() == Some("default");
-    if let Some(group) = target_group.filter(|_| !preserves_implicit_default) {
+    let preserves_implicit_main =
+        config.migration_groups.is_empty() && target_group.as_deref() == Some(MAIN_MIGRATION_GROUP);
+    if let Some(group) = target_group.filter(|_| !preserves_implicit_main) {
         let entry = config
             .migration_groups
             .entry(group)

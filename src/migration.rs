@@ -1,7 +1,7 @@
 use crate::{
     discovery::validate_configured_db_path,
     migration_sql::{validate_migration_sql, validate_migration_sql_for_history_table},
-    Config, Migration,
+    Config, Migration, MAIN_MIGRATION_GROUP,
 };
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
@@ -16,7 +16,7 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
             config,
             "migrations.dir",
             &config.migrations.dir,
-            "default",
+            MAIN_MIGRATION_GROUP,
         )?);
     } else {
         let group_configs = config.effective_migration_groups();
@@ -28,7 +28,7 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
                 config,
                 "migrations.dir",
                 &config.migrations.dir,
-                "default",
+                MAIN_MIGRATION_GROUP,
             )?)
         } else {
             None
@@ -198,7 +198,7 @@ pub fn parse_migration_file(path: &Path) -> Result<Migration> {
     let checksum = checksum_sql(&sql);
     Ok(Migration {
         version: version.to_string(),
-        group: "default".to_string(),
+        group: MAIN_MIGRATION_GROUP.to_string(),
         version_number,
         name: name.to_string(),
         checksum,

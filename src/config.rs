@@ -13,6 +13,8 @@ use std::path::{Path, PathBuf};
 
 pub const DEFAULT_CONFIG_PATH: &str = "sqlite-fleet.toml";
 pub const DEFAULT_MIGRATIONS_TABLE: &str = "_sqlite_fleet_migrations";
+pub const MAIN_MIGRATION_GROUP: &str = "main";
+pub const ALL_DB_GROUP: &str = "all";
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
@@ -703,7 +705,7 @@ impl Config {
     pub fn effective_migration_groups(&self) -> HashMap<String, MigrationGroupConfig> {
         if self.migration_groups.is_empty() {
             return HashMap::from([(
-                "default".to_string(),
+                MAIN_MIGRATION_GROUP.to_string(),
                 MigrationGroupConfig {
                     dir: Some(self.migrations.dir.clone()),
                     migrations: Vec::new(),
@@ -711,10 +713,11 @@ impl Config {
             )]);
         }
         let mut groups = self.migration_groups.clone();
-        if groups.values().all(is_empty_version_migration_group) && !groups.contains_key("default")
+        if groups.values().all(is_empty_version_migration_group)
+            && !groups.contains_key(MAIN_MIGRATION_GROUP)
         {
             groups.insert(
-                "default".to_string(),
+                MAIN_MIGRATION_GROUP.to_string(),
                 MigrationGroupConfig {
                     dir: Some(self.migrations.dir.clone()),
                     migrations: Vec::new(),
@@ -744,13 +747,8 @@ impl Config {
             .collect::<Vec<_>>();
         if groups.is_empty() {
             groups = {
-                if configured.contains_key("default") {
-                    vec!["default".to_string()]
-                } else if configured
-                    .get("core")
-                    .is_some_and(|group| !is_empty_version_migration_group(group))
-                {
-                    vec!["core".to_string()]
+                if configured.contains_key(MAIN_MIGRATION_GROUP) {
+                    vec![MAIN_MIGRATION_GROUP.to_string()]
                 } else {
                     let mut names = configured
                         .iter()

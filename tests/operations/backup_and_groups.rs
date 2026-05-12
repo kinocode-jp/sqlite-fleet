@@ -86,6 +86,28 @@ fn backup_creates_sqlite_copy_for_selected_database() {
 }
 
 #[test]
+fn implicit_all_db_group_selects_every_database() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("data")).unwrap();
+    fs::create_dir_all(dir.path().join("migrations")).unwrap();
+    create_db(&dir.path().join("data").join("tenant-a.db"), "items");
+    create_db(&dir.path().join("data").join("tenant-b.db"), "items");
+    let config = base_config(&dir);
+
+    let report = backup(
+        &config,
+        DatabaseSelection {
+            group: Some("all".to_string()),
+            ..DatabaseSelection::default()
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.database_count, 2);
+    assert_eq!(report.backed_up, 2);
+}
+
+#[test]
 fn backup_removes_database_operation_lock_after_success() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("data")).unwrap();
@@ -364,4 +386,3 @@ fn db_groups_alias_selects_databases_in_configured_order() {
     assert_eq!(report.backed_up, 1);
     assert_eq!(report.backups[0].database.id, "tenant-b");
 }
-

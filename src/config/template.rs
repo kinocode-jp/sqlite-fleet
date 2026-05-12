@@ -35,13 +35,13 @@ table = "_sqlite_fleet_migrations"
 
 # Uncomment after creating matching files in migrations/.
 # [migration_groups]
-# core = ["001", "002"]
+# main = ["001", "002"]
 
 # [db_groups]
 # canary = ["tenant-a"]
 
 # [database_migration_groups]
-# tenant-a = ["core"]
+# tenant-a = ["main"]
 
 [execution]
 parallel = 4

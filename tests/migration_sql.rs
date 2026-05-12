@@ -89,7 +89,7 @@ fn migration_sql_rejects_transaction_control_statements() {
     };
     let sql = "CREATE TABLE direct_items(id INTEGER PRIMARY KEY); ROLLBACK;";
     let migration = Migration {
-        group: "default".to_string(),
+        group: "main".to_string(),
         version: "001".to_string(),
         version_number: 1,
         name: "direct".to_string(),
@@ -280,7 +280,7 @@ fn direct_migration_sql_rejects_history_table_writes() {
             readable: true,
         };
         let migration = Migration {
-            group: "default".to_string(),
+            group: "main".to_string(),
             version: "001".to_string(),
             version_number: 1,
             name: "direct".to_string(),
