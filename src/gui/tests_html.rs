@@ -203,9 +203,13 @@
         assert!(INDEX_HTML.contains("if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration)"));
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
-        assert!(INDEX_HTML.contains(r#"<div class="migration-assignment-editor">"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループに分ける</button>"#));
+        assert!(INDEX_HTML.contains(r#"<div id="migrationAssignmentEditor" class="migration-assignment-editor">"#));
+        assert!(INDEX_HTML.contains(r#"id="migrationGroupSimpleNote" class="simple-mode-note" hidden"#));
+        assert!(INDEX_HTML.contains("const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0"));
         assert!(INDEX_HTML.contains(r#"<button id="saveDatabaseRule" class="primary">適用グループ保存</button>"#));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal)"));
+        assert!(INDEX_HTML.contains("$('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal)"));
         assert!(INDEX_HTML.contains("$('migrationGroupCards').addEventListener('click', (event) =>"));
         assert!(INDEX_HTML.contains("const name = requireValue('manageMigrationGroupName', 'Group name')"));
         assert!(INDEX_HTML.contains("(state.migration_groups || []).some((group) => group.name === name)"));

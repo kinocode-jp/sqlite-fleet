@@ -12,11 +12,6 @@ table = "_sqlite_fleet_migrations"
 [migration_groups]
 main = ["001", "002", "003", "004"]
 
-[database_migration_groups]
-tenant_empty = ["main"]
-tenant_partial = ["main"]
-tenant_all = ["main"]
-
 [execution]
 parallel = 4
 lock_timeout_ms = 5000

@@ -90,16 +90,23 @@
     .topology-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; padding:16px; }
     .topology-grid h3 { margin:0 0 10px; font-size:14px; }
     .migration-group-editor { display:grid; grid-template-columns:280px minmax(0, 1fr); gap:14px; padding:16px; }
+    .migration-group-editor.simple { grid-template-columns:minmax(0, 1fr); }
+    .migration-group-editor.simple .migration-group-sidebar { display:none; }
+    .simple-mode-note { margin:0 0 10px; color:var(--muted); font-size:13px; }
     .group-list { display:grid; gap:6px; }
     .group-list-item { display:grid; gap:3px; width:100%; min-height:56px; padding:9px 10px; text-align:left; white-space:normal; }
     .group-list-item.active { border-color:var(--accent); background:#eaf6fa; color:var(--accent-strong); }
     .group-list-item span { color:var(--muted); font-size:12px; font-weight:650; }
     .migration-checklist { display:grid; gap:6px; }
+    .migration-row { min-height:40px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+    .migration-row strong { font-size:13px; overflow-wrap:anywhere; }
+    .migration-row span { color:var(--muted); font-size:12px; }
     .check-row { display:grid; grid-template-columns:22px minmax(0, 1fr); gap:8px; align-items:center; min-height:40px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
     .check-row input { width:auto; margin:0; }
     .check-row strong { font-size:13px; overflow-wrap:anywhere; }
     .check-row span { color:var(--muted); font-size:12px; }
     .migration-assignment-editor { display:grid; grid-template-columns:320px minmax(0, 1fr); gap:14px; padding:16px; border-top:1px solid var(--line); background:var(--surface-2); }
+    .migration-assignment-editor[hidden] { display:none; }
     .card-list { display:grid; gap:10px; }
     .info-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
     .info-card strong { font-size:14px; overflow-wrap:anywhere; }
@@ -195,12 +202,12 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>Migrationグループ</h2>
-            <p class="panel-description">標準では全migrationがmainグループに入り、必要なDBだけ別グループへ分岐できます。</p>
+            <p class="panel-description">通常はグループを意識せず、全DBに同じmigrationを適用します。分けたい時だけグループを追加します。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。">?</span>
         </div>
-        <div class="migration-group-editor">
-          <section>
+        <div id="migrationGroupEditor" class="migration-group-editor">
+          <section class="migration-group-sidebar">
             <div class="section-header">
               <h3>Migration Groups</h3>
               <button id="openMigrationGroupModal" class="primary">新規グループ作成</button>
@@ -210,12 +217,14 @@
           <section>
             <div class="section-header">
               <h3 id="selectedMigrationGroupTitle">Migration files</h3>
+              <button id="openMigrationGroupModalInline" class="primary" hidden>グループに分ける</button>
               <button id="saveMigrationGroupMembership" class="primary">保存</button>
             </div>
+            <p id="migrationGroupSimpleNote" class="simple-mode-note" hidden>全DBに適用されるmigrationファイルです。グループに分けたい時だけ新しいグループを作成してください。</p>
             <div id="migrationGroupChecklist" class="migration-checklist"></div>
           </section>
         </div>
-        <div class="migration-assignment-editor">
+        <div id="migrationAssignmentEditor" class="migration-assignment-editor">
           <section>
             <h3>DBごとの適用グループ</h3>
             <div class="info-card">
@@ -536,10 +545,11 @@
       '対象をDry run': 'Dry run targets',
       '対象をBackup': 'Back up targets',
       '対象へ適用': 'Apply to targets',
-      '標準では全migrationがmainグループに入り、必要なDBだけ別グループへ分岐できます。': 'By default, all migrations belong to main; branch specific DBs into separate groups when needed.',
+      '通常はグループを意識せず、全DBに同じmigrationを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
       'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
       '新規グループ作成': 'Create group',
       '新規Migrationグループ': 'New Migration Group',
+      '全DBに適用されるmigrationファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
@@ -684,6 +694,9 @@
         createdMigrationFile: 'Migration file registered',
         createdDatabaseFile: 'DB registered',
         duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
+        newMigrationGroup: 'New group',
+        splitMigrationGroups: 'Split into groups',
+        allMigrationFilesTitle: 'Migration files applied to all DBs',
         migrationGroupsLabel: 'Migration Groups',
         dbGroupsLabel: 'DB Groups',
         upToDate: 'Up to date',

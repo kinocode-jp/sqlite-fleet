@@ -1,6 +1,9 @@
         createdMigrationFile: 'Migrationファイルを登録しました',
         createdDatabaseFile: 'DBを登録しました',
         duplicateMigrationGroup: (name) => `Migration Groupは既に存在します: ${name}`,
+        newMigrationGroup: '新規グループ作成',
+        splitMigrationGroups: 'グループに分ける',
+        allMigrationFilesTitle: '全DBに適用されるMigrationファイル',
         migrationGroupsLabel: 'Migrationグループ',
         dbGroupsLabel: 'DBグループ',
         upToDate: '最新',
@@ -268,10 +271,18 @@
     }
     function renderMigrationGroupEditor() {
       const groups = state.migration_groups || [];
+      const rules = state.database_migration_rules || [];
+      const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0;
       if (!groups.some((group) => group.name === selectedMigrationGroupName)) {
         selectedMigrationGroupName = groups.length ? groups[0].name : null;
       }
       const selectedGroup = groups.find((group) => group.name === selectedMigrationGroupName);
+      $('migrationGroupEditor').classList.toggle('simple', simpleMode);
+      $('migrationAssignmentEditor').hidden = simpleMode;
+      $('migrationGroupSimpleNote').hidden = !simpleMode;
+      $('openMigrationGroupModal').textContent = simpleMode ? t('splitMigrationGroups') : t('newMigrationGroup');
+      $('openMigrationGroupModalInline').hidden = !simpleMode;
+      $('openMigrationGroupModalInline').textContent = t('splitMigrationGroups');
       $('migrationGroupCards').innerHTML = groups.map((group) => {
         const active = group.name === selectedMigrationGroupName ? ' active' : '';
         return `<button type="button" class="group-list-item${active}" data-migration-group="${escapeHtml(group.name)}">
@@ -279,14 +290,21 @@
           <span>${escapeHtml(`${group.migrations.length} ${t('migrationsLabel')}`)}</span>
         </button>`;
       }).join('') || `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
-      $('selectedMigrationGroupTitle').textContent = selectedGroup ? selectedGroup.name : t('migrationFilesLabel');
-      $('saveMigrationGroupMembership').disabled = !selectedGroup;
+      $('selectedMigrationGroupTitle').textContent = simpleMode ? t('allMigrationFilesTitle') : (selectedGroup ? selectedGroup.name : t('migrationFilesLabel'));
+      $('saveMigrationGroupMembership').hidden = simpleMode;
+      $('saveMigrationGroupMembership').disabled = simpleMode || !selectedGroup;
       if (!selectedGroup) {
         $('migrationGroupChecklist').innerHTML = `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
         return;
       }
       const selectedVersions = new Set(selectedGroup.migrations.map((migration) => migration.version));
       const uniqueMigrations = uniqueMigrationsByVersion(state.migrations);
+      if (simpleMode) {
+        $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => `<div class="migration-row">
+          <strong>${escapeHtml(`${migration.version}_${migration.name}`)}</strong><br><span>${escapeHtml(migration.checksum)}</span>
+        </div>`).join('') || `<p class="muted">${escapeHtml(t('noMigrations'))}</p>`;
+        return;
+      }
       $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => {
         const checked = selectedVersions.has(migration.version) ? ' checked' : '';
         const id = `migrationGroupVersion-${escapeHtml(migration.version)}`;
@@ -730,6 +748,7 @@
       renderMigrationGroupEditor();
     });
     $('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal);
+    $('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal);
     $('closeMigrationGroupModal').addEventListener('click', closeMigrationGroupModal);
     $('cancelMigrationGroup').addEventListener('click', closeMigrationGroupModal);
     $('migrationGroupModal').addEventListener('click', (event) => {
