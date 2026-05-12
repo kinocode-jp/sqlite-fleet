@@ -39,10 +39,12 @@
         confirmSqlApply: '選択DBへSQLを適用します。続行しますか？',
         sqlDone: (mode, changed) => `${mode} 完了: changed=${changed}`,
         chooseTemplate: 'SQLテンプレートを選択してください',
+        noSnippets: '登録がありません',
         templateInserted: (name) => `${name} テンプレートを挿入しました。内容を確認・編集してください`,
         snippetSaved: (name) => `スニペットを保存しました: ${name}`,
         snippetInserted: (name) => `スニペットを挿入しました: ${name}`,
         snippetDeleted: (name) => `スニペットを削除しました: ${name}`,
+        confirmSnippetDelete: (name) => `スニペット「${name}」を削除します。SQLエディタの内容は削除されません。`,
         chooseSnippet: 'スニペットを選択してください',
         enterSnippetName: 'スニペット名を入力してください',
         enterSqlToSave: '保存するSQLを入力してください',
@@ -738,7 +740,9 @@
     function renderMigrationSnippets() {
       const snippets = loadMigrationSnippets();
       const names = Object.keys(snippets).sort();
-      $('newMigrationSnippetSelect').innerHTML = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      $('newMigrationSnippetSelect').innerHTML = names.length
+        ? names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
+        : `<option value="">${escapeHtml(t('noSnippets'))}</option>`;
     }
     function saveNewMigrationSnippet() {
       const name = $('newMigrationSnippetName').value.trim();
@@ -770,8 +774,26 @@
         message(t('chooseSnippet'), true);
         return;
       }
+      pendingSnippetDeleteName = name;
+      $('snippetDeleteMessage').textContent = t('confirmSnippetDelete', name);
+      $('snippetDeleteModal').hidden = false;
+      $('confirmSnippetDelete').focus();
+    }
+    function closeSnippetDeleteModal() {
+      pendingSnippetDeleteName = null;
+      $('snippetDeleteModal').hidden = true;
+    }
+    function confirmDeleteMigrationSnippet() {
+      const name = pendingSnippetDeleteName;
+      const snippets = loadMigrationSnippets();
+      if (!name || !Object.prototype.hasOwnProperty.call(snippets, name)) {
+        closeSnippetDeleteModal();
+        message(t('chooseSnippet'), true);
+        return;
+      }
       delete snippets[name];
       saveMigrationSnippets(snippets);
+      closeSnippetDeleteModal();
       message(t('snippetDeleted', name));
     }
     async function loadSchema(options = {}) {
@@ -1031,8 +1053,18 @@
     $('migrationFileModal').addEventListener('click', (event) => {
       if (event.target === $('migrationFileModal')) closeMigrationFileModal();
     });
+    $('closeSnippetDeleteModal').addEventListener('click', closeSnippetDeleteModal);
+    $('cancelSnippetDelete').addEventListener('click', closeSnippetDeleteModal);
+    $('confirmSnippetDelete').addEventListener('click', confirmDeleteMigrationSnippet);
+    $('snippetDeleteModal').addEventListener('click', (event) => {
+      if (event.target === $('snippetDeleteModal')) closeSnippetDeleteModal();
+    });
     document.addEventListener('keydown', (event) => {
       if (event.key !== 'Escape') return;
+      if (!$('snippetDeleteModal').hidden) {
+        closeSnippetDeleteModal();
+        return;
+      }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();
       if (!$('migrationFileModal').hidden) closeMigrationFileModal();
     });
