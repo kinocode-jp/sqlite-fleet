@@ -40,6 +40,10 @@ fn init_creates_nested_config_parent_directory() {
 
     assert!(config_path.exists());
     assert!(dir.path().join("nested").join("migrations").is_dir());
+
+    let config = Config::load(&config_path).unwrap();
+    let migrations = load_migrations(&config).unwrap();
+    assert!(migrations.is_empty());
 }
 
 #[test]

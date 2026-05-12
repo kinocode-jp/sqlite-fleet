@@ -825,8 +825,9 @@ path_glob = "./data/**/*.db"
 dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
-[migration_groups]
-core = ["001", "002"]
+# Uncomment after creating matching files in migrations/.
+# [migration_groups]
+# core = ["001", "002"]
 
 # [db_groups]
 # canary = ["tenant-a"]
