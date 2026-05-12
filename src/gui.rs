@@ -2555,7 +2555,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
       </div>
       <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行計画</a>
-        <a href='#topology-panel' data-page-link="groups"><span class="nav-icon">MAP</span>グループ管理</a>
+        <a href='#migration-groups-panel' data-page-link="migration-groups"><span class="nav-icon">MIG</span>Migrationグループ</a>
+        <a href='#db-groups-panel' data-page-link="db-groups"><span class="nav-icon">MAP</span>DBグループ</a>
         <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>Migration管理</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL作業</a>
@@ -2611,13 +2612,13 @@ const INDEX_HTML: &str = r#"<!doctype html>
         </div>
       </section>
 
-      <section class="panel page" data-page="groups" id="topology-panel">
+      <section class="panel page" data-page="migration-groups" id="migration-groups-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>グループ設計</h2>
-            <p class="panel-description">Migration Group、DB Group、DBごとの割当をまとめて確認します。</p>
+            <h2>Migrationグループ</h2>
+            <p class="panel-description">どのmigrationをどのグループとして扱うか、DBごとの割当と合わせて管理します。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetでは適用内容と適用先を別々のグループで設計します。">?</span>
+          <span class="tool-tip" tabindex="0" data-tip="Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。">?</span>
         </div>
         <div class="topology-grid">
           <section>
@@ -2630,15 +2631,6 @@ const INDEX_HTML: &str = r#"<!doctype html>
             <div id="migrationGroupCards" class="card-list"></div>
           </section>
           <section>
-            <h3>DB Groups</h3>
-            <div class="info-card">
-              <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
-              <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
-              <button id="saveDbGroup" class="primary">DB Group保存</button>
-            </div>
-            <div id="dbGroupCards" class="card-list"></div>
-          </section>
-          <section>
             <h3>DB -> Migration Groups</h3>
             <div class="info-card">
               <label class="field"><span class="field-label">DB selector</span><input id="manageRuleSelector" placeholder="tenant-a"></label>
@@ -2646,6 +2638,27 @@ const INDEX_HTML: &str = r#"<!doctype html>
               <button id="saveDatabaseRule" class="primary">割当保存</button>
             </div>
             <div id="databaseRules" class="card-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="db-groups" id="db-groups-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>DBグループ</h2>
+            <p class="panel-description">カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。">?</span>
+        </div>
+        <div class="topology-grid">
+          <section>
+            <h3>DB Groups</h3>
+            <div class="info-card">
+              <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
+              <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
+              <button id="saveDbGroup" class="primary">DB Group保存</button>
+            </div>
+            <div id="dbGroupCards" class="card-list"></div>
           </section>
         </div>
       </section>
@@ -2896,7 +2909,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
     const staticTranslations = {
       '管理画面ナビゲーション': 'Admin navigation',
       '実行計画': 'Run plan',
-      'グループ管理': 'Group management',
+      'Migrationグループ': 'Migration Groups',
+      'DBグループ': 'DB Groups',
       'DB管理': 'Database management',
       'Migration管理': 'Migration management',
       'SQL作業': 'SQL workspace',
@@ -2916,9 +2930,10 @@ const INDEX_HTML: &str = r#"<!doctype html>
       '対象をDry run': 'Dry run targets',
       '対象をBackup': 'Back up targets',
       '対象へ適用': 'Apply to targets',
-      'グループ設計': 'Group design',
-      'Migration Group、DB Group、DBごとの割当をまとめて確認します。': 'Manage Migration Groups, DB Groups, and DB-to-group assignments in one place.',
-      'sqlite-fleetでは適用内容と適用先を別々のグループで設計します。': 'sqlite-fleet models migration content and database targets as separate groups.',
+      'どのmigrationをどのグループとして扱うか、DBごとの割当と合わせて管理します。': 'Manage which migrations belong to each group together with DB assignments.',
+      'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
+      'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
+      'DB GroupはどのDBへ操作するかを決める対象セットです。実行計画のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in the run plan.',
       'Migration Group保存': 'Save Migration Group',
       'DB Group保存': 'Save DB Group',
       '割当保存': 'Save assignment',
@@ -3178,7 +3193,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
     const pageTitles = {
       en: {
         execute: 'Run plan',
-        groups: 'Group management',
+        'migration-groups': 'Migration Groups',
+        'db-groups': 'DB Groups',
         databases: 'Database management',
         migrations: 'Migration management',
         sql: 'SQL workspace',
@@ -3188,7 +3204,8 @@ const INDEX_HTML: &str = r#"<!doctype html>
       },
       ja: {
         execute: '実行計画',
-        groups: 'グループ管理',
+        'migration-groups': 'Migrationグループ',
+        'db-groups': 'DBグループ',
         databases: 'DB管理',
         migrations: 'Migration管理',
         sql: 'SQL作業',
@@ -5997,7 +6014,14 @@ mod tests {
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
         assert!(INDEX_HTML
-            .contains(r#"<section class="panel page" data-page="groups" id="topology-panel">"#));
+            .contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups">"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups">"#));
+        assert!(INDEX_HTML.contains(
+            r#"<section class="panel page" data-page="migration-groups" id="migration-groups-panel">"#
+        ));
+        assert!(INDEX_HTML.contains(
+            r#"<section class="panel page" data-page="db-groups" id="db-groups-panel">"#
+        ));
     }
 
     #[test]
