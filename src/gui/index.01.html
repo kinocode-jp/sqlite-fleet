@@ -2,7 +2,7 @@
         createdDatabaseFile: 'DBを追加しました',
         duplicateMigrationGroup: (name) => `マイグレーショングループは既に存在します: ${name}`,
         newMigrationGroup: 'グループ作成',
-        splitMigrationGroups: 'グループ分け',
+        splitMigrationGroups: 'グループ作成',
         allMigrationFilesTitle: '全DBに適用されるマイグレーションファイル',
         migrationGroupsLabel: 'マイグレーショングループ',
         dbGroupsLabel: 'DBグループ',
@@ -11,6 +11,11 @@
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'マイグレーションファイル',
         fileNameLabel: 'ファイル名',
+        versionLabel: 'バージョン',
+        nameLabel: '名前',
+        groupLabel: 'グループ',
+        checksumLabel: 'Checksum',
+        pathLabel: 'パス',
         latestMigrationFilename: (filename) => `現在の最新ファイル名は ${filename} です`,
         noLatestMigrationFilename: 'マイグレーションファイルはまだありません',
         targetDbLabel: '対象DB',
@@ -142,7 +147,7 @@
       renderSqlTemplates();
       renderLatestMigrationFilename();
       if (state) render();
-      else message(currentLocale === 'en' ? staticTranslations['読み込み中...'] : '読み込み中...');
+      else clearMessage();
     }
 
     function setBusy(value) {
@@ -160,9 +165,14 @@
       }
     }
     function message(text, isError = false) {
-      const el = $('message');
-      el.textContent = text;
+      $('messageText').textContent = text;
+      const el = $('messageBar');
       el.className = `message ${isError ? 'error' : 'muted'}`;
+      el.hidden = false;
+    }
+    function clearMessage() {
+      $('messageText').textContent = '';
+      $('messageBar').hidden = true;
     }
     function activePage() {
       const active = document.querySelector('.page.active[data-page]');
@@ -228,7 +238,7 @@
       try {
         state = await api('/api/state');
         render();
-        if (showLoadedMessage) message(t('loaded'));
+        if (showLoadedMessage) clearMessage();
       } catch (error) {
         message(error.message, true);
       }
@@ -271,8 +281,8 @@
         </tr>`;
       }).join('');
 
-      $('migrations').innerHTML = state.migrations.map((migration) => `<tr>
-        <td><code>${escapeHtml(migrationFileName(migration))}</code></td>
+      $('migrations').innerHTML = state.migrations.map((migration, index) => `<tr>
+        <td><button class="link-button" type="button" data-migration-detail-index="${escapeHtml(index)}"><code>${escapeHtml(migrationFileName(migration))}</code></button></td>
         <td>${chips([migration.group])}</td>
         <td><code>${escapeHtml(migration.checksum)}</code></td>
       </tr>`).join('') || `<tr><td colspan="3" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
@@ -353,6 +363,23 @@
         if (filename) return filename;
       }
       return `${migration.version}_${migration.name}.sql`;
+    }
+    function openMigrationDetailModal(index) {
+      const migration = state && state.migrations ? state.migrations[Number(index)] : null;
+      if (!migration) return;
+      const rows = [
+        [t('fileNameLabel'), migrationFileName(migration)],
+        [t('versionLabel'), migration.version],
+        [t('nameLabel'), migration.name],
+        [t('groupLabel'), migration.group],
+        [t('checksumLabel'), migration.checksum],
+        [t('pathLabel'), migration.path || ''],
+      ];
+      $('migrationDetailBody').innerHTML = `<div class="key-grid">${rows.map(([label, value]) => `<div class="key-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div>`;
+      $('migrationDetailModal').hidden = false;
+    }
+    function closeMigrationDetailModal() {
+      $('migrationDetailModal').hidden = true;
     }
     function renderDatabaseSelectors(plans) {
       const current = $('sqlDatabase').value;
@@ -1098,6 +1125,10 @@
       selectedMigrationGroupName = button.dataset.migrationGroup;
       renderMigrationGroupEditor();
     });
+    $('migrations').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-migration-detail-index]');
+      if (button) openMigrationDetailModal(button.dataset.migrationDetailIndex);
+    });
     $('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal);
     $('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal);
     $('openMigrationGroupModalFromMigrations').addEventListener('click', openMigrationGroupModal);
@@ -1112,6 +1143,11 @@
     $('migrationFileModal').addEventListener('click', (event) => {
       if (event.target === $('migrationFileModal')) closeMigrationFileModal();
     });
+    $('closeMigrationDetailModal').addEventListener('click', closeMigrationDetailModal);
+    $('closeMigrationDetail').addEventListener('click', closeMigrationDetailModal);
+    $('migrationDetailModal').addEventListener('click', (event) => {
+      if (event.target === $('migrationDetailModal')) closeMigrationDetailModal();
+    });
     $('closeSnippetDeleteModal').addEventListener('click', closeSnippetDeleteModal);
     $('cancelSnippetDelete').addEventListener('click', closeSnippetDeleteModal);
     $('confirmSnippetDelete').addEventListener('click', confirmDeleteMigrationSnippet);
@@ -1124,9 +1160,14 @@
         closeSnippetDeleteModal();
         return;
       }
+      if (!$('migrationDetailModal').hidden) {
+        closeMigrationDetailModal();
+        return;
+      }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();
       if (!$('migrationFileModal').hidden) closeMigrationFileModal();
     });
+    $('clearMessage').addEventListener('click', clearMessage);
     $('saveDbGroup').addEventListener('click', saveDbGroup);
     $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
     $('createMigrationFile').addEventListener('click', createMigrationFile);

@@ -31,8 +31,10 @@
     .page-title { display:grid; gap:4px; }
     .page-title h2 { margin:0; font-size:24px; line-height:1.2; }
     .page-title p { margin:0; color:var(--muted); }
-    .message { min-width:280px; max-width:520px; margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); box-shadow:var(--shadow); }
+    .message { min-width:280px; max-width:520px; margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .message[hidden] { display:none; }
     .message.error { border-color:#f2b8b5; background:var(--danger-bg); color:var(--danger); }
+    .message button { min-height:24px; padding:2px 7px; border:0; background:transparent; color:inherit; font-size:16px; line-height:1; }
     .summary { display:grid; grid-template-columns:repeat(6, minmax(130px, 1fr)); gap:12px; margin-bottom:18px; }
     .metric { min-height:88px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
     .metric strong { display:block; margin-top:6px; font-size:21px; line-height:1.15; overflow-wrap:anywhere; }
@@ -69,6 +71,8 @@
     button.danger { background:var(--danger); border-color:var(--danger); color:#fff; }
     button.danger:hover:not(:disabled) { filter:brightness(.94); color:#fff; }
     button:disabled { opacity:.55; cursor:wait; }
+    .link-button { min-height:0; padding:0; border:0; background:transparent; color:var(--accent-strong); font:inherit; text-align:left; text-decoration:underline; text-underline-offset:2px; box-shadow:none; }
+    .link-button:hover:not(:disabled), .link-button:focus { border:0; color:var(--accent); }
     input, select, textarea { width:100%; border:1px solid var(--line-strong); border-radius:6px; background:#fff; color:var(--text); font:inherit; padding:8px 10px; }
     input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px solid rgba(15,111,143,.18); outline-offset:1px; border-color:var(--accent); }
     textarea { min-height:300px; resize:vertical; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height:1.45; }
@@ -205,7 +209,7 @@
         <div class="page-title">
           <h2 id="pageHeading">実行</h2>
         </div>
-        <p id="message" class="message muted">読み込み中...</p>
+        <div id="messageBar" class="message muted" hidden><span id="messageText"></span><button id="clearMessage" type="button" aria-label="Close">×</button></div>
       </header>
       <section class="summary page active" data-page="execute" id="summary" aria-label="状態サマリー"></section>
 
@@ -252,7 +256,7 @@
           <section>
             <div class="section-header">
               <h3 id="selectedMigrationGroupTitle">Migration files</h3>
-              <button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>
+              <button id="openMigrationGroupModalInline" class="primary" hidden>グループ作成</button>
               <button id="saveMigrationGroupMembership" class="primary">保存</button>
             </div>
             <p id="migrationGroupSimpleNote" class="simple-mode-note" hidden>全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。</p>
@@ -337,10 +341,9 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>マイグレーション一覧</h2>
-            <p class="panel-description">読み込まれているマイグレーションをファイル名、グループ、checksumで確認します。</p>
           </div>
           <button id="openMigrationFileModal" class="primary">新規作成</button>
-          <button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>
+          <button id="openMigrationGroupModalFromMigrations" hidden>グループ作成</button>
           <span class="tool-tip" tabindex="0" data-tip="履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。">?</span>
         </div>
         <div class="table-wrap">
@@ -350,6 +353,19 @@
           </table>
         </div>
       </section>
+
+      <div id="migrationDetailModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="migrationDetailModalTitle">
+          <div class="modal-header">
+            <h2 id="migrationDetailModalTitle">マイグレーション詳細</h2>
+            <button id="closeMigrationDetailModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div id="migrationDetailBody" class="modal-body"></div>
+          <div class="modal-actions">
+            <button id="closeMigrationDetail" type="button">閉じる</button>
+          </div>
+        </section>
+      </div>
 
       <div id="migrationFileModal" class="modal-backdrop" hidden>
         <section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">
@@ -653,7 +669,6 @@
       '通常はグループを意識せず、全DBに同じマイグレーションを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
       'マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
       'グループ作成': 'Create group',
-      'グループ分け': 'Split into groups',
       '新規作成': 'Create new',
       '新規マイグレーショングループ': 'New Migration Group',
       '新規マイグレーション': 'New migration',
@@ -680,7 +695,6 @@
       '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
       'DBを追加': 'Add DB',
       'マイグレーション一覧': 'Migrations',
-      '読み込まれているマイグレーションをファイル名、グループ、checksumで確認します。': 'Review every loaded migration by file name, group, and checksum.',
       '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
       'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
@@ -701,6 +715,8 @@
       '削除': 'Delete',
       '登録がありません': 'No snippets',
       'スニペット削除': 'Delete snippet',
+      'マイグレーション詳細': 'Migration details',
+      '閉じる': 'Close',
       '選択したスニペットを削除します。': 'Delete the selected snippet.',
       'スニペットを削除': 'Delete snippet',
       'SQLファイル保存': 'Save SQL file',
@@ -812,12 +828,10 @@
       'Schema builder': 'スキーマ作成',
       'Settings': '設定',
       'Settings / permissions': '設定',
-      'Split into groups': 'グループ分け',
       'Add DB': 'DBを追加',
     };
     const localeText = {
       en: {
-        loaded: 'Showing the latest state',
         dbCount: 'DB count',
         failed: 'Failed',
         corruptMissing: 'Corrupt / missing',
@@ -841,7 +855,7 @@
         createdDatabaseFile: 'DB registered',
         duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
         newMigrationGroup: 'New group',
-        splitMigrationGroups: 'Split into groups',
+        splitMigrationGroups: 'Create group',
         allMigrationFilesTitle: 'Migration files applied to all DBs',
         migrationGroupsLabel: 'Migration Groups',
         dbGroupsLabel: 'DB Groups',
@@ -850,6 +864,11 @@
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'Migration files',
         fileNameLabel: 'File name',
+        versionLabel: 'Version',
+        nameLabel: 'Name',
+        groupLabel: 'Group',
+        checksumLabel: 'Checksum',
+        pathLabel: 'Path',
         latestMigrationFilename: (filename) => `Latest file name is ${filename}`,
         noLatestMigrationFilename: 'No migration files yet',
         targetDbLabel: 'Target DB',
@@ -909,7 +928,6 @@
         table: 'table',
       },
       ja: {
-        loaded: '最新状態を表示しています',
         dbCount: 'DB数',
         failed: '失敗',
         corruptMissing: '不整合/欠損',

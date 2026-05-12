@@ -108,6 +108,11 @@
         assert!(INDEX_HTML.contains(r#"<main class="content">"#));
         assert!(INDEX_HTML.contains("grid-template-columns:272px minmax(0, 1fr)"));
         assert!(INDEX_HTML.contains(r#"<header class="topbar">"#));
+        assert!(INDEX_HTML.contains(r#"<div id="messageBar" class="message muted" hidden>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="clearMessage" type="button" aria-label="Close">×</button>"#));
+        assert!(INDEX_HTML.contains("function clearMessage()"));
+        assert!(INDEX_HTML.contains("$('clearMessage').addEventListener('click', clearMessage)"));
+        assert!(!INDEX_HTML.contains(r#"<p id="message" class="message muted">読み込み中...</p>"#));
         assert!(INDEX_HTML.contains(".sidebar-nav a[hidden] { display:none; }"));
         assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">実行</h2>"#));
         assert!(!INDEX_HTML.contains("実行計画から管理するSQLite fleet"));
@@ -171,7 +176,7 @@
         assert!(INDEX_HTML.contains("function translateStaticDom()"));
         assert!(INDEX_HTML.contains("function setLocale(locale)"));
         assert!(INDEX_HTML.contains("'実行': 'Run'"));
-        assert!(INDEX_HTML.contains("'グループ分け': 'Split into groups'"));
+        assert!(INDEX_HTML.contains("'グループ作成': 'Create group'"));
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
         assert!(INDEX_HTML.contains("'Version': 'Version'"));
@@ -244,8 +249,8 @@
         assert!(INDEX_HTML.contains("escapeHtml(migrationFileName(migration))"));
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループ作成</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" hidden>グループ作成</button>"#));
         assert!(INDEX_HTML.contains(r#"<div id="migrationAssignmentEditor" class="migration-assignment-editor">"#));
         assert!(INDEX_HTML.contains(r#"id="migrationGroupSimpleNote" class="simple-mode-note" hidden"#));
         assert!(INDEX_HTML.contains("const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0"));
@@ -272,6 +277,9 @@
         assert!(INDEX_HTML.contains(r#"id="migrationFileModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
+        assert!(INDEX_HTML.contains(r#"id="migrationDetailModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="migrationDetailModalTitle">マイグレーション詳細</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<div id="migrationDetailBody" class="modal-body"></div>"#));
         assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(!INDEX_HTML.contains(r#"<thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(INDEX_HTML.contains(r#"<label class="field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
@@ -303,6 +311,8 @@
         assert!(INDEX_HTML.contains("function nextMigrationFileName()"));
         assert!(INDEX_HTML.contains("function latestMigrationFileName()"));
         assert!(INDEX_HTML.contains("function renderLatestMigrationFilename()"));
+        assert!(INDEX_HTML.contains("function openMigrationDetailModal(index)"));
+        assert!(INDEX_HTML.contains("function closeMigrationDetailModal()"));
         assert!(INDEX_HTML.contains("function parseMigrationFilename(value)"));
         assert!(INDEX_HTML.contains("function insertNewMigrationTemplate()"));
         assert!(INDEX_HTML.contains("function formatNewMigrationSql()"));
@@ -322,6 +332,9 @@
         assert!(INDEX_HTML.contains("$('newMigrationFilename').value = nextMigrationFileName()"));
         assert!(INDEX_HTML.contains("const filenameParts = parseMigrationFilename($('newMigrationFilename').value)"));
         assert!(INDEX_HTML.contains("filename: filenameParts.filename"));
+        assert!(INDEX_HTML.contains(r#"data-migration-detail-index="${escapeHtml(index)}""#));
+        assert!(INDEX_HTML.contains("$('migrations').addEventListener('click', (event) =>"));
+        assert!(INDEX_HTML.contains("$('closeMigrationDetailModal').addEventListener('click', closeMigrationDetailModal)"));
         assert!(INDEX_HTML.contains("return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`"));
         assert!(INDEX_HTML.contains("migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください"));
         assert!(INDEX_HTML.contains("$('newMigrationGroup').value = names.includes('main') ? 'main' : names[0]"));
