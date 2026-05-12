@@ -306,15 +306,9 @@
             <h2>マイグレーション一覧</h2>
             <p class="panel-description">読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。</p>
           </div>
-          <button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループ分け</button>
+          <button id="openMigrationFileModal" class="primary">新規作成</button>
+          <button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>
           <span class="tool-tip" tabindex="0" data-tip="履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。">?</span>
-        </div>
-        <div class="form-grid">
-          <label class="field"><span class="field-label">Version</span><input id="newMigrationVersion" placeholder="005"></label>
-          <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
-          <label class="field wide"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="main"></label>
-          <label class="field wide"><span class="field-label">SQL</span><textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea></label>
-          <div class="actions wide"><button id="createMigrationFile" class="primary">マイグレーションファイル追加</button></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -323,6 +317,25 @@
           </table>
         </div>
       </section>
+
+      <div id="migrationFileModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">
+          <div class="modal-header">
+            <h2 id="migrationFileModalTitle">新規マイグレーション</h2>
+            <button id="closeMigrationFileModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <label class="field"><span class="field-label">Version</span><input id="newMigrationVersion" placeholder="005"></label>
+            <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
+            <label class="field"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="main"></label>
+            <label class="field"><span class="field-label">SQL</span><textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea></label>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelMigrationFile" type="button">キャンセル</button>
+            <button id="createMigrationFile" class="primary">作成</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel page" data-page="sql" id="sql-panel">
         <div class="panel-header">
@@ -552,7 +565,9 @@
       'マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
       'グループ作成': 'Create group',
       'グループ分け': 'Split into groups',
+      '新規作成': 'Create new',
       '新規マイグレーショングループ': 'New Migration Group',
+      '新規マイグレーション': 'New migration',
       '全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       '作成': 'Create',
@@ -576,7 +591,6 @@
       'マイグレーション一覧': 'Migrations',
       '読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。': 'Review every loaded migration by version, group, and checksum.',
       '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
-      'マイグレーションファイル追加': 'Add migration file',
       'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
       'SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。': 'The DB used for SQL execution and schema loading.',
@@ -644,7 +658,9 @@
       'Resolved target': '解決済み対象',
       'Migration Groups': 'マイグレーショングループ',
       'Create group': 'グループ作成',
+      'Create new': '新規作成',
       'New Migration Group': '新規マイグレーショングループ',
+      'New migration': '新規マイグレーション',
       'Cancel': 'キャンセル',
       'Create': '作成',
       'DB Groups': 'DBグループ',
@@ -684,7 +700,6 @@
       'Settings / permissions': '設定',
       'Split into groups': 'グループ分け',
       'Add DB': 'DBを追加',
-      'Add migration file': 'マイグレーションファイル追加',
     };
     const localeText = {
       en: {

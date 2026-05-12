@@ -480,6 +480,17 @@
     function closeMigrationGroupModal() {
       $('migrationGroupModal').hidden = true;
     }
+    function openMigrationFileModal() {
+      $('newMigrationVersion').value = '';
+      $('newMigrationName').value = '';
+      $('newMigrationGroup').value = 'main';
+      $('newMigrationSql').value = '';
+      $('migrationFileModal').hidden = false;
+      $('newMigrationVersion').focus();
+    }
+    function closeMigrationFileModal() {
+      $('migrationFileModal').hidden = true;
+    }
     async function saveDbGroup() {
       try {
         await postAdmin('/api/admin/db-group', {
@@ -508,6 +519,7 @@
           group: $('newMigrationGroup').value,
           sql: $('newMigrationSql').value,
         });
+        closeMigrationFileModal();
       } catch (error) {
         message(error.message, true);
       }
@@ -769,8 +781,16 @@
     $('migrationGroupModal').addEventListener('click', (event) => {
       if (event.target === $('migrationGroupModal')) closeMigrationGroupModal();
     });
+    $('openMigrationFileModal').addEventListener('click', openMigrationFileModal);
+    $('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal);
+    $('cancelMigrationFile').addEventListener('click', closeMigrationFileModal);
+    $('migrationFileModal').addEventListener('click', (event) => {
+      if (event.target === $('migrationFileModal')) closeMigrationFileModal();
+    });
     document.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape' && !$('migrationGroupModal').hidden) closeMigrationGroupModal();
+      if (event.key !== 'Escape') return;
+      if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();
+      if (!$('migrationFileModal').hidden) closeMigrationFileModal();
     });
     $('saveDbGroup').addEventListener('click', saveDbGroup);
     $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);

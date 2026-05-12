@@ -172,8 +172,12 @@
         assert!(INDEX_HTML.contains("function setLocale(locale)"));
         assert!(INDEX_HTML.contains("'実行': 'Run'"));
         assert!(INDEX_HTML.contains("'グループ分け': 'Split into groups'"));
+        assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
+        assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
         assert!(INDEX_HTML.contains("'Run': '実行'"));
         assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
+        assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
+        assert!(INDEX_HTML.contains("'New migration': '新規マイグレーション'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
         assert!(INDEX_HTML.contains("'Migration Groups': 'マイグレーショングループ'"));
@@ -221,7 +225,7 @@
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループ分け</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>"#));
         assert!(INDEX_HTML.contains(r#"<div id="migrationAssignmentEditor" class="migration-assignment-editor">"#));
         assert!(INDEX_HTML.contains(r#"id="migrationGroupSimpleNote" class="simple-mode-note" hidden"#));
         assert!(INDEX_HTML.contains("const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0"));
@@ -238,6 +242,29 @@
         assert!(INDEX_HTML.contains("body: JSON.stringify({ name, versions: [] })"));
         assert!(INDEX_HTML.contains(".map((input) => input.dataset.migrationVersion)"));
         assert!(!INDEX_HTML.contains("manageMigrationGroupVersions"));
+    }
+
+    #[test]
+    fn html_uses_modal_for_migration_file_creation() {
+        assert!(INDEX_HTML.contains(
+            r#"<button id="openMigrationFileModal" class="primary">新規作成</button>"#
+        ));
+        assert!(INDEX_HTML.contains(r#"id="migrationFileModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(
+            r#"role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle""#
+        ));
+        assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<input id="newMigrationVersion" placeholder="005">"#));
+        assert!(INDEX_HTML.contains(r#"<textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea>"#));
+        assert!(INDEX_HTML.contains("function openMigrationFileModal()"));
+        assert!(INDEX_HTML.contains("function closeMigrationFileModal()"));
+        assert!(INDEX_HTML.contains("$('newMigrationGroup').value = 'main'"));
+        assert!(INDEX_HTML.contains("$('openMigrationFileModal').addEventListener('click', openMigrationFileModal)"));
+        assert!(INDEX_HTML.contains("$('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal)"));
+        assert!(INDEX_HTML.contains("$('cancelMigrationFile').addEventListener('click', closeMigrationFileModal)"));
+        assert!(INDEX_HTML.contains("if (event.target === $('migrationFileModal')) closeMigrationFileModal()"));
+        assert!(INDEX_HTML.contains("closeMigrationFileModal();"));
+        assert!(!INDEX_HTML.contains(r#"<button id="createMigrationFile" class="primary">マイグレーションファイル追加</button>"#));
     }
 
     #[test]
