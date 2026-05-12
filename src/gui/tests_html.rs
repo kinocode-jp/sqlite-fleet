@@ -183,7 +183,7 @@
         assert!(INDEX_HTML.contains("'登録がありません': 'No snippets'"));
         assert!(INDEX_HTML.contains("'スニペット削除': 'Delete snippet'"));
         assert!(INDEX_HTML.contains("'テンプレート検索': 'Search templates'"));
-        assert!(INDEX_HTML.contains("'スニペット保存': 'Save snippet'"));
+        assert!(INDEX_HTML.contains("'現在のSQLをスニペット保存': 'Save current SQL as snippet'"));
         assert!(INDEX_HTML.contains("'Run': '実行'"));
         assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
         assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
@@ -195,7 +195,7 @@
         assert!(INDEX_HTML.contains("'Format': 'フォーマット'"));
         assert!(INDEX_HTML.contains("'Clear': 'クリア'"));
         assert!(INDEX_HTML.contains("'Search templates': 'テンプレート検索'"));
-        assert!(INDEX_HTML.contains("'Save snippet': 'スニペット保存'"));
+        assert!(INDEX_HTML.contains("'Save current SQL as snippet': '現在のSQLをスニペット保存'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
         assert!(INDEX_HTML.contains("'Migration Groups': 'マイグレーショングループ'"));
@@ -282,7 +282,7 @@
         assert!(INDEX_HTML.contains(r#"<button id="clearNewMigrationSql" type="button">クリア</button>"#));
         assert!(INDEX_HTML.contains(r#"<input id="newMigrationSnippetName" placeholder="スニペット名">"#));
         assert!(INDEX_HTML.contains(r#"<select id="newMigrationSnippetSelect" aria-label="Snippet"></select>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="saveNewMigrationSnippet" type="button">スニペット保存</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="saveNewMigrationSnippet" type="button">現在のSQLをスニペット保存</button>"#));
         assert!(INDEX_HTML.contains(r#"id="snippetDeleteModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="snippetDeleteModalTitle">スニペット削除</h2>"#));
         assert!(INDEX_HTML.contains(r#"<button id="confirmSnippetDelete" type="button" class="danger">スニペットを削除</button>"#));
