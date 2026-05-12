@@ -174,10 +174,14 @@
         assert!(INDEX_HTML.contains("'グループ分け': 'Split into groups'"));
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
+        assert!(INDEX_HTML.contains("'整形': 'Format'"));
+        assert!(INDEX_HTML.contains("'クリア': 'Clear'"));
         assert!(INDEX_HTML.contains("'Run': '実行'"));
         assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
         assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
         assert!(INDEX_HTML.contains("'New migration': '新規マイグレーション'"));
+        assert!(INDEX_HTML.contains("'Format': '整形'"));
+        assert!(INDEX_HTML.contains("'Clear': 'クリア'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
         assert!(INDEX_HTML.contains("'Migration Groups': 'マイグレーショングループ'"));
@@ -250,21 +254,44 @@
             r#"<button id="openMigrationFileModal" class="primary">新規作成</button>"#
         ));
         assert!(INDEX_HTML.contains(r#"id="migrationFileModal" class="modal-backdrop" hidden"#));
-        assert!(INDEX_HTML.contains(
-            r#"role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle""#
-        ));
+        assert!(INDEX_HTML.contains(r#"<section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
         assert!(INDEX_HTML.contains(r#"<input id="newMigrationVersion" placeholder="005">"#));
+        assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>"#));
+        assert!(INDEX_HTML.contains(r#"<select id="newMigrationSqlTemplate" aria-label="SQL template"></select>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="insertNewMigrationTemplate" type="button">テンプレート挿入</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="formatNewMigrationSql" type="button">整形</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="clearNewMigrationSql" type="button">クリア</button>"#));
         assert!(INDEX_HTML.contains(r#"<textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea>"#));
+        assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlCursor">Ln 1, Col 1</span>"#));
+        assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlStats">0 bytes / 0 lines</span>"#));
         assert!(INDEX_HTML.contains("function openMigrationFileModal()"));
         assert!(INDEX_HTML.contains("function closeMigrationFileModal()"));
-        assert!(INDEX_HTML.contains("$('newMigrationGroup').value = 'main'"));
+        assert!(INDEX_HTML.contains("function renderMigrationFileGroupOptions()"));
+        assert!(INDEX_HTML.contains("function insertNewMigrationTemplate()"));
+        assert!(INDEX_HTML.contains("function formatNewMigrationSql()"));
+        assert!(INDEX_HTML.contains("function updateNewMigrationSqlMeta()"));
+        assert!(INDEX_HTML.contains("function handleSqlEditorKeydown(event)"));
+        assert!(INDEX_HTML.contains("$('newMigrationGroup').value = names.includes('main') ? 'main' : names[0]"));
+        assert!(!INDEX_HTML.contains("openMigrationFileModal() {\n      renderMigrationFileGroupOptions();\n      $('newMigrationVersion').value = '';\n      $('newMigrationName').value = '';\n      $('newMigrationGroup').value = 'main';"));
+        assert!(INDEX_HTML.contains("$('newMigrationGroupField').hidden = names.length <= 1 && names[0] === 'main'"));
         assert!(INDEX_HTML.contains("$('openMigrationFileModal').addEventListener('click', openMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('cancelMigrationFile').addEventListener('click', closeMigrationFileModal)"));
+        assert!(INDEX_HTML.contains("$('insertNewMigrationTemplate').addEventListener('click', insertNewMigrationTemplate)"));
+        assert!(INDEX_HTML.contains("$('formatNewMigrationSql').addEventListener('click', formatNewMigrationSql)"));
+        assert!(INDEX_HTML.contains("$('newMigrationSql').addEventListener('keydown', handleSqlEditorKeydown)"));
         assert!(INDEX_HTML.contains("if (event.target === $('migrationFileModal')) closeMigrationFileModal()"));
         assert!(INDEX_HTML.contains("closeMigrationFileModal();"));
         assert!(!INDEX_HTML.contains(r#"<button id="createMigrationFile" class="primary">マイグレーションファイル追加</button>"#));
+    }
+
+    #[test]
+    fn html_sql_format_does_not_split_semicolons() {
+        assert!(INDEX_HTML.contains("function formatSqlText(sql)"));
+        assert!(INDEX_HTML.contains(".map((line) => line.trimEnd())"));
+        assert!(INDEX_HTML.contains(".replace(/\\n{3,}/g, '\\n\\n')"));
+        assert!(!INDEX_HTML.contains(".replace(/;(?!\\s*$)\\s*/g, ';\\n')"));
     }
 
     #[test]

@@ -268,6 +268,7 @@
       </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
 
       renderMigrationGroupEditor();
+      renderMigrationFileGroupOptions();
 
       $('dbGroupCards').innerHTML = state.db_groups.map((group) => `<article class="info-card">
         <strong>${escapeHtml(group.name)}</strong>
@@ -481,10 +482,11 @@
       $('migrationGroupModal').hidden = true;
     }
     function openMigrationFileModal() {
+      renderMigrationFileGroupOptions();
       $('newMigrationVersion').value = '';
       $('newMigrationName').value = '';
-      $('newMigrationGroup').value = 'main';
       $('newMigrationSql').value = '';
+      updateNewMigrationSqlMeta();
       $('migrationFileModal').hidden = false;
       $('newMigrationVersion').focus();
     }
@@ -538,6 +540,61 @@
       $('sqlTemplate').innerHTML = Object.entries(sqlTemplates)
         .map(([key, template]) => `<option value="${escapeHtml(key)}">${escapeHtml(template[0])}</option>`)
         .join('');
+      $('newMigrationSqlTemplate').innerHTML = Object.entries(sqlTemplates)
+        .map(([key, template]) => `<option value="${escapeHtml(key)}">${escapeHtml(template[0])}</option>`)
+        .join('');
+    }
+    function renderMigrationFileGroupOptions() {
+      const groups = (state && state.migration_groups ? state.migration_groups : []).map((group) => group.name);
+      const names = groups.length ? groups : ['main'];
+      $('newMigrationGroup').innerHTML = names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('');
+      $('newMigrationGroup').value = names.includes('main') ? 'main' : names[0];
+      $('newMigrationGroupField').hidden = names.length <= 1 && names[0] === 'main';
+    }
+    function insertNewMigrationTemplate() {
+      const template = sqlTemplates[$('newMigrationSqlTemplate').value];
+      if (!template) {
+        message(t('chooseTemplate'), true);
+        return;
+      }
+      insertIntoTextarea($('newMigrationSql'), template[1]);
+      updateNewMigrationSqlMeta();
+      message(t('templateInserted', template[0]));
+    }
+    function formatSqlText(sql) {
+      return String(sql || '')
+        .replace(/\r\n?/g, '\n')
+        .split('\n')
+        .map((line) => line.trimEnd())
+        .join('\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+    }
+    function formatNewMigrationSql() {
+      const formatted = formatSqlText($('newMigrationSql').value);
+      $('newMigrationSql').value = formatted ? `${formatted}\n` : '';
+      updateNewMigrationSqlMeta();
+    }
+    function clearNewMigrationSql() {
+      $('newMigrationSql').value = '';
+      updateNewMigrationSqlMeta();
+      $('newMigrationSql').focus();
+    }
+    function updateNewMigrationSqlMeta() {
+      const editor = $('newMigrationSql');
+      const sql = editor.value || '';
+      const beforeCursor = sql.slice(0, editor.selectionStart || 0);
+      const lines = sql.split('\n');
+      const currentLine = beforeCursor.split('\n');
+      const bytes = new TextEncoder().encode(sql).length;
+      $('newMigrationSqlCursor').textContent = `Ln ${currentLine.length}, Col ${currentLine[currentLine.length - 1].length + 1}`;
+      $('newMigrationSqlStats').textContent = `${bytes} bytes / ${lines.length} lines`;
+    }
+    function handleSqlEditorKeydown(event) {
+      if (event.key !== 'Tab') return;
+      event.preventDefault();
+      insertIntoTextarea(event.target, '  ');
+      updateNewMigrationSqlMeta();
     }
     async function loadSchema(options = {}) {
       const showLoadedMessage = options.showLoadedMessage !== false;
@@ -652,6 +709,15 @@
     function setSql(sql) {
       $('sqlInput').value = sql;
       $('sqlInput').focus();
+    }
+    function insertIntoTextarea(textarea, text) {
+      const start = textarea.selectionStart || 0;
+      const end = textarea.selectionEnd || 0;
+      const value = textarea.value || '';
+      textarea.value = `${value.slice(0, start)}${text}${value.slice(end)}`;
+      const nextPosition = start + text.length;
+      textarea.setSelectionRange(nextPosition, nextPosition);
+      textarea.focus();
     }
     function insertSelectedTemplate() {
       const template = sqlTemplates[$('sqlTemplate').value];
@@ -795,6 +861,13 @@
     $('saveDbGroup').addEventListener('click', saveDbGroup);
     $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
     $('createMigrationFile').addEventListener('click', createMigrationFile);
+    $('insertNewMigrationTemplate').addEventListener('click', insertNewMigrationTemplate);
+    $('formatNewMigrationSql').addEventListener('click', formatNewMigrationSql);
+    $('clearNewMigrationSql').addEventListener('click', clearNewMigrationSql);
+    $('newMigrationSql').addEventListener('input', updateNewMigrationSqlMeta);
+    $('newMigrationSql').addEventListener('click', updateNewMigrationSqlMeta);
+    $('newMigrationSql').addEventListener('keyup', updateNewMigrationSqlMeta);
+    $('newMigrationSql').addEventListener('keydown', handleSqlEditorKeydown);
     $('createDatabaseFile').addEventListener('click', createDatabaseFile);
     $('sqlFile').addEventListener('change', async (event) => {
       const file = event.target.files && event.target.files[0];
