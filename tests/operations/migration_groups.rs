@@ -107,6 +107,75 @@ fn legacy_dir_migration_groups_do_not_require_default_migrations_dir() {
 }
 
 #[test]
+fn empty_core_group_does_not_disable_default_migrations_for_unassigned_databases() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("data")).unwrap();
+    fs::create_dir_all(dir.path().join("migrations")).unwrap();
+    let db = dir.path().join("data").join("tenant.db");
+    create_db(&db, "base_items");
+    fs::write(
+        dir.path().join("migrations").join("001_create_items.sql"),
+        "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+    let mut config = base_config(&dir);
+    config.migration_groups = HashMap::from([(
+        "core".to_string(),
+        MigrationGroupConfig::versions(Vec::new()),
+    )]);
+
+    let report = migrate_with_options(
+        &config,
+        MigrateOptions {
+            dry_run: false,
+            selection: DatabaseSelection::default(),
+            backup_before_migrate: Some(false),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.applied_databases, 1);
+    assert!(table_exists(&db, "items"));
+}
+
+#[test]
+fn empty_migration_group_can_be_assigned_to_database() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("data")).unwrap();
+    fs::create_dir_all(dir.path().join("migrations")).unwrap();
+    let empty_db = dir.path().join("data").join("tenant-empty.db");
+    let default_db = dir.path().join("data").join("tenant-default.db");
+    create_db(&empty_db, "base_items");
+    create_db(&default_db, "base_items");
+    fs::write(
+        dir.path().join("migrations").join("001_create_items.sql"),
+        "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+    let mut config = base_config(&dir);
+    config.migration_groups = HashMap::from([(
+        "core".to_string(),
+        MigrationGroupConfig::versions(Vec::new()),
+    )]);
+    config.database_migration_groups =
+        HashMap::from([("tenant-empty".to_string(), vec!["core".to_string()])]);
+
+    let report = migrate_with_options(
+        &config,
+        MigrateOptions {
+            dry_run: false,
+            selection: DatabaseSelection::default(),
+            backup_before_migrate: Some(false),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.applied_databases, 1);
+    assert!(!table_exists(&empty_db, "items"));
+    assert!(table_exists(&default_db, "items"));
+}
+
+#[test]
 fn migration_group_membership_can_share_fixed_migration_files() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("data")).unwrap();
@@ -421,4 +490,3 @@ fn migrate_blocks_history_for_migration_group_that_is_no_longer_targeted() {
     assert_eq!(report.applied_databases, 0);
     assert!(!table_exists(&db_path, "more_core_items"));
 }
-

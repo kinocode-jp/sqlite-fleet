@@ -176,8 +176,8 @@
         assert!(INDEX_HTML.contains("[t('dbGroupsLabel'), state.db_groups.length]"));
         assert!(INDEX_HTML.contains("[t('upToDate'), s.up_to_date]"));
         assert!(INDEX_HTML.contains("[t('pendingDb'), s.pending]"));
-        assert!(INDEX_HTML.contains("escapeHtml(t('migrationsLabel'))"));
-        assert!(INDEX_HTML.contains("escapeHtml(t('targetDbLabel'))"));
+        assert!(INDEX_HTML.contains("${t('migrationsLabel')}"));
+        assert!(INDEX_HTML.contains("t('migrationFilesLabel')"));
         assert!(INDEX_HTML.contains("escapeHtml(t('selectorsLabel'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('previewLabel'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
@@ -196,12 +196,23 @@
         assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupName" placeholder="premium">"#));
         assert!(INDEX_HTML.contains("function openMigrationGroupModal()"));
         assert!(INDEX_HTML.contains("function closeMigrationGroupModal()"));
+        assert!(INDEX_HTML.contains("function renderMigrationGroupEditor()"));
+        assert!(INDEX_HTML.contains("function saveMigrationGroupMembership()"));
+        assert!(INDEX_HTML.contains("function uniqueMigrationsByVersion(migrations)"));
+        assert!(INDEX_HTML.contains("const byVersion = new Map()"));
+        assert!(INDEX_HTML.contains("if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration)"));
+        assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
+        assert!(INDEX_HTML.contains(r#"<div class="migration-assignment-editor">"#));
+        assert!(INDEX_HTML.contains(r#"<button id="saveDatabaseRule" class="primary">適用グループ保存</button>"#));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal)"));
+        assert!(INDEX_HTML.contains("$('migrationGroupCards').addEventListener('click', (event) =>"));
         assert!(INDEX_HTML.contains("const name = requireValue('manageMigrationGroupName', 'Group name')"));
         assert!(INDEX_HTML.contains("(state.migration_groups || []).some((group) => group.name === name)"));
         assert!(INDEX_HTML.contains("throw new Error(t('duplicateMigrationGroup', name))"));
         assert!(INDEX_HTML.contains("duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`"));
-        assert!(INDEX_HTML.contains("versions: state.migrations.map((migration) => migration.version)"));
+        assert!(INDEX_HTML.contains("body: JSON.stringify({ name, versions: [] })"));
+        assert!(INDEX_HTML.contains(".map((input) => input.dataset.migrationVersion)"));
         assert!(!INDEX_HTML.contains("manageMigrationGroupVersions"));
     }
 

@@ -274,8 +274,22 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     let request: MigrationGroupRequest =
         serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
     let name = clean_name(&request.name, "Migration group name")?;
-    let versions = clean_list(request.versions, "versions")?;
+    let versions = clean_version_list(request.versions)?;
     let mut config = locked_config(state)?;
+    if config.migration_groups.is_empty() && name != "default" {
+        let default_versions = if config.resolve_path(&config.migrations.dir).exists() {
+            load_migrations(&config)?
+                .into_iter()
+                .map(|migration| migration.version)
+                .collect::<Vec<_>>()
+        } else {
+            Vec::new()
+        };
+        config.migration_groups.insert(
+            "default".to_string(),
+            MigrationGroupConfig::versions(default_versions),
+        );
+    }
     match config.migration_groups.get_mut(&name) {
         Some(group) => group.migrations = versions,
         None => {
@@ -288,6 +302,17 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     Ok(AdminResult::new(format!(
         "migration group を保存しました: {name}"
     )))
+}
+
+fn clean_version_list(values: Vec<String>) -> Result<Vec<String>> {
+    let mut cleaned = Vec::new();
+    for value in values {
+        let value = clean_version(&value)?;
+        if !cleaned.contains(&value) {
+            cleaned.push(value);
+        }
+    }
+    Ok(cleaned)
 }
 
 fn api_save_db_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
@@ -422,4 +447,3 @@ fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminR
         path.display()
     )))
 }
-

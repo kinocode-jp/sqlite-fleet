@@ -89,6 +89,17 @@
     .target-preview { min-height:38px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
     .topology-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; padding:16px; }
     .topology-grid h3 { margin:0 0 10px; font-size:14px; }
+    .migration-group-editor { display:grid; grid-template-columns:280px minmax(0, 1fr); gap:14px; padding:16px; }
+    .group-list { display:grid; gap:6px; }
+    .group-list-item { display:grid; gap:3px; width:100%; min-height:56px; padding:9px 10px; text-align:left; white-space:normal; }
+    .group-list-item.active { border-color:var(--accent); background:#eaf6fa; color:var(--accent-strong); }
+    .group-list-item span { color:var(--muted); font-size:12px; font-weight:650; }
+    .migration-checklist { display:grid; gap:6px; }
+    .check-row { display:grid; grid-template-columns:22px minmax(0, 1fr); gap:8px; align-items:center; min-height:40px; padding:8px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+    .check-row input { width:auto; margin:0; }
+    .check-row strong { font-size:13px; overflow-wrap:anywhere; }
+    .check-row span { color:var(--muted); font-size:12px; }
+    .migration-assignment-editor { display:grid; grid-template-columns:320px minmax(0, 1fr); gap:14px; padding:16px; border-top:1px solid var(--line); background:var(--surface-2); }
     .card-list { display:grid; gap:10px; }
     .info-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
     .info-card strong { font-size:14px; overflow-wrap:anywhere; }
@@ -110,7 +121,7 @@
     .modal-body { display:grid; gap:14px; padding:16px; }
     .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:0 16px 16px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
-    @media (max-width:900px) { .topology-grid { grid-template-columns:1fr; } }
+    @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
     @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help { grid-template-columns:1fr; } .form-grid .wide { grid-column:auto; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
@@ -188,14 +199,23 @@
           </div>
           <span class="tool-tip" tabindex="0" data-tip="Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。">?</span>
         </div>
-        <div class="topology-grid">
+        <div class="migration-group-editor">
           <section>
             <div class="section-header">
               <h3>Migration Groups</h3>
               <button id="openMigrationGroupModal" class="primary">新規グループ作成</button>
             </div>
-            <div id="migrationGroupCards" class="card-list"></div>
+            <div id="migrationGroupCards" class="group-list"></div>
           </section>
+          <section>
+            <div class="section-header">
+              <h3 id="selectedMigrationGroupTitle">Migration files</h3>
+              <button id="saveMigrationGroupMembership" class="primary">保存</button>
+            </div>
+            <div id="migrationGroupChecklist" class="migration-checklist"></div>
+          </section>
+        </div>
+        <div class="migration-assignment-editor">
           <section>
             <h3>DBごとの適用グループ</h3>
             <div class="info-card">
@@ -203,6 +223,9 @@
               <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするMigration Groupです。複数指定できます。">?</span></span><input id="manageRuleGroups" placeholder="core, premium"></label>
               <button id="saveDatabaseRule" class="primary">適用グループ保存</button>
             </div>
+          </section>
+          <section>
+            <h3>登録済み割当</h3>
             <div id="databaseRules" class="card-list"></div>
           </section>
         </div>
@@ -485,6 +508,7 @@
     };
     let state = null;
     let schemaState = null;
+    let selectedMigrationGroupName = null;
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const textNodeSources = new WeakMap();
@@ -525,6 +549,7 @@
       'DBごとの適用グループ': 'Per-DB Migration Groups',
       'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
       'Applied Migration Groups': 'Applied Migration Groups',
+      'Migration files': 'Migration files',
       'このDBで適用対象にするMigration Groupです。複数指定できます。': 'Migration Groups that apply to this DB. Multiple groups are allowed.',
       '適用グループ保存': 'Save applied groups',
       'DBマトリクス': 'Database matrix',
@@ -611,6 +636,7 @@
       'DB selector': 'DBセレクタ',
       'Migration groups': 'Migrationグループ',
       'Applied Migration Groups': '適用Migrationグループ',
+      'Migration files': 'Migrationファイル',
       'New DB path': '新規DBパス',
       'Add to DB group': 'DBグループへ追加',
       'Version': 'Version',
@@ -660,6 +686,7 @@
         upToDate: 'Up to date',
         pendingDb: 'Pending DB',
         migrationsLabel: 'Migrations',
+        migrationFilesLabel: 'Migration files',
         targetDbLabel: 'Target DB',
         assignedGroupsLabel: 'Applied Migration Groups',
         selectorsLabel: 'Selectors',

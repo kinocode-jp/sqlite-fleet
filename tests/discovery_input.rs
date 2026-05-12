@@ -285,7 +285,7 @@ dr = "migrations/core"
 }
 
 #[test]
-fn config_load_rejects_empty_migration_group_table() {
+fn config_load_accepts_empty_migration_group_table() {
     let dir = tempdir().unwrap();
     let config_path = dir.path().join("sqlite-fleet.toml");
     fs::write(
@@ -300,8 +300,13 @@ path_glob = "data/*.db"
     )
     .unwrap();
 
-    let error = Config::load(&config_path).unwrap_err().to_string();
-    assert!(error.contains("dir または migrations が必要"), "{error}");
+    let config = Config::load(&config_path).unwrap();
+    assert!(config
+        .migration_groups
+        .get("core")
+        .unwrap()
+        .migrations
+        .is_empty());
 }
 
 #[test]

@@ -22,7 +22,7 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
         let group_configs = config.effective_migration_groups();
         let base_migrations = if group_configs
             .values()
-            .any(|group_config| group_config.dir.is_none())
+            .any(|group_config| group_config.dir.is_none() && !group_config.migrations.is_empty())
         {
             Some(load_migrations_from_dir(
                 config,
@@ -54,6 +54,9 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
                 }
                 migrations.extend(group_migrations);
             } else {
+                if group_config.migrations.is_empty() {
+                    continue;
+                }
                 let base_migrations = base_migrations
                     .as_ref()
                     .expect("base migrations are loaded for version-list migration groups");

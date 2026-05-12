@@ -6,6 +6,7 @@
         upToDate: '最新',
         pendingDb: '未適用DB',
         migrationsLabel: 'Migrations',
+        migrationFilesLabel: 'Migrationファイル',
         targetDbLabel: '対象DB',
         assignedGroupsLabel: '適用Migrationグループ',
         selectorsLabel: 'セレクタ',
@@ -140,6 +141,9 @@
       if (!disabled && state && state.status && state.status.plans.length === 0) {
         $('sqlDatabase').disabled = true;
       }
+      if (!disabled && state && !selectedMigrationGroupName) {
+        $('saveMigrationGroupMembership').disabled = true;
+      }
     }
     function message(text, isError = false) {
       const el = $('message');
@@ -246,11 +250,7 @@
         <td><code>${escapeHtml(migration.checksum)}</code></td>
       </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
 
-      $('migrationGroupCards').innerHTML = state.migration_groups.map((group) => `<article class="info-card">
-        <strong>${escapeHtml(group.name)}</strong>
-        <div><span class="label">${escapeHtml(t('migrationsLabel'))}</span><div>${group.migrations.length ? escapeHtml(group.migrations.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</div></div>
-        <div><span class="label">${escapeHtml(t('targetDbLabel'))}</span><div>${chips(group.databases)}</div></div>
-      </article>`).join('') || `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
+      renderMigrationGroupEditor();
 
       $('dbGroupCards').innerHTML = state.db_groups.map((group) => `<article class="info-card">
         <strong>${escapeHtml(group.name)}</strong>
@@ -265,6 +265,43 @@
 
       renderSettings();
       updateTargetPreview();
+    }
+    function renderMigrationGroupEditor() {
+      const groups = state.migration_groups || [];
+      if (!groups.some((group) => group.name === selectedMigrationGroupName)) {
+        selectedMigrationGroupName = groups.length ? groups[0].name : null;
+      }
+      const selectedGroup = groups.find((group) => group.name === selectedMigrationGroupName);
+      $('migrationGroupCards').innerHTML = groups.map((group) => {
+        const active = group.name === selectedMigrationGroupName ? ' active' : '';
+        return `<button type="button" class="group-list-item${active}" data-migration-group="${escapeHtml(group.name)}">
+          <strong>${escapeHtml(group.name)}</strong>
+          <span>${escapeHtml(`${group.migrations.length} ${t('migrationsLabel')}`)}</span>
+        </button>`;
+      }).join('') || `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
+      $('selectedMigrationGroupTitle').textContent = selectedGroup ? selectedGroup.name : t('migrationFilesLabel');
+      $('saveMigrationGroupMembership').disabled = !selectedGroup;
+      if (!selectedGroup) {
+        $('migrationGroupChecklist').innerHTML = `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
+        return;
+      }
+      const selectedVersions = new Set(selectedGroup.migrations.map((migration) => migration.version));
+      const uniqueMigrations = uniqueMigrationsByVersion(state.migrations);
+      $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => {
+        const checked = selectedVersions.has(migration.version) ? ' checked' : '';
+        const id = `migrationGroupVersion-${escapeHtml(migration.version)}`;
+        return `<label class="check-row" for="${id}">
+          <input id="${id}" type="checkbox" data-migration-version="${escapeHtml(migration.version)}"${checked}>
+          <span><strong>${escapeHtml(`${migration.version}_${migration.name}`)}</strong><br><span>${escapeHtml(migration.checksum)}</span></span>
+        </label>`;
+      }).join('') || `<p class="muted">${escapeHtml(t('noMigrations'))}</p>`;
+    }
+    function uniqueMigrationsByVersion(migrations) {
+      const byVersion = new Map();
+      for (const migration of migrations || []) {
+        if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration);
+      }
+      return Array.from(byVersion.values());
     }
     function renderDatabaseSelectors(plans) {
       const current = $('sqlDatabase').value;
@@ -377,11 +414,28 @@
         if ((state.migration_groups || []).some((group) => group.name === name)) {
           throw new Error(t('duplicateMigrationGroup', name));
         }
-        await postAdmin('/api/admin/migration-group', {
-          name,
-          versions: state.migrations.map((migration) => migration.version),
+        const result = await api('/api/admin/migration-group', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, versions: [] }),
         });
+        selectedMigrationGroupName = name;
+        message(adminSuccessMessage('/api/admin/migration-group', result.message));
         closeMigrationGroupModal();
+        await load({ showLoadedMessage: false });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveMigrationGroupMembership() {
+      try {
+        if (!selectedMigrationGroupName) throw new Error(t('noMigrationGroups'));
+        const versions = Array.from($('migrationGroupChecklist').querySelectorAll('input[data-migration-version]:checked'))
+          .map((input) => input.dataset.migrationVersion);
+        await postAdmin('/api/admin/migration-group', {
+          name: selectedMigrationGroupName,
+          versions,
+        });
       } catch (error) {
         message(error.message, true);
       }
@@ -668,6 +722,13 @@
       history.replaceState(null, '', link.getAttribute('href'));
     }));
     $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
+    $('saveMigrationGroupMembership').addEventListener('click', saveMigrationGroupMembership);
+    $('migrationGroupCards').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-migration-group]');
+      if (!button) return;
+      selectedMigrationGroupName = button.dataset.migrationGroup;
+      renderMigrationGroupEditor();
+    });
     $('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal);
     $('closeMigrationGroupModal').addEventListener('click', closeMigrationGroupModal);
     $('cancelMigrationGroup').addEventListener('click', closeMigrationGroupModal);

@@ -452,6 +452,88 @@
     }
 
     #[test]
+    fn api_save_empty_migration_group_preserves_implicit_default_migrations() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        std::fs::write(
+            migration_dir.join("002_more.sql"),
+            "CREATE TABLE more(id INTEGER);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_save_migration_group(
+            &state,
+            br#"{"name":"premium","versions":[]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(
+            config
+                .migration_groups
+                .get("default")
+                .unwrap()
+                .migrations,
+            vec!["001", "002"]
+        );
+        assert!(config
+            .migration_groups
+            .get("premium")
+            .unwrap()
+            .migrations
+            .is_empty());
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["001", "002"]);
+    }
+
+    #[test]
+    fn api_save_empty_migration_group_allows_missing_migrations_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_save_migration_group(
+            &state,
+            br#"{"name":"premium","versions":[]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert!(config
+            .migration_groups
+            .get("default")
+            .unwrap()
+            .migrations
+            .is_empty());
+        assert!(config
+            .migration_groups
+            .get("premium")
+            .unwrap()
+            .migrations
+            .is_empty());
+        let migrations = load_migrations(&config).unwrap();
+        assert!(migrations.is_empty());
+    }
+
+    #[test]
     fn api_create_migration_file_for_dir_group_writes_into_group_dir() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("legacy_migrations");
@@ -759,4 +841,3 @@
         assert!(audit.contains(r#""operation":"gui.backup""#), "{audit}");
         assert!(dir.path().join("backups").exists());
     }
-

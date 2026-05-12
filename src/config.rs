@@ -5,7 +5,6 @@ use crate::{
     sqlite_ident::validate_identifier,
 };
 use anyhow::{anyhow, bail, Context, Result};
-use serde::de::Error as DeError;
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
@@ -121,11 +120,6 @@ impl<'de> Deserialize<'de> for MigrationGroupConfig {
                 Ok(MigrationGroupConfig::versions(migrations))
             }
             MigrationGroupConfigInput::Table(MigrationGroupConfigTable { dir, migrations }) => {
-                if dir.is_none() && migrations.is_empty() {
-                    return Err(D::Error::custom(
-                        "migration group table には dir または migrations が必要です",
-                    ));
-                }
                 Ok(MigrationGroupConfig { dir, migrations })
             }
         }
@@ -531,9 +525,6 @@ impl Config {
         validate_identifier(&self.migrations.table)?;
         for (group, config) in &self.migration_groups {
             validate_group_name("migration_groups", group)?;
-            if config.dir.is_none() && config.migrations.is_empty() {
-                bail!("migration_groups.{group} は dir または migrations が必要です");
-            }
             if let Some(dir) = config.dir.as_deref() {
                 if dir.trim().is_empty() {
                     bail!("migration_groups.{group}.dir は空にできません");
@@ -711,16 +702,26 @@ impl Config {
 
     pub fn effective_migration_groups(&self) -> HashMap<String, MigrationGroupConfig> {
         if self.migration_groups.is_empty() {
-            HashMap::from([(
+            return HashMap::from([(
                 "default".to_string(),
                 MigrationGroupConfig {
                     dir: Some(self.migrations.dir.clone()),
                     migrations: Vec::new(),
                 },
-            )])
-        } else {
-            self.migration_groups.clone()
+            )]);
         }
+        let mut groups = self.migration_groups.clone();
+        if groups.values().all(is_empty_version_migration_group) && !groups.contains_key("default")
+        {
+            groups.insert(
+                "default".to_string(),
+                MigrationGroupConfig {
+                    dir: Some(self.migrations.dir.clone()),
+                    migrations: Vec::new(),
+                },
+            );
+        }
+        groups
     }
 
     pub fn effective_db_groups(&self) -> HashMap<String, Vec<String>> {
@@ -745,10 +746,17 @@ impl Config {
             groups = {
                 if configured.contains_key("default") {
                     vec!["default".to_string()]
-                } else if configured.contains_key("core") {
+                } else if configured
+                    .get("core")
+                    .is_some_and(|group| !is_empty_version_migration_group(group))
+                {
                     vec!["core".to_string()]
                 } else {
-                    let mut names = configured.keys().cloned().collect::<Vec<_>>();
+                    let mut names = configured
+                        .iter()
+                        .filter(|(_name, group)| !is_empty_version_migration_group(group))
+                        .map(|(name, _group)| name.clone())
+                        .collect::<Vec<_>>();
                     names.sort();
                     names
                 }
@@ -788,6 +796,10 @@ impl Config {
         }
         Ok(())
     }
+}
+
+fn is_empty_version_migration_group(group: &MigrationGroupConfig) -> bool {
+    group.dir.is_none() && group.migrations.is_empty()
 }
 
 include!("config/template.rs");
