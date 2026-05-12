@@ -238,8 +238,10 @@
         assert!(INDEX_HTML.contains("function renderMigrationGroupEditor()"));
         assert!(INDEX_HTML.contains("function saveMigrationGroupMembership()"));
         assert!(INDEX_HTML.contains("function uniqueMigrationsByVersion(migrations)"));
+        assert!(INDEX_HTML.contains("function migrationFileName(migration)"));
         assert!(INDEX_HTML.contains("const byVersion = new Map()"));
         assert!(INDEX_HTML.contains("if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration)"));
+        assert!(INDEX_HTML.contains("escapeHtml(migrationFileName(migration))"));
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>"#));
@@ -270,6 +272,8 @@
         assert!(INDEX_HTML.contains(r#"id="migrationFileModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
+        assert!(!INDEX_HTML.contains(r#"<thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(INDEX_HTML.contains(r#"<label class="field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
         assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>"#));
         assert!(INDEX_HTML.contains(r#"<span class="field-label">テンプレート</span>"#));
@@ -317,7 +321,9 @@
         assert!(INDEX_HTML.contains("renderLatestMigrationFilename();"));
         assert!(INDEX_HTML.contains("$('newMigrationFilename').value = nextMigrationFileName()"));
         assert!(INDEX_HTML.contains("const filenameParts = parseMigrationFilename($('newMigrationFilename').value)"));
+        assert!(INDEX_HTML.contains("filename: filenameParts.filename"));
         assert!(INDEX_HTML.contains("return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`"));
+        assert!(INDEX_HTML.contains("migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください"));
         assert!(INDEX_HTML.contains("$('newMigrationGroup').value = names.includes('main') ? 'main' : names[0]"));
         assert!(!INDEX_HTML.contains("newMigrationVersion"));
         assert!(!INDEX_HTML.contains("newMigrationName"));

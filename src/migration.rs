@@ -164,28 +164,7 @@ pub fn parse_migration_file(path: &Path) -> Result<Migration> {
                 path.display()
             )
         })?;
-    let extension = path.extension().and_then(|ext| ext.to_str());
-    if extension != Some("sql") {
-        bail!("migration ファイルの拡張子は小文字 .sql である必要があります: {file_name}");
-    }
-    let stem = path
-        .file_stem()
-        .and_then(|name| name.to_str())
-        .ok_or_else(|| anyhow!("migration ファイル名が不正です: {}", path.display()))?;
-    let (version, name) = stem.split_once('_').ok_or_else(|| {
-        anyhow!("migration ファイル名は <version>_<name>.sql 形式が必要です: {file_name}")
-    })?;
-    if version.is_empty() || name.is_empty() {
-        bail!("migration ファイル名は <version>_<name>.sql 形式が必要です: {file_name}");
-    }
-    if !version.chars().all(|ch| ch.is_ascii_digit()) {
-        bail!(
-            "migration version は数値である必要があります。ASCII数字のみ使用できます: {file_name}"
-        );
-    }
-    if !is_valid_migration_name(name) {
-        bail!("migration name は英数字、_、- のみ使用できます: {file_name}");
-    }
+    let (version, name) = parse_migration_file_name(file_name)?;
     let version_number = version
         .parse::<u64>()
         .with_context(|| format!("migration version は数値である必要があります: {file_name}"))?;
@@ -207,6 +186,45 @@ pub fn parse_migration_file(path: &Path) -> Result<Migration> {
     })
 }
 
+pub fn parse_migration_file_name(file_name: &str) -> Result<(String, String)> {
+    if file_name.contains('/') || file_name.contains('\\') {
+        bail!("migration ファイル名にパス区切りは使用できません: {file_name}");
+    }
+    let stem = file_name.strip_suffix(".sql").ok_or_else(|| {
+        anyhow!("migration ファイルの拡張子は小文字 .sql である必要があります: {file_name}")
+    })?;
+    let (version, name) = if let Some((version, name)) = stem.split_once('_') {
+        if !version.is_empty() && version.chars().all(|ch| ch.is_ascii_digit()) {
+            (version, name)
+        } else {
+            let (name, version) = stem.rsplit_once('_').ok_or_else(|| {
+                anyhow!(
+                    "migration ファイル名は <version>_<name>.sql または <name>_<version>.sql 形式が必要です: {file_name}"
+                )
+            })?;
+            (version, name)
+        }
+    } else {
+        bail!(
+            "migration ファイル名は <version>_<name>.sql または <name>_<version>.sql 形式が必要です: {file_name}"
+        );
+    };
+    if version.is_empty() || name.is_empty() {
+        bail!(
+            "migration ファイル名は <version>_<name>.sql または <name>_<version>.sql 形式が必要です: {file_name}"
+        );
+    }
+    if !version.chars().all(|ch| ch.is_ascii_digit()) {
+        bail!(
+            "migration version は数値である必要があります。ASCII数字のみ使用できます: {file_name}"
+        );
+    }
+    if !is_valid_migration_name(name) {
+        bail!("migration name は英数字、_、- のみ使用できます: {file_name}");
+    }
+    Ok((version.to_string(), name.to_string()))
+}
+
 pub fn checksum_sql(sql: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(sql.as_bytes());
@@ -223,11 +241,20 @@ pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> 
             bail!("migration group は空白なしの非空文字列である必要があります");
         }
         config.validate_resolved_path_within_base("migration ファイル", &migration.path)?;
-        let expected_file_name = format!("{}_{}.sql", migration.version, migration.name);
-        if migration.path.file_name().and_then(|name| name.to_str()) != Some(&expected_file_name) {
+        let file_name = migration
+            .path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| {
+                anyhow!(
+                    "migration path のファイル名が不正です: {}",
+                    migration.path.display()
+                )
+            })?;
+        let (file_version, file_name_stem) = parse_migration_file_name(file_name)?;
+        if file_version != migration.version || file_name_stem != migration.name {
             bail!(
-                "migration path のファイル名がversion/nameと一致しません: expected={} actual={}",
-                expected_file_name,
+                "migration path のファイル名がversion/nameと一致しません: actual={}",
                 migration.path.display()
             );
         }

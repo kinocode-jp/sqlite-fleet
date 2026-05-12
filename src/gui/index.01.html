@@ -261,7 +261,7 @@
           <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
           <td>${chips(plan.migration_groups)}</td>
           <td>${escapeHtml(plan.applied_count)}</td>
-          <td>${pending ? escapeHtml(plan.pending.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+          <td>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
           <td><code>${escapeHtml(plan.database.path)}</code></td>
           <td class="actions">
             <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
@@ -272,11 +272,10 @@
       }).join('');
 
       $('migrations').innerHTML = state.migrations.map((migration) => `<tr>
-        <td><code>${escapeHtml(migration.version)}</code></td>
-        <td>${escapeHtml(migration.name)}</td>
+        <td><code>${escapeHtml(migrationFileName(migration))}</code></td>
         <td>${chips([migration.group])}</td>
         <td><code>${escapeHtml(migration.checksum)}</code></td>
-      </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+      </tr>`).join('') || `<tr><td colspan="3" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
 
       renderMigrationGroupEditor();
       renderMigrationFileGroupOptions();
@@ -327,7 +326,7 @@
       const uniqueMigrations = uniqueMigrationsByVersion(state.migrations);
       if (simpleMode) {
         $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => `<div class="migration-row">
-          <strong>${escapeHtml(`${migration.version}_${migration.name}`)}</strong><br><span>${escapeHtml(migration.checksum)}</span>
+          <strong>${escapeHtml(migrationFileName(migration))}</strong><br><span>${escapeHtml(migration.checksum)}</span>
         </div>`).join('') || `<p class="muted">${escapeHtml(t('noMigrations'))}</p>`;
         return;
       }
@@ -336,7 +335,7 @@
         const id = `migrationGroupVersion-${escapeHtml(migration.version)}`;
         return `<label class="check-row" for="${id}">
           <input id="${id}" type="checkbox" data-migration-version="${escapeHtml(migration.version)}"${checked}>
-          <span><strong>${escapeHtml(`${migration.version}_${migration.name}`)}</strong><br><span>${escapeHtml(migration.checksum)}</span></span>
+          <span><strong>${escapeHtml(migrationFileName(migration))}</strong><br><span>${escapeHtml(migration.checksum)}</span></span>
         </label>`;
       }).join('') || `<p class="muted">${escapeHtml(t('noMigrations'))}</p>`;
     }
@@ -346,6 +345,14 @@
         if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration);
       }
       return Array.from(byVersion.values());
+    }
+    function migrationFileName(migration) {
+      if (migration && typeof migration.path === 'string') {
+        const parts = migration.path.split(/[\\/]/);
+        const filename = parts[parts.length - 1];
+        if (filename) return filename;
+      }
+      return `${migration.version}_${migration.name}.sql`;
     }
     function renderDatabaseSelectors(plans) {
       const current = $('sqlDatabase').value;
@@ -532,6 +539,7 @@
         await postAdmin('/api/admin/migration-file', {
           version: filenameParts.version,
           name: filenameParts.name,
+          filename: filenameParts.filename,
           group: $('newMigrationGroup').value,
           sql: $('newMigrationSql').value,
         });
@@ -559,7 +567,7 @@
         if (nextNumber === currentNumber && String(migration.version).length > String(current.version).length) return migration;
         return current;
       });
-      return `${latest.version}_${latest.name}.sql`;
+      return migrationFileName(latest);
     }
     function renderLatestMigrationFilename() {
       const el = $('newMigrationLatestFilename');
@@ -569,17 +577,21 @@
     function parseMigrationFilename(value) {
       const filename = String(value || '').trim();
       if (!filename) throw new Error(t('required', t('fileNameLabel')));
+      if (filename.includes('/') || filename.includes('\\')) throw new Error('migration file name にパス区切りは使用できません');
       if (!filename.endsWith('.sql')) throw new Error('migration file name は .sql で終わる必要があります');
       const stem = filename.slice(0, -4);
-      const separator = stem.indexOf('_');
-      if (separator <= 0 || separator === stem.length - 1) {
-        throw new Error('migration file name は <version>_<name>.sql 形式で入力してください');
+      const firstSeparator = stem.indexOf('_');
+      const lastSeparator = stem.lastIndexOf('_');
+      if (firstSeparator <= 0 || firstSeparator === stem.length - 1) {
+        throw new Error('migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください');
       }
-      const version = stem.slice(0, separator);
-      const name = stem.slice(separator + 1);
+      const prefix = stem.slice(0, firstSeparator);
+      const suffix = stem.slice(lastSeparator + 1);
+      const version = /^[0-9]+$/.test(prefix) ? prefix : suffix;
+      const name = /^[0-9]+$/.test(prefix) ? stem.slice(firstSeparator + 1) : stem.slice(0, lastSeparator);
       if (!/^[0-9]+$/.test(version)) throw new Error('migration version はASCII数字のみ使用できます');
       if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error('migration name は英数字、_、- のみ使用できます');
-      return { version, name };
+      return { version, name, filename };
     }
     async function createDatabaseFile() {
       try {

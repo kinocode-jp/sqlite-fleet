@@ -659,6 +659,31 @@
     }
 
     #[test]
+    fn api_create_migration_file_preserves_suffix_version_filename() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"suffix_item","filename":"suffix_item_005.sql","group":"main","sql":"CREATE TABLE suffix_item(id INTEGER);"}"#.to_vec(),
+        )
+        .unwrap();
+
+        assert!(migration_dir.join("suffix_item_005.sql").exists());
+        assert!(!migration_dir.join("005_suffix_item.sql").exists());
+        let config = state.config.lock().unwrap();
+        let migrations = load_migrations(&config).unwrap();
+        assert_eq!(migrations[0].version, "005");
+        assert_eq!(migrations[0].name, "suffix_item");
+    }
+
+    #[test]
     fn api_create_migration_file_requires_group_when_groups_are_explicit() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");

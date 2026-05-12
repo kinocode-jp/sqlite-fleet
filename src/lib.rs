@@ -46,7 +46,10 @@ use discovery::{validate_database_id, validate_database_set};
 use history::create_migrations_table_sql;
 pub use history::{ensure_migrations_table, read_applied_migrations};
 use migration::validate_migrations;
-pub use migration::{checksum_sql, load_migrations, parse_migration_file, validate_migration};
+pub use migration::{
+    checksum_sql, load_migrations, parse_migration_file, parse_migration_file_name,
+    validate_migration,
+};
 use path_utils::normalize_path_for_comparison;
 use sqlite_ident::validate_identifier;
 

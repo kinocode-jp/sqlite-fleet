@@ -359,8 +359,23 @@ fn api_save_database_migration_group(state: &ServerState, body: Vec<u8>) -> Resu
 fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationFileRequest =
         serde_json::from_slice(&body).context("migration file request body のJSONが不正です")?;
-    let version = clean_version(&request.version)?;
-    let name = clean_file_stem(&request.name, "migration name")?;
+    let (filename, version, name) = match request.filename.as_deref() {
+        Some(filename) => {
+            let filename = filename.trim();
+            let (version, name) = sqlite_fleet::parse_migration_file_name(filename)?;
+            (filename.to_string(), version, name)
+        }
+        None => {
+            let version = clean_version(&request.version)?;
+            let name = clean_file_stem(&request.name, "migration name")?;
+            (format!("{version}_{name}.sql"), version, name)
+        }
+    };
+    let request_version = clean_version(&request.version)?;
+    let request_name = clean_file_stem(&request.name, "migration name")?;
+    if request_version != version || request_name != name {
+        bail!("migration file name と version/name が一致しません");
+    }
     let sql = request.sql.trim();
     if sql.is_empty() {
         bail!("migration SQL は空にできません");
@@ -391,7 +406,6 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
             migrations_dir.display()
         )
     })?;
-    let filename = format!("{version}_{name}.sql");
     let path = migrations_dir.join(filename);
     validate_path_stays_in_base(&config, &path, "migration file")?;
     if path.exists() {

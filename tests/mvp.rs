@@ -94,6 +94,17 @@ fn parses_migration_file() {
 }
 
 #[test]
+fn parses_suffix_version_migration_file() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("create_users_001.sql");
+    fs::write(&path, "CREATE TABLE users(id INTEGER);").unwrap();
+    let migration = parse_migration_file(&path).unwrap();
+    assert_eq!(migration.version, "001");
+    assert_eq!(migration.version_number, 1);
+    assert_eq!(migration.name, "create_users");
+}
+
+#[test]
 fn rejects_non_numeric_migration_version() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("abc_create_users.sql");

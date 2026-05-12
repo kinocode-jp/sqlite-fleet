@@ -170,6 +170,7 @@ struct DatabaseMigrationGroupRequest {
 struct MigrationFileRequest {
     version: String,
     name: String,
+    filename: Option<String>,
     group: Option<String>,
     sql: String,
 }

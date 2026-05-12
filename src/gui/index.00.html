@@ -337,7 +337,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>マイグレーション一覧</h2>
-            <p class="panel-description">読み込まれているマイグレーションをバージョン順に確認し、グループとchecksumを確認します。</p>
+            <p class="panel-description">読み込まれているマイグレーションをファイル名、グループ、checksumで確認します。</p>
           </div>
           <button id="openMigrationFileModal" class="primary">新規作成</button>
           <button id="openMigrationGroupModalFromMigrations" hidden>グループ分け</button>
@@ -345,7 +345,7 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>
+            <thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>
             <tbody id="migrations"></tbody>
           </table>
         </div>
@@ -680,7 +680,7 @@
       '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
       'DBを追加': 'Add DB',
       'マイグレーション一覧': 'Migrations',
-      '読み込まれているマイグレーションをバージョン順に確認し、グループとchecksumを確認します。': 'Review every loaded migration by version, group, and checksum.',
+      '読み込まれているマイグレーションをファイル名、グループ、checksumで確認します。': 'Review every loaded migration by file name, group, and checksum.',
       '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
       'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
