@@ -122,7 +122,7 @@
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
         assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#));
-        assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB一覧</a>"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
         let migration_group_nav = INDEX_HTML
             .find(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#)
@@ -152,7 +152,7 @@
         ));
         assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="help" id="help">"#));
         assert!(INDEX_HTML.contains("基本の考え方"));
-        assert!(INDEX_HTML.contains("migrationファイルは <code>migrations.dir</code>"));
+        assert!(INDEX_HTML.contains("マイグレーションファイルは <code>migrations.dir</code>"));
         assert!(INDEX_HTML.contains("選択中の1ファイルだけを飛ばして適用する操作ではありません"));
         assert!(INDEX_HTML.contains("audit.path"));
     }
@@ -171,12 +171,12 @@
         assert!(INDEX_HTML.contains("function translateStaticDom()"));
         assert!(INDEX_HTML.contains("function setLocale(locale)"));
         assert!(INDEX_HTML.contains("'実行': 'Run'"));
-        assert!(INDEX_HTML.contains("'グループに分ける': 'Split into groups'"));
+        assert!(INDEX_HTML.contains("'グループ分け': 'Split into groups'"));
         assert!(INDEX_HTML.contains("'Run': '実行'"));
         assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
-        assert!(INDEX_HTML.contains("'Migration Groups': 'Migrationグループ'"));
+        assert!(INDEX_HTML.contains("'Migration Groups': 'マイグレーショングループ'"));
         assert!(INDEX_HTML
             .contains("document.querySelectorAll('[data-locale-button]').forEach((button) =>"));
         assert!(INDEX_HTML.contains(
@@ -207,7 +207,7 @@
 
     #[test]
     fn html_uses_modal_for_migration_group_creation() {
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModal" class="primary">新規グループ作成</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModal" class="primary">グループ作成</button>"#));
         assert!(INDEX_HTML.contains(r#"id="migrationGroupModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"role="dialog" aria-modal="true" aria-labelledby="migrationGroupModalTitle""#));
         assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupName" placeholder="premium">"#));
@@ -220,12 +220,12 @@
         assert!(INDEX_HTML.contains("if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration)"));
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループに分ける</button>"#));
-        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループに分ける</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループ分け</button>"#));
         assert!(INDEX_HTML.contains(r#"<div id="migrationAssignmentEditor" class="migration-assignment-editor">"#));
         assert!(INDEX_HTML.contains(r#"id="migrationGroupSimpleNote" class="simple-mode-note" hidden"#));
         assert!(INDEX_HTML.contains("const simpleMode = groups.length === 1 && groups[0].name === 'main' && rules.length === 0"));
-        assert!(INDEX_HTML.contains(r#"<button id="saveDatabaseRule" class="primary">適用グループ保存</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="saveDatabaseRule" class="primary">割当を保存</button>"#));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModal').addEventListener('click', openMigrationGroupModal)"));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModalInline').addEventListener('click', openMigrationGroupModal)"));
         assert!(INDEX_HTML.contains("$('openMigrationGroupModalFromMigrations').addEventListener('click', openMigrationGroupModal)"));
@@ -245,7 +245,7 @@
         assert!(INDEX_HTML.contains(r#"class="tool-tip""#));
         assert!(INDEX_HTML.contains(".panel { margin-bottom:18px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); overflow:visible; }"));
         assert!(INDEX_HTML.contains(".tool-tip:hover, .tool-tip:focus { z-index:40; }"));
-        assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどこへ適用するか"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどのDBへ実行するか"#));
         assert!(INDEX_HTML.contains(r#"data-tip="db_groups/groups に定義した対象DBのまとまりです"#));
         assert!(INDEX_HTML
             .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));

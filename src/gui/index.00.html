@@ -143,13 +143,13 @@
       </div>
       <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行</a>
-        <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>Migrationグループ</a>
-        <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>Migration管理</a>
+        <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>マイグレーショングループ</a>
+        <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション</a>
         <a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups"><span class="nav-icon">MAP</span>DBグループ</a>
-        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
+        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB一覧</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL実行</a>
-        <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>Schema作成</a>
-        <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定/権限</a>
+        <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>スキーマ作成</a>
+        <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
         <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
       </nav>
       <section class="side-card" aria-label="主要操作">
@@ -182,7 +182,7 @@
             <h2>実行</h2>
             <p class="panel-description">DBグループ、個別DB、limitを組み合わせて操作対象を決めます。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="DBグループはどこへ適用するか、Migration Groupは各DBに何を適用するかを決めます。">?</span>
+          <span class="tool-tip" tabindex="0" data-tip="DBグループはどのDBへ実行するか、マイグレーショングループは各DBにどのマイグレーションを適用するかを決めます。">?</span>
         </div>
         <div class="form-grid">
           <label class="field"><span class="field-label">DB group <span class="tool-tip" tabindex="0" data-tip="db_groups/groups に定義した対象DBのまとまりです。未指定なら全DBが対象です。">?</span></span><select id="targetGroup"></select></label>
@@ -203,40 +203,40 @@
       <section class="panel page" data-page="migration-groups" id="migration-groups-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Migrationグループ</h2>
-            <p class="panel-description">通常はグループを意識せず、全DBに同じmigrationを適用します。分けたい時だけグループを追加します。</p>
+            <h2>マイグレーショングループ</h2>
+            <p class="panel-description">通常はグループを意識せず、全DBに同じマイグレーションを適用します。分けたい時だけグループを追加します。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。">?</span>
+          <span class="tool-tip" tabindex="0" data-tip="マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。">?</span>
         </div>
         <div id="migrationGroupEditor" class="migration-group-editor">
           <section class="migration-group-sidebar">
             <div class="section-header">
               <h3>Migration Groups</h3>
-              <button id="openMigrationGroupModal" class="primary">新規グループ作成</button>
+              <button id="openMigrationGroupModal" class="primary">グループ作成</button>
             </div>
             <div id="migrationGroupCards" class="group-list"></div>
           </section>
           <section>
             <div class="section-header">
               <h3 id="selectedMigrationGroupTitle">Migration files</h3>
-              <button id="openMigrationGroupModalInline" class="primary" hidden>グループに分ける</button>
+              <button id="openMigrationGroupModalInline" class="primary" hidden>グループ分け</button>
               <button id="saveMigrationGroupMembership" class="primary">保存</button>
             </div>
-            <p id="migrationGroupSimpleNote" class="simple-mode-note" hidden>全DBに適用されるmigrationファイルです。グループに分けたい時だけ新しいグループを作成してください。</p>
+            <p id="migrationGroupSimpleNote" class="simple-mode-note" hidden>全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。</p>
             <div id="migrationGroupChecklist" class="migration-checklist"></div>
           </section>
         </div>
         <div id="migrationAssignmentEditor" class="migration-assignment-editor">
           <section>
-            <h3>DBごとの適用グループ</h3>
+            <h3>DB別マイグレーショングループ</h3>
             <div class="info-card">
-              <label class="field"><span class="field-label">DB selector <span class="tool-tip" tabindex="0" data-tip="DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。">?</span></span><input id="manageRuleSelector" placeholder="tenant-a"></label>
-              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするMigration Groupです。複数指定できます。未指定DBはmainを使います。">?</span></span><input id="manageRuleGroups" placeholder="main, premium"></label>
-              <button id="saveDatabaseRule" class="primary">適用グループ保存</button>
+              <label class="field"><span class="field-label">DB selector <span class="tool-tip" tabindex="0" data-tip="DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するマイグレーショングループを指定します。">?</span></span><input id="manageRuleSelector" placeholder="tenant-a"></label>
+              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするマイグレーショングループです。複数指定できます。未指定DBはmainを使います。">?</span></span><input id="manageRuleGroups" placeholder="main, premium"></label>
+              <button id="saveDatabaseRule" class="primary">割当を保存</button>
             </div>
           </section>
           <section>
-            <h3>登録済み割当</h3>
+            <h3>登録済みルール</h3>
             <div id="databaseRules" class="card-list"></div>
           </section>
         </div>
@@ -245,7 +245,7 @@
       <div id="migrationGroupModal" class="modal-backdrop" hidden>
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="migrationGroupModalTitle">
           <div class="modal-header">
-            <h2 id="migrationGroupModalTitle">新規Migrationグループ</h2>
+            <h2 id="migrationGroupModalTitle">新規マイグレーショングループ</h2>
             <button id="closeMigrationGroupModal" type="button" aria-label="Close">×</button>
           </div>
           <div class="modal-body">
@@ -264,7 +264,7 @@
             <h2>DBグループ</h2>
             <p class="panel-description">カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="DB GroupはどのDBへ操作するかを決める対象セットです。実行のDB groupで選択できます。">?</span>
+          <span class="tool-tip" tabindex="0" data-tip="DBグループはどのDBへ操作するかを決める対象セットです。実行ページのDB groupで選択できます。">?</span>
         </div>
         <div class="topology-grid">
           <section>
@@ -272,7 +272,7 @@
             <div class="info-card">
               <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
               <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
-              <button id="saveDbGroup" class="primary">DB Group保存</button>
+              <button id="saveDbGroup" class="primary">DBグループを保存</button>
             </div>
             <div id="dbGroupCards" class="card-list"></div>
           </section>
@@ -282,15 +282,15 @@
       <section class="panel page" data-page="databases" id="databases-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>DBマトリクス</h2>
-            <p class="panel-description">DBごとの状態、対象Migration Group、未適用内容を比較します。</p>
+            <h2>DB一覧</h2>
+            <p class="panel-description">DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。">?</span>
         </div>
         <div class="form-grid">
           <label class="field"><span class="field-label">New DB path <span class="tool-tip" tabindex="0" data-tip="設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。">?</span></span><input id="newDatabasePath" placeholder="data/tenant-new.db"></label>
           <label class="field"><span class="field-label">Add to DB group <span class="tool-tip" tabindex="0" data-tip="任意です。指定すると作成したDBパスをDB group selectorへ追加します。">?</span></span><input id="newDatabaseGroup" placeholder="canary"></label>
-          <div class="actions wide"><button id="createDatabaseFile" class="primary">DB登録</button></div>
+          <div class="actions wide"><button id="createDatabaseFile" class="primary">DBを追加</button></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -303,10 +303,10 @@
       <section class="panel page" data-page="migrations" id="migrations-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Migration台帳</h2>
-            <p class="panel-description">全migrationをversion順に確認し、所属グループとchecksumを追跡します。</p>
+            <h2>マイグレーション一覧</h2>
+            <p class="panel-description">読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。</p>
           </div>
-          <button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループに分ける</button>
+          <button id="openMigrationGroupModalFromMigrations" class="primary" hidden>グループ分け</button>
           <span class="tool-tip" tabindex="0" data-tip="履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。">?</span>
         </div>
         <div class="form-grid">
@@ -314,7 +314,7 @@
           <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
           <label class="field wide"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="main"></label>
           <label class="field wide"><span class="field-label">SQL</span><textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea></label>
-          <div class="actions wide"><button id="createMigrationFile" class="primary">Migrationファイル登録</button></div>
+          <div class="actions wide"><button id="createMigrationFile" class="primary">マイグレーションファイル追加</button></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -328,12 +328,12 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>SQL実行</h2>
-            <p class="panel-description">migration履歴に残さない作業用SQLを、dry-runで確認してから適用できます。</p>
+            <p class="panel-description">マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。">?</span>
         </div>
         <div class="form-grid">
-          <label class="field"><span class="field-label">Target DB <span class="tool-tip" tabindex="0" data-tip="SQLを実行するDBです。Schema Editorの読み込み対象もこのDBになります。">?</span></span><select id="sqlDatabase"></select></label>
+          <label class="field"><span class="field-label">Target DB <span class="tool-tip" tabindex="0" data-tip="SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。">?</span></span><select id="sqlDatabase"></select></label>
           <label class="field"><span class="field-label">SQL file <span class="tool-tip" tabindex="0" data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。">?</span></span><input id="sqlFile" type="file" accept=".sql,text/sql,text/plain"></label>
           <label class="field"><span class="field-label">SQL template <span class="tool-tip" tabindex="0" data-tip="よく使うSQLite構文をSQL欄へ挿入します。挿入後に内容を必ず確認してください。">?</span></span><select id="sqlTemplate"></select></label>
           <label class="field"><span class="field-label">Output file name <span class="tool-tip" tabindex="0" data-tip="SQL欄の内容を保存するときのファイル名です。拡張子.sqlは自動補完されます。">?</span></span><input id="sqlFileName" value="sqlite-fleet-change.sql"></label>
@@ -343,15 +343,15 @@
             <button id="downloadSql">SQLファイル保存</button>
             <button id="sqlDryRun" class="primary">SQL dry-run</button>
             <button id="sqlApply" class="danger">SQLを適用</button>
-            <button id="loadSchema">Schemaを再読み込み</button>
+            <button id="loadSchema">スキーマを再読み込み</button>
           </div>
         </div>
       </section>
       <section class="panel page" data-page="schema" id="schema-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>Schema作成</h2>
-            <p class="panel-description">よく使うDDLを生成し、現在のschemaと照らし合わせて作業できます。</p>
+            <h2>スキーマ作成</h2>
+            <p class="panel-description">よく使うDDLを生成し、現在のスキーマと照らし合わせて作業できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="ここで生成したSQLはSQL Consoleへ入ります。実行前に必ずdry-runしてください。">?</span>
         </div>
@@ -359,24 +359,24 @@
           <section class="builder-block">
             <label class="field"><span class="field-label">New table <span class="tool-tip" tabindex="0" data-tip="作成するテーブル名です。識別子は自動でダブルクォートされます。">?</span></span><input id="newTableName" placeholder="new_table"></label>
             <label class="field"><span class="field-label">Columns <span class="tool-tip" tabindex="0" data-tip="カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。">?</span></span><input id="newTableColumns" placeholder="id INTEGER PRIMARY KEY, name TEXT"></label>
-            <div class="actions"><button id="generateCreateTable">CREATE TABLE SQL生成</button></div>
+            <div class="actions"><button id="generateCreateTable">CREATE TABLE SQLを生成</button></div>
           </section>
           <section class="builder-block">
             <label class="field"><span class="field-label">Table <span class="tool-tip" tabindex="0" data-tip="カラムを追加する既存テーブル名です。">?</span></span><input id="alterTableName" placeholder="target_table"></label>
             <label class="field"><span class="field-label">New column <span class="tool-tip" tabindex="0" data-tip="追加するカラム名です。">?</span></span><input id="newColumnName" placeholder="new_column"></label>
             <label class="field"><span class="field-label">Column definition <span class="tool-tip" tabindex="0" data-tip="型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。">?</span></span><input id="newColumnDefinition" placeholder="TEXT NOT NULL DEFAULT ''"></label>
-            <div class="actions"><button id="generateAddColumn">ADD COLUMN SQL生成</button></div>
+            <div class="actions"><button id="generateAddColumn">ADD COLUMN SQLを生成</button></div>
           </section>
           <section class="builder-block">
             <label class="field"><span class="field-label">Rename table from <span class="tool-tip" tabindex="0" data-tip="変更前のテーブル名です。">?</span></span><input id="renameTableFrom" placeholder="old_table"></label>
             <label class="field"><span class="field-label">Rename table to <span class="tool-tip" tabindex="0" data-tip="変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。">?</span></span><input id="renameTableTo" placeholder="new_table"></label>
-            <div class="actions"><button id="generateRenameTable">RENAME TABLE SQL生成</button></div>
+            <div class="actions"><button id="generateRenameTable">RENAME TABLE SQLを生成</button></div>
           </section>
           <section class="builder-block">
             <label class="field"><span class="field-label">Rename column table <span class="tool-tip" tabindex="0" data-tip="カラム名を変更するテーブルです。">?</span></span><input id="renameColumnTable" placeholder="target_table"></label>
             <label class="field"><span class="field-label">Rename column from <span class="tool-tip" tabindex="0" data-tip="変更前のカラム名です。">?</span></span><input id="renameColumnFrom" placeholder="old_column"></label>
             <label class="field"><span class="field-label">Rename column to <span class="tool-tip" tabindex="0" data-tip="変更後のカラム名です。アプリケーション側の参照も更新が必要です。">?</span></span><input id="renameColumnTo" placeholder="new_column"></label>
-            <div class="actions"><button id="generateRenameColumn">RENAME COLUMN SQL生成</button></div>
+            <div class="actions"><button id="generateRenameColumn">RENAME COLUMN SQLを生成</button></div>
           </section>
         </div>
         <div id="schema" class="schema-list"></div>
@@ -385,7 +385,7 @@
       <section class="panel page" data-page="settings" id="settings-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>設定/権限</h2>
+            <h2>設定</h2>
             <p class="panel-description">GUIで許可されている操作、backup/report/audit/execution設定を確認します。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
@@ -417,8 +417,8 @@
           <section>
             <h3>基本の考え方</h3>
             <ul>
-              <li>migrationファイルは <code>migrations.dir</code> の固定ディレクトリに置きます。</li>
-              <li><code>[migration_groups]</code> はversionリストで所属を管理します。未設定時は全migrationが <code>main</code> に入ります。</li>
+              <li>マイグレーションファイルは <code>migrations.dir</code> の固定ディレクトリに置きます。</li>
+              <li><code>[migration_groups]</code> はversionリストでグループを管理します。未設定時は全マイグレーションが <code>main</code> に入ります。</li>
               <li><code>[database_migration_groups]</code> はDBごとに対象マイグレーショングループを指定します。未指定DBは <code>main</code> を使います。</li>
               <li><code>[db_groups]</code> はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の <code>all</code> は全DBです。</li>
             </ul>
@@ -426,24 +426,24 @@
           <section>
             <h3>画面の見方</h3>
             <ul>
-              <li>DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。</li>
-              <li>Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。</li>
-              <li>Migration Groupsではmainから分岐した各グループのmigrationをチェックボックスで編集できます。</li>
+              <li>DB一覧ではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。</li>
+              <li>マイグレーションでは読み込まれているマイグレーションファイルとchecksumを確認します。</li>
+              <li>マイグレーショングループではmainから分岐した各グループのマイグレーションをチェックボックスで編集できます。</li>
             </ul>
           </section>
           <section>
             <h3>操作</h3>
             <ul>
               <li>CheckはDB状態、checksum、不明な適用履歴を検査します。</li>
-              <li>Dry runは対象DBの未適用migrationを読み取り確認します。DBは変更しません。</li>
-              <li>適用は対象DBの未適用migrationをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。</li>
+              <li>Dry runは対象DBの未適用マイグレーションを確認します。DBは変更しません。</li>
+              <li>適用は対象DBの未適用マイグレーションをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。</li>
               <li>BackupはSQLite backup APIでDBの一貫したコピーを <code>backup.dir</code> に作成します。</li>
             </ul>
           </section>
           <section>
             <h3>SQL Console</h3>
             <ul>
-              <li>作業用SQLを選択DBに対してdry-runまたは適用できます。migration履歴には登録されません。</li>
+              <li>SQLを選択DBに対してdry-runまたは適用できます。マイグレーション履歴には登録されません。</li>
               <li>SQL applyはatomic transactionで実行します。途中で失敗した場合はrollbackします。</li>
               <li><code>ATTACH</code> / <code>DETACH</code> はGUI SQLでは拒否されます。</li>
               <li><code>VACUUM</code>、<code>VACUUM INTO</code>、<code>PRAGMA journal_mode</code> は単独SQLとしてだけ適用できます。</li>
@@ -527,20 +527,20 @@
     const staticTranslations = {
       '管理画面ナビゲーション': 'Admin navigation',
       '実行': 'Run',
-      'Migrationグループ': 'Migration Groups',
+      'マイグレーショングループ': 'Migration Groups',
       'DBグループ': 'DB Groups',
-      'DB管理': 'Database management',
-      'Migration管理': 'Migration management',
+      'DB一覧': 'Databases',
+      'マイグレーション': 'Migrations',
       'SQL実行': 'SQL runner',
-      'Schema作成': 'Schema builder',
-      '設定/権限': 'Settings / permissions',
+      'スキーマ作成': 'Schema builder',
+      '設定': 'Settings',
       'ヘルプ': 'Help',
       '主要操作': 'Primary actions',
       '更新': 'Refresh',
       '読み込み中...': 'Loading...',
       '状態サマリー': 'Status summary',
       'DBグループ、個別DB、limitを組み合わせて操作対象を決めます。': 'Choose targets with DB groups, individual DB overrides, and optional limits.',
-      'DBグループはどこへ適用するか、Migration Groupは各DBに何を適用するかを決めます。': 'DB Groups decide where an operation runs. Migration Groups decide what each DB receives.',
+      'DBグループはどのDBへ実行するか、マイグレーショングループは各DBにどのマイグレーションを適用するかを決めます。': 'DB Groups decide where an operation runs. Migration Groups decide what each DB receives.',
       'db_groups/groups に定義した対象DBのまとまりです。未指定なら全DBが対象です。': 'A configured set of target databases from db_groups/groups. Leave empty to target every DB.',
       '選択したDBだけに絞ります。DB groupと併用した場合は両方に一致するDBが対象です。': 'Restricts the operation to one DB. With a DB Group, the DB must also be in that group.',
       '対象DBを先頭から指定数に制限します。カナリア適用に使います。': 'Limits targets to the first N databases. Useful for canary rollout.',
@@ -548,37 +548,38 @@
       '対象をDry run': 'Dry run targets',
       '対象をBackup': 'Back up targets',
       '対象へ適用': 'Apply to targets',
-      '通常はグループを意識せず、全DBに同じmigrationを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
-      'Migration Groupは各DBへ適用するmigrationの集合です。DB Groupとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
-      '新規グループ作成': 'Create group',
-      'グループに分ける': 'Split into groups',
-      '新規Migrationグループ': 'New Migration Group',
-      '全DBに適用されるmigrationファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
+      '通常はグループを意識せず、全DBに同じマイグレーションを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
+      'マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
+      'グループ作成': 'Create group',
+      'グループ分け': 'Split into groups',
+      '新規マイグレーショングループ': 'New Migration Group',
+      '全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
-      'DB GroupはどのDBへ操作するかを決める対象セットです。実行のDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in Run.',
-      'Migration Group保存': 'Save Migration Group',
-      'DB Group保存': 'Save DB Group',
-      'DBごとの適用グループ': 'Per-DB Migration Groups',
-      'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するMigration Groupを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
+      'DBグループはどのDBへ操作するかを決める対象セットです。実行ページのDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in Run.',
+      'マイグレーショングループを保存': 'Save Migration Group',
+      'DBグループを保存': 'Save DB Group',
+      'DB別マイグレーショングループ': 'Per-DB Migration Groups',
+      'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するマイグレーショングループを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
       'Applied Migration Groups': 'Applied Migration Groups',
       'Migration files': 'Migration files',
-      'このDBで適用対象にするMigration Groupです。複数指定できます。未指定DBはmainを使います。': 'Migration Groups that apply to this DB. Multiple groups are allowed. Unassigned DBs use main.',
-      '適用グループ保存': 'Save applied groups',
-      'DBマトリクス': 'Database matrix',
-      'DBごとの状態、対象Migration Group、未適用内容を比較します。': 'Compare status, assigned Migration Groups, and pending migrations per database.',
+      'このDBで適用対象にするマイグレーショングループです。複数指定できます。未指定DBはmainを使います。': 'Migration Groups that apply to this DB. Multiple groups are allowed. Unassigned DBs use main.',
+      '割当を保存': 'Save assignment',
+      '登録済みルール': 'Saved rules',
+      'DB一覧': 'Databases',
+      'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。': 'Check status, assigned Migration Groups, and pending migrations per database.',
       'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
       '設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。': 'Creates an empty SQLite DB under the config directory. Choose a path matched by discovery settings.',
       '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
-      'DB登録': 'Register DB',
-      'Migration台帳': 'Migration ledger',
-      '全migrationをversion順に確認し、所属グループとchecksumを追跡します。': 'Review every loaded migration by version, group, and checksum.',
+      'DBを追加': 'Add DB',
+      'マイグレーション一覧': 'Migrations',
+      '読み込まれているマイグレーションをversion順に確認し、グループとchecksumを確認します。': 'Review every loaded migration by version, group, and checksum.',
       '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
-      'Migrationファイル登録': 'Register migration file',
-      'migration履歴に残さない作業用SQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
+      'マイグレーションファイル追加': 'Add migration file',
+      'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
-      'SQLを実行するDBです。Schema Editorの読み込み対象もこのDBになります。': 'The DB used for SQL execution and schema loading.',
+      'SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。': 'The DB used for SQL execution and schema loading.',
       'UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。': 'Loads a UTF-8 .sql or text file. Files over 2 MiB are rejected.',
       'よく使うSQLite構文をSQL欄へ挿入します。挿入後に内容を必ず確認してください。': 'Inserts a common SQLite template into the SQL editor. Review it before running.',
       'SQL欄の内容を保存するときのファイル名です。拡張子.sqlは自動補完されます。': 'File name used when saving the SQL editor contents. The .sql extension is added automatically.',
@@ -586,23 +587,23 @@
       'テンプレート挿入': 'Insert template',
       'SQLファイル保存': 'Save SQL file',
       'SQLを適用': 'Apply SQL',
-      'Schemaを再読み込み': 'Reload schema',
-      'よく使うDDLを生成し、現在のschemaと照らし合わせて作業できます。': 'Generate common DDL and compare it with the current schema while editing.',
+      'スキーマを再読み込み': 'Reload schema',
+      'よく使うDDLを生成し、現在のスキーマと照らし合わせて作業できます。': 'Generate common DDL and compare it with the current schema while editing.',
       'ここで生成したSQLはSQL Consoleへ入ります。実行前に必ずdry-runしてください。': 'Generated SQL is placed in the SQL console. Always dry-run before applying.',
       '作成するテーブル名です。識別子は自動でダブルクォートされます。': 'The table to create. Identifiers are double-quoted automatically.',
       'カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。': 'Column definitions inserted directly into CREATE TABLE, including constraints and DEFAULT values.',
-      'CREATE TABLE SQL生成': 'Generate CREATE TABLE SQL',
+      'CREATE TABLE SQLを生成': 'Generate CREATE TABLE SQL',
       'カラムを追加する既存テーブル名です。': 'The existing table to alter.',
       '追加するカラム名です。': 'The column to add.',
       '型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。': 'Type, NOT NULL, DEFAULT, and related definition. Check SQLite ADD COLUMN limitations.',
-      'ADD COLUMN SQL生成': 'Generate ADD COLUMN SQL',
+      'ADD COLUMN SQLを生成': 'Generate ADD COLUMN SQL',
       '変更前のテーブル名です。': 'Current table name.',
       '変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。': 'New table name. Check impact on related views and triggers.',
-      'RENAME TABLE SQL生成': 'Generate RENAME TABLE SQL',
+      'RENAME TABLE SQLを生成': 'Generate RENAME TABLE SQL',
       'カラム名を変更するテーブルです。': 'Table containing the column to rename.',
       '変更前のカラム名です。': 'Current column name.',
       '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
-      'RENAME COLUMN SQL生成': 'Generate RENAME COLUMN SQL',
+      'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
       'GUIで許可されている操作、backup/report/audit/execution設定を確認します。': 'Review enabled GUI operations and backup/report/audit/execution settings.',
       'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
       '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。': 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
@@ -610,40 +611,40 @@
       '画面の見方': 'How to read the UI',
       '操作': 'Operations',
       '安全設定と監査ログ': 'Safety settings and audit log',
-      'migrationファイルは': 'Migration files are stored in',
+      'マイグレーションファイルは': 'Migration files are stored in',
       'の固定ディレクトリに置きます。': '.',
-      'はversionリストで所属を管理します。未設定時は全migrationが': 'assigns migrations by version list. When unset, all migrations belong to',
+      'はversionリストでグループを管理します。未設定時は全マイグレーションが': 'assigns migrations by version list. When unset, all migrations belong to',
       'に入ります。': '.',
       'はDBごとに対象マイグレーショングループを指定します。未指定DBは': 'assigns target Migration Groups per DB. Unassigned DBs use',
       'を使います。': '.',
       'はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の': 'defines DB Groups for canaries and other target sets. The built-in',
       'は全DBです。': 'means all DBs.',
-      'DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。': 'Databases shows applied counts, pending migrations, and inconsistencies per DB.',
-      'Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
-      'Migration Groupsではmainから分岐した各グループのmigrationをチェックボックスで編集できます。': 'Migration Groups edits migrations for each group branched from main with checkboxes.',
+      'DB一覧ではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。': 'Databases shows applied counts, pending migrations, and inconsistencies per DB.',
+      'マイグレーションでは読み込まれているマイグレーションファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
+      'マイグレーショングループではmainから分岐した各グループのマイグレーションをチェックボックスで編集できます。': 'Migration Groups edits migrations for each group branched from main with checkboxes.',
       'CheckはDB状態、checksum、不明な適用履歴を検査します。': 'Check verifies DB state, checksums, and unknown applied history.',
-      'Dry runは対象DBの未適用migrationを読み取り確認します。DBは変更しません。': 'Dry run inspects pending migrations for target DBs without changing them.',
-      '適用は対象DBの未適用migrationをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。': 'Apply runs all pending migrations for the target DBs in version order. It is not a one-file-only apply action.',
+      'Dry runは対象DBの未適用マイグレーションを確認します。DBは変更しません。': 'Dry run inspects pending migrations for target DBs without changing them.',
+      '適用は対象DBの未適用マイグレーションをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。': 'Apply runs all pending migrations for the target DBs in version order. It is not a one-file-only apply action.',
       'BackupはSQLite backup APIでDBの一貫したコピーを': 'Backup uses the SQLite backup API to create a consistent copy under',
       'に作成します。': '.',
-      '作業用SQLを選択DBに対してdry-runまたは適用できます。migration履歴には登録されません。': 'Ad hoc SQL can be dry-run or applied to the selected DB. It is not recorded in migration history.',
+      'SQLを選択DBに対してdry-runまたは適用できます。マイグレーション履歴には登録されません。': 'Ad hoc SQL can be dry-run or applied to the selected DB. It is not recorded in migration history.',
       'SQL applyはatomic transactionで実行します。途中で失敗した場合はrollbackします。': 'SQL apply runs in an atomic transaction. Failures roll back the batch.',
       'はGUI SQLでは拒否されます。': 'are rejected by GUI SQL.',
       '、': ', ',
       'は単独SQLとしてだけ適用できます。': 'can only be applied as single statements.',
     };
     const staticJapaneseTranslations = {
-      'Fleet migration control plane': 'Fleet migration 管理',
-      'Global': '全体操作',
+      'Fleet migration control plane': 'Fleet migration コントロール',
+      'Global': 'グローバル',
       'Language': '言語',
       'Check': 'Check',
       'DB group': 'DBグループ',
       'Database override': 'DB指定',
       'Limit': 'Limit',
       'Resolved target': '解決済み対象',
-      'Migration Groups': 'Migrationグループ',
-      'Create group': '新規グループ作成',
-      'New Migration Group': '新規Migrationグループ',
+      'Migration Groups': 'マイグレーショングループ',
+      'Create group': 'グループ作成',
+      'New Migration Group': '新規マイグレーショングループ',
       'Cancel': 'キャンセル',
       'Create': '作成',
       'DB Groups': 'DBグループ',
@@ -651,14 +652,14 @@
       'Versions': 'Versions',
       'DB selectors': 'DBセレクタ',
       'DB selector': 'DBセレクタ',
-      'Migration groups': 'Migrationグループ',
-      'Applied Migration Groups': '適用Migrationグループ',
-      'Migration files': 'Migrationファイル',
+      'Migration groups': 'マイグレーショングループ',
+      'Applied Migration Groups': '適用マイグレーショングループ',
+      'Migration files': 'マイグレーションファイル',
       'New DB path': '新規DBパス',
       'Add to DB group': 'DBグループへ追加',
       'Version': 'Version',
       'Name': '名前',
-      'Add to migration group': 'Migrationグループへ追加',
+      'Add to migration group': 'マイグレーショングループへ追加',
       'Target DB': '対象DB',
       'SQL file': 'SQLファイル',
       'SQL template': 'SQLテンプレート',
@@ -666,7 +667,7 @@
       'GUI permissions': 'GUI権限',
       'Runtime': '実行設定',
       'Paths': 'パス',
-      'Object Definitions': 'Object定義',
+      'Object Definitions': 'オブジェクト定義',
       'Column': 'カラム',
       'Type': '型',
       'Not null': 'NOT NULL',
@@ -674,6 +675,16 @@
       'Hidden': 'Hidden',
       'Run': '実行',
       'SQL runner': 'SQL実行',
+      'Databases': 'DB一覧',
+      'Database management': 'DB一覧',
+      'Migration management': 'マイグレーション',
+      'Migrations': 'マイグレーション',
+      'Schema builder': 'スキーマ作成',
+      'Settings': '設定',
+      'Settings / permissions': '設定',
+      'Split into groups': 'グループ分け',
+      'Add DB': 'DBを追加',
+      'Add migration file': 'マイグレーションファイル追加',
     };
     const localeText = {
       en: {
@@ -771,11 +782,11 @@
         noMigrations: 'migration はありません',
         noMigrationGroups: 'migration group はありません',
         noDbGroups: 'DB group はありません',
-        noRules: 'DBごとの指定はありません。未指定DBはmain Migration Groupを使います。',
+        noRules: 'DBごとの指定はありません。未指定DBはmainマイグレーショングループを使います。',
         noTables: 'テーブルはありません',
-        selectDbForSchema: 'DBを選択してSchemaを読み込んでください',
+        selectDbForSchema: 'DBを選択してスキーマを読み込んでください',
         unset: '未設定',
         saved: '保存しました',
-        savedMigrationGroup: 'Migration Groupを保存しました',
-        savedDbGroup: 'DB Groupを保存しました',
+        savedMigrationGroup: 'マイグレーショングループを保存しました',
+        savedDbGroup: 'DBグループを保存しました',
         savedDatabaseRule: 'DBの割当を保存しました',
