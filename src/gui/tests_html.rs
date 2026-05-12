@@ -124,6 +124,17 @@
         assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#));
         assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
+        let migration_group_nav = INDEX_HTML
+            .find(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#)
+            .expect("migration group nav link exists");
+        let migration_nav = INDEX_HTML
+            .find(r#"<a href='#migrations-panel' data-page-link="migrations">"#)
+            .expect("migration nav link exists");
+        let db_group_nav = INDEX_HTML
+            .find(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#)
+            .expect("db group nav link exists");
+        assert!(migration_group_nav < migration_nav);
+        assert!(migration_nav < db_group_nav);
         assert!(INDEX_HTML.contains("function updateConditionalNav()"));
         assert!(INDEX_HTML.contains("const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main')"));
         assert!(INDEX_HTML.contains(
