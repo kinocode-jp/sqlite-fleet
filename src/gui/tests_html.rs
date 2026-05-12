@@ -287,6 +287,7 @@
         assert!(INDEX_HTML.contains(r#"<h2 id="snippetDeleteModalTitle">スニペット削除</h2>"#));
         assert!(INDEX_HTML.contains(r#"<button id="confirmSnippetDelete" type="button" class="danger">スニペットを削除</button>"#));
         assert!(INDEX_HTML.contains(r#"<pre id="newMigrationSqlLines" class="sql-line-numbers" aria-hidden="true">1</pre>"#));
+        assert!(INDEX_HTML.contains(".sql-line-numbers { margin:0; padding:10px 8px;"));
         assert!(INDEX_HTML.contains(r#"<pre id="newMigrationSqlHighlight" class="sql-highlight" aria-hidden="true"></pre>"#));
         assert!(INDEX_HTML.contains(r#"<textarea id="newMigrationSql" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="ALTER TABLE ...;"></textarea>"#));
         assert!(INDEX_HTML.contains(r#"<div id="newMigrationSqlCompletions" class="sql-completion-list" hidden></div>"#));
