@@ -2,13 +2,16 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use sqlite_fleet::{
-    check, discover_databases, load_migrations, migrate, status_report, write_report_json, Config,
+    backup, check, discover_databases, load_migrations, migrate_with_options, status_report,
+    write_audit_event, write_report_json, Config, DatabaseSelection, MigrateOptions,
+    MigrationGroupConfig,
 };
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, TcpListener, TcpStream, ToSocketAddrs};
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::Duration;
 
 const MAX_HTTP_HEADER_BYTES: usize = 16 * 1024;
@@ -21,20 +24,22 @@ struct HttpRequest {
 }
 
 struct ServerState {
-    config: Config,
+    config: Mutex<Config>,
+    config_path: PathBuf,
     csrf_token: String,
     script_nonce: String,
     bind_ip: IpAddr,
     port: u16,
 }
 
-pub fn serve(config: Config, host: &str, port: u16) -> Result<()> {
+pub fn serve(config: Config, config_path: PathBuf, host: &str, port: u16) -> Result<()> {
     validate_gui_host(host)?;
     let listener = TcpListener::bind((host, port))
         .with_context(|| format!("GUIサーバを起動できません: {host}:{port}"))?;
     let addr = listener.local_addr()?;
     let state = ServerState {
-        config,
+        config: Mutex::new(config),
+        config_path,
         csrf_token: generate_csrf_token()?,
         script_nonce: generate_csrf_token()?,
         bind_ip: addr.ip(),
@@ -88,7 +93,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
         }
     }
     let mut request_body = None;
-    if matches!((method, path), ("POST", "/api/sql")) {
+    if method == "POST" && requires_json_body(path) {
         if let Err(error) = validate_json_content_type(&headers) {
             return write_json_error(&mut stream, 400, error);
         }
@@ -100,6 +105,16 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
     {
         return write_json_error(&mut stream, 400, error);
     }
+    let config = match state.config.lock() {
+        Ok(config) => config.clone(),
+        Err(_) => {
+            return write_json_error(
+                &mut stream,
+                500,
+                anyhow::anyhow!("GUI設定状態が壊れています"),
+            )
+        }
+    };
 
     match (method, path) {
         ("GET", "/") => {
@@ -119,19 +134,19 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             if let Err(error) = validate_no_query(query) {
                 return write_json_error(&mut stream, 400, error);
             }
-            write_json(&mut stream, 200, &api_state(&state.config))
+            write_json(&mut stream, 200, &api_state(&config))
         }
         ("GET", "/api/discover") => {
             if let Err(error) = validate_no_query(query) {
                 return write_json_error(&mut stream, 400, error);
             }
-            write_json_result(&mut stream, discover_databases(&state.config))
+            write_json_result(&mut stream, discover_databases(&config))
         }
         ("GET", "/api/plan") => {
             if let Err(error) = validate_no_query(query) {
                 return write_json_error(&mut stream, 400, error);
             }
-            write_json(&mut stream, 200, &api_plan(&state.config))
+            write_json(&mut stream, 200, &api_plan(&config))
         }
         ("GET", "/api/schema") => {
             let query = match parse_query(query) {
@@ -152,13 +167,62 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 }
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
-            write_json_result(&mut stream, api_schema(&state.config, database))
+            write_json_result(&mut stream, api_schema(&config, database))
         }
         ("POST", "/api/check") => {
+            if !config.gui.allow_check {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI check は設定で無効化されています"),
+                );
+            }
             if let Err(error) = validate_no_query(query) {
                 return write_json_error(&mut stream, 400, error);
             }
-            write_json(&mut stream, 200, &api_check(&state.config))
+            write_json(&mut stream, 200, &api_check(&config))
+        }
+        ("POST", "/api/backup") => {
+            if !config.gui.allow_backup {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI backup は設定で無効化されています"),
+                );
+            }
+            let query = match parse_query(query) {
+                Ok(query) => query,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            if let Err(error) = validate_query_keys(&query, &["database", "group", "limit"]) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            let database = match optional_nonempty_query(&query, "database") {
+                Ok(database) => database,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            let group = match optional_nonempty_query(&query, "group") {
+                Ok(group) => group,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            let limit = match optional_usize_query(&query, "limit") {
+                Ok(limit) => limit,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            let result = backup(
+                &config,
+                DatabaseSelection {
+                    database: database.map(str::to_string),
+                    group: group.map(str::to_string),
+                    limit,
+                    ..DatabaseSelection::default()
+                },
+            )
+            .and_then(|report| {
+                write_audit_event(&config, "gui.backup", &report)?;
+                Ok(report)
+            });
+            write_json_result(&mut stream, result)
         }
         ("POST", "/api/sql") => {
             let query = match parse_query(query) {
@@ -169,6 +233,13 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Ok(dry_run) => dry_run,
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
+            if !dry_run && !config.gui.allow_sql_apply {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI SQL apply は設定で無効化されています"),
+                );
+            }
             if let Err(error) = validate_query_keys(&query, &["dry_run", "database"]) {
                 return write_json_error(&mut stream, 400, error);
             }
@@ -184,9 +255,117 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
             let body = request_body.unwrap_or_default();
+            let result = api_sql(&config, database, dry_run, &body);
+            let result = if dry_run {
+                result
+            } else {
+                match result {
+                    Ok(sql_result) => write_audit_event(
+                        &config,
+                        "gui.sql_apply",
+                        &serde_json::json!({
+                            "success": true,
+                            "result": sql_result,
+                        }),
+                    )
+                    .map(|()| sql_result),
+                    Err(error) => {
+                        let message = error.to_string();
+                        match write_audit_event(
+                            &config,
+                            "gui.sql_apply",
+                            &serde_json::json!({
+                                "success": false,
+                                "database": database,
+                                "error": message,
+                            }),
+                        ) {
+                            Ok(()) => Err(error),
+                            Err(audit_error) => Err(audit_error),
+                        }
+                    }
+                }
+            };
+            write_json_result(&mut stream, result)
+        }
+        ("POST", "/api/admin/migration-group") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
             write_json_result(
                 &mut stream,
-                api_sql(&state.config, database, dry_run, &body),
+                api_save_migration_group(state, request_body.unwrap_or_default()),
+            )
+        }
+        ("POST", "/api/admin/db-group") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_save_db_group(state, request_body.unwrap_or_default()),
+            )
+        }
+        ("POST", "/api/admin/database-migration-group") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_save_database_migration_group(state, request_body.unwrap_or_default()),
+            )
+        }
+        ("POST", "/api/admin/migration-file") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_create_migration_file(state, request_body.unwrap_or_default()),
+            )
+        }
+        ("POST", "/api/admin/database-file") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_create_database_file(state, request_body.unwrap_or_default()),
             )
         }
         ("POST", "/api/migrate") => {
@@ -198,18 +377,48 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Ok(dry_run) => dry_run,
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
-            if let Err(error) = validate_query_keys(&query, &["dry_run", "database"]) {
+            if !config.gui.allow_migrate {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migrate は設定で無効化されています"),
+                );
+            }
+            if let Err(error) =
+                validate_query_keys(&query, &["dry_run", "database", "group", "limit"])
+            {
                 return write_json_error(&mut stream, 400, error);
             }
             let database = match optional_nonempty_query(&query, "database") {
                 Ok(database) => database,
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
-            let result = migrate(&state.config, dry_run, database).and_then(|report| {
-                let report_write_error = write_report_json(&state.config, &report).err();
+            let group = match optional_nonempty_query(&query, "group") {
+                Ok(group) => group,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            let limit = match optional_usize_query(&query, "limit") {
+                Ok(limit) => limit,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            let result = migrate_with_options(
+                &config,
+                MigrateOptions {
+                    dry_run,
+                    selection: DatabaseSelection {
+                        database: database.map(str::to_string),
+                        group: group.map(str::to_string),
+                        limit,
+                    },
+                    backup_before_migrate: None,
+                },
+            )
+            .and_then(|report| {
+                let report_write_error = write_report_json(&config, &report).err();
                 if let Some(error) = report_write_error {
                     Err(error)
                 } else {
+                    write_audit_event(&config, "gui.migrate", &report)?;
                     Ok(report)
                 }
             });
@@ -332,6 +541,11 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
         (Ok(status), Ok(databases), Ok(migrations)) => ApiEnvelope {
             ok: true,
             data: Some(StateData {
+                migration_groups: api_migration_groups(config, &databases, &migrations),
+                db_groups: api_db_groups(config, &databases),
+                database_migration_rules: api_database_migration_rules(config),
+                gui_permissions: GuiPermissionData::from_config(config),
+                settings: SettingsData::from_config(config),
                 project: config.project.name.clone(),
                 status,
                 databases,
@@ -352,6 +566,88 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
             ),
         },
     }
+}
+
+fn api_migration_groups(
+    config: &Config,
+    databases: &[sqlite_fleet::Database],
+    migrations: &[sqlite_fleet::Migration],
+) -> Vec<MigrationGroupData> {
+    let mut names = config
+        .effective_migration_groups()
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    names.sort();
+    names
+        .into_iter()
+        .map(|name| {
+            let group_migrations = migrations
+                .iter()
+                .filter(|migration| migration.group == name)
+                .map(sqlite_fleet::MigrationSummary::from)
+                .collect::<Vec<_>>();
+            let group_databases = databases
+                .iter()
+                .filter(|database| {
+                    config
+                        .migration_groups_for_database(database)
+                        .iter()
+                        .any(|group| group == &name)
+                })
+                .map(|database| database.id.clone())
+                .collect::<Vec<_>>();
+            MigrationGroupData {
+                name,
+                migrations: group_migrations,
+                databases: group_databases,
+            }
+        })
+        .collect()
+}
+
+fn api_db_groups(config: &Config, databases: &[sqlite_fleet::Database]) -> Vec<DbGroupData> {
+    let mut groups = config
+        .effective_db_groups()
+        .into_iter()
+        .map(|(name, selectors)| {
+            let mut database_ids = Vec::new();
+            for selector in &selectors {
+                for database in databases {
+                    if config.database_matches_selector(database, selector)
+                        && !database_ids.contains(&database.id)
+                    {
+                        database_ids.push(database.id.clone());
+                    }
+                }
+            }
+            DbGroupData {
+                name,
+                selectors,
+                database_ids,
+            }
+        })
+        .collect::<Vec<_>>();
+    groups.sort_by(|left, right| left.name.cmp(&right.name));
+    groups
+}
+
+fn api_database_migration_rules(config: &Config) -> Vec<DatabaseMigrationRuleData> {
+    let mut rules = config
+        .database_migration_groups
+        .iter()
+        .map(|(selector, groups)| {
+            let mut migration_groups = groups.clone();
+            migration_groups.sort();
+            migration_groups.dedup();
+            DatabaseMigrationRuleData {
+                selector: selector.clone(),
+                migration_groups,
+            }
+        })
+        .collect::<Vec<_>>();
+    rules.sort_by(|left, right| left.selector.cmp(&right.selector));
+    rules
 }
 
 fn api_plan(config: &Config) -> ApiEnvelope<Vec<sqlite_fleet::DatabasePlan>> {
@@ -499,6 +795,159 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
             "SQL applied".to_string()
         },
     })
+}
+
+fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: MigrationGroupRequest =
+        serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
+    let name = clean_name(&request.name, "Migration group name")?;
+    let versions = clean_list(request.versions, "versions")?;
+    let mut config = locked_config(state)?;
+    match config.migration_groups.get_mut(&name) {
+        Some(group) => group.migrations = versions,
+        None => {
+            config
+                .migration_groups
+                .insert(name.clone(), MigrationGroupConfig::versions(versions));
+        }
+    }
+    persist_config(state, config)?;
+    Ok(AdminResult::new(format!(
+        "migration group を保存しました: {name}"
+    )))
+}
+
+fn api_save_db_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: DbGroupRequest =
+        serde_json::from_slice(&body).context("DB group request body のJSONが不正です")?;
+    let name = clean_name(&request.name, "DB group name")?;
+    let selectors = clean_list(request.selectors, "selectors")?;
+    let mut config = locked_config(state)?;
+    config.db_groups.insert(name.clone(), selectors);
+    persist_config(state, config)?;
+    Ok(AdminResult::new(format!("DB group を保存しました: {name}")))
+}
+
+fn api_save_database_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: DatabaseMigrationGroupRequest = serde_json::from_slice(&body)
+        .context("database migration group request body のJSONが不正です")?;
+    let selector = clean_name(&request.selector, "DB selector")?;
+    let groups = clean_list(request.groups, "migration groups")?;
+    let mut config = locked_config(state)?;
+    config
+        .database_migration_groups
+        .insert(selector.clone(), groups);
+    persist_config(state, config)?;
+    Ok(AdminResult::new(format!(
+        "DBのmigration group割当を保存しました: {selector}"
+    )))
+}
+
+fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: MigrationFileRequest =
+        serde_json::from_slice(&body).context("migration file request body のJSONが不正です")?;
+    let version = clean_version(&request.version)?;
+    let name = clean_file_stem(&request.name, "migration name")?;
+    let sql = request.sql.trim();
+    if sql.is_empty() {
+        bail!("migration SQL は空にできません");
+    }
+    if utf8_byte_len(sql) > MAX_SQL_BYTES {
+        bail!("migration SQL が大きすぎます");
+    }
+    let mut config = locked_config(state)?;
+    let target_group = request
+        .group
+        .as_deref()
+        .map(str::trim)
+        .filter(|group| !group.is_empty())
+        .map(|group| clean_name(group, "Migration group name"))
+        .transpose()?;
+    if !config.migration_groups.is_empty() && target_group.is_none() {
+        bail!("明示的な migration_groups がある設定では migration group の指定が必要です");
+    }
+    let migrations_dir_value = target_group
+        .as_deref()
+        .and_then(|group| config.migration_groups.get(group))
+        .and_then(|group| group.dir.as_deref())
+        .unwrap_or(&config.migrations.dir);
+    let migrations_dir = resolve_existing_or_creatable_dir(&config, migrations_dir_value)?;
+    std::fs::create_dir_all(&migrations_dir).with_context(|| {
+        format!(
+            "migrations.dir を作成できません: {}",
+            migrations_dir.display()
+        )
+    })?;
+    let filename = format!("{version}_{name}.sql");
+    let path = migrations_dir.join(filename);
+    validate_path_stays_in_base(&config, &path, "migration file")?;
+    if path.exists() {
+        bail!("migration file は既に存在します: {}", path.display());
+    }
+    std::fs::write(&path, sql)
+        .with_context(|| format!("migration file を作成できません: {}", path.display()))?;
+    let preserves_implicit_default =
+        config.migration_groups.is_empty() && target_group.as_deref() == Some("default");
+    if let Some(group) = target_group.filter(|_| !preserves_implicit_default) {
+        let entry = config
+            .migration_groups
+            .entry(group)
+            .or_insert_with(|| MigrationGroupConfig::versions(Vec::new()));
+        let tracks_all_dir_migrations = entry.dir.is_some() && entry.migrations.is_empty();
+        if !tracks_all_dir_migrations && !entry.migrations.iter().any(|item| item == &version) {
+            entry.migrations.push(version.clone());
+        }
+    }
+    if let Err(error) = load_migrations(&config) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error);
+    }
+    if let Err(error) = persist_config(state, config) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error);
+    }
+    Ok(AdminResult::new(format!(
+        "migration file を作成しました: {}",
+        path.display()
+    )))
+}
+
+fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: DatabaseFileRequest =
+        serde_json::from_slice(&body).context("database file request body のJSONが不正です")?;
+    let relative_path = clean_relative_path(&request.path, "DB path")?;
+    let mut config = locked_config(state)?;
+    let path = config.resolve_path(&relative_path);
+    validate_path_stays_in_base(&config, &path, "DB path")?;
+    if path.exists() {
+        bail!("DB file は既に存在します: {}", path.display());
+    }
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("DB directory を作成できません: {}", parent.display()))?;
+    }
+    Connection::open(&path)
+        .with_context(|| format!("DB file を作成できません: {}", path.display()))?;
+    if let Some(group) = request
+        .db_group
+        .as_deref()
+        .map(str::trim)
+        .filter(|group| !group.is_empty())
+    {
+        let group = clean_name(group, "DB group name")?;
+        let entry = config.db_groups.entry(group).or_default();
+        if !entry.iter().any(|item| item == &relative_path) {
+            entry.push(relative_path.clone());
+        }
+    }
+    if let Err(error) = persist_config(state, config) {
+        let _ = std::fs::remove_file(&path);
+        return Err(error);
+    }
+    Ok(AdminResult::new(format!(
+        "DB file を作成しました: {}",
+        path.display()
+    )))
 }
 
 fn execute_sql_apply(conn: &Connection, sql: &str) -> Result<u64> {
@@ -1179,6 +1628,89 @@ struct StateData {
     status: sqlite_fleet::StatusReport,
     databases: Vec<sqlite_fleet::Database>,
     migrations: Vec<sqlite_fleet::Migration>,
+    migration_groups: Vec<MigrationGroupData>,
+    db_groups: Vec<DbGroupData>,
+    database_migration_rules: Vec<DatabaseMigrationRuleData>,
+    gui_permissions: GuiPermissionData,
+    settings: SettingsData,
+}
+
+#[derive(Serialize)]
+struct MigrationGroupData {
+    name: String,
+    migrations: Vec<sqlite_fleet::MigrationSummary>,
+    databases: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DbGroupData {
+    name: String,
+    selectors: Vec<String>,
+    database_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DatabaseMigrationRuleData {
+    selector: String,
+    migration_groups: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct GuiPermissionData {
+    allow_check: bool,
+    allow_migrate: bool,
+    allow_backup: bool,
+    allow_restore: bool,
+    allow_sql_apply: bool,
+    allow_migration_edit: bool,
+}
+
+impl GuiPermissionData {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            allow_check: config.gui.allow_check,
+            allow_migrate: config.gui.allow_migrate,
+            allow_backup: config.gui.allow_backup,
+            allow_restore: config.gui.allow_restore,
+            allow_sql_apply: config.gui.allow_sql_apply,
+            allow_migration_edit: config.gui.allow_migration_edit,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct SettingsData {
+    discovery: String,
+    migrations_dir: String,
+    migrations_table: String,
+    backup_dir: String,
+    backup_before_migrate: bool,
+    backup_keep_last: usize,
+    audit_path: Option<String>,
+    report_path: Option<String>,
+    report_format: String,
+    parallel: usize,
+    lock_timeout_ms: u64,
+    continue_on_error: bool,
+}
+
+impl SettingsData {
+    fn from_config(config: &Config) -> Self {
+        Self {
+            discovery: config.databases.discovery.clone(),
+            migrations_dir: config.migrations.dir.clone(),
+            migrations_table: config.migrations.table.clone(),
+            backup_dir: config.backup.dir.clone(),
+            backup_before_migrate: config.backup.before_migrate,
+            backup_keep_last: config.backup.keep_last,
+            audit_path: config.audit.path.clone(),
+            report_path: config.report.path.clone(),
+            report_format: config.report.format.clone(),
+            parallel: config.execution.parallel,
+            lock_timeout_ms: config.execution.lock_timeout_ms,
+            continue_on_error: config.execution.continue_on_error,
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -1234,6 +1766,189 @@ struct SqlResult {
     dry_run: bool,
     changed: u64,
     message: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationGroupRequest {
+    name: String,
+    versions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DbGroupRequest {
+    name: String,
+    selectors: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatabaseMigrationGroupRequest {
+    selector: String,
+    groups: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationFileRequest {
+    version: String,
+    name: String,
+    group: Option<String>,
+    sql: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct DatabaseFileRequest {
+    path: String,
+    db_group: Option<String>,
+}
+
+#[derive(Serialize)]
+struct AdminResult {
+    message: String,
+}
+
+impl AdminResult {
+    fn new(message: String) -> Self {
+        Self { message }
+    }
+}
+
+fn locked_config(state: &ServerState) -> Result<Config> {
+    state
+        .config
+        .lock()
+        .map(|config| config.clone())
+        .map_err(|_| anyhow::anyhow!("GUI設定状態が壊れています"))
+}
+
+fn persist_config(state: &ServerState, config: Config) -> Result<()> {
+    config.validate()?;
+    let text = toml::to_string_pretty(&config).context("設定をTOMLへ変換できません")?;
+    let tmp = state.config_path.with_extension("toml.tmp");
+    std::fs::write(&tmp, text)
+        .with_context(|| format!("設定ファイルを書き込めません: {}", tmp.display()))?;
+    std::fs::rename(&tmp, &state.config_path).with_context(|| {
+        format!(
+            "設定ファイルを置き換えられません: {}",
+            state.config_path.display()
+        )
+    })?;
+    *state
+        .config
+        .lock()
+        .map_err(|_| anyhow::anyhow!("GUI設定状態が壊れています"))? = config;
+    Ok(())
+}
+
+fn clean_name(value: &str, label: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("{label} は空にできません");
+    }
+    if value.chars().any(char::is_whitespace) {
+        bail!("{label} に空白は使用できません");
+    }
+    Ok(value.to_string())
+}
+
+fn clean_list(values: Vec<String>, label: &str) -> Result<Vec<String>> {
+    if values.is_empty() {
+        bail!("{label} は1件以上必要です");
+    }
+    let mut cleaned = Vec::new();
+    for value in values {
+        let value = clean_name(&value, label)?;
+        if !cleaned.contains(&value) {
+            cleaned.push(value);
+        }
+    }
+    Ok(cleaned)
+}
+
+fn clean_version(value: &str) -> Result<String> {
+    let value = clean_name(value, "version")?;
+    if !value.chars().all(|ch| ch.is_ascii_digit()) {
+        bail!("version はASCII数字だけ使用できます: {value}");
+    }
+    Ok(value)
+}
+
+fn clean_file_stem(value: &str, label: &str) -> Result<String> {
+    let value = clean_name(value, label)?;
+    if !value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-'))
+    {
+        bail!("{label} は英数字、_、- だけ使用できます: {value}");
+    }
+    Ok(value)
+}
+
+fn clean_relative_path(value: &str, label: &str) -> Result<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("{label} は空にできません");
+    }
+    let path = Path::new(value);
+    if path.is_absolute() {
+        bail!("{label} は相対パスで指定してください");
+    }
+    if path
+        .components()
+        .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        bail!("{label} に .. は使用できません");
+    }
+    Ok(value.to_string())
+}
+
+fn resolve_existing_or_creatable_dir(config: &Config, value: &str) -> Result<PathBuf> {
+    let value = value.trim();
+    if value.is_empty() {
+        bail!("directory は空にできません");
+    }
+    let path = config.resolve_path(value);
+    validate_path_stays_in_base(config, &path, "directory")?;
+    Ok(path)
+}
+
+fn validate_path_stays_in_base(config: &Config, path: &Path, label: &str) -> Result<()> {
+    let base = std::fs::canonicalize(&config.base_dir)
+        .with_context(|| format!("base_dir を解決できません: {}", config.base_dir.display()))?;
+    let parent = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("{label} の親ディレクトリが必要です"))?;
+    let canonical_parent = if parent.exists() {
+        std::fs::canonicalize(parent).with_context(|| {
+            format!(
+                "{label} の親ディレクトリを解決できません: {}",
+                parent.display()
+            )
+        })?
+    } else {
+        let mut existing = parent;
+        while !existing.exists() {
+            existing = existing
+                .parent()
+                .ok_or_else(|| anyhow::anyhow!("{label} の親ディレクトリを解決できません"))?;
+        }
+        std::fs::canonicalize(existing).with_context(|| {
+            format!(
+                "{label} の既存親ディレクトリを解決できません: {}",
+                existing.display()
+            )
+        })?
+    };
+    if !canonical_parent.starts_with(&base) {
+        bail!(
+            "{label} は設定ディレクトリ外を指せません: {}",
+            path.display()
+        );
+    }
+    Ok(())
 }
 
 fn write_json_result<T: Serialize>(stream: &mut TcpStream, result: Result<T>) -> Result<()> {
@@ -1323,6 +2038,10 @@ fn split_target(target: &str) -> (&str, &str) {
 
 fn is_api_path(path: &str) -> bool {
     path == "/api" || path.starts_with("/api/")
+}
+
+fn requires_json_body(path: &str) -> bool {
+    path == "/api/sql" || path.starts_with("/api/admin/")
 }
 
 fn target_path_contains_percent_encoding(target: &str) -> bool {
@@ -1633,6 +2352,22 @@ fn optional_nonempty_query<'a>(
     }
 }
 
+fn optional_usize_query(query: &HashMap<String, String>, name: &str) -> Result<Option<usize>> {
+    match query.get(name).map(String::as_str) {
+        Some("") => bail!("query parameter {name} は空にできません"),
+        Some(value) => {
+            let limit = value
+                .parse::<usize>()
+                .with_context(|| format!("query parameter {name} は正の整数が必要です"))?;
+            if limit == 0 {
+                bail!("query parameter {name} は1以上が必要です");
+            }
+            Ok(Some(limit))
+        }
+        None => Ok(None),
+    }
+}
+
 fn validate_query_keys(query: &HashMap<String, String>, allowed: &[&str]) -> Result<()> {
     for key in query.keys() {
         if !allowed.contains(&key.as_str()) {
@@ -1705,56 +2440,110 @@ fn hex_encode(bytes: impl AsRef<[u8]>) -> String {
 }
 
 const INDEX_HTML: &str = r#"<!doctype html>
-<html lang="ja">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>sqlite-fleet GUI</title>
   <style nonce="__SCRIPT_NONCE__">
-    :root { color-scheme: light; --bg:#f6f7f9; --panel:#ffffff; --text:#1f2933; --muted:#607080; --line:#d9e0e7; --accent:#1769aa; --danger:#b42318; --ok:#16794c; --warn:#9a5b00; }
-    * { box-sizing: border-box; }
-    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
-    .layout { display:grid; grid-template-columns:280px minmax(0, 1fr); min-height:100vh; }
-    .sidebar { position:sticky; top:0; height:100vh; overflow:auto; border-right:1px solid var(--line); background:var(--panel); padding:20px; }
+    :root { color-scheme:light; --app-bg:#f4f6f8; --surface:#fff; --surface-2:#f8fafc; --surface-3:#eef3f7; --text:#17212b; --muted:#667789; --line:#d8e0e8; --line-strong:#c4ced8; --accent:#0f6f8f; --accent-strong:#0b536c; --danger:#b42318; --danger-bg:#fff1f0; --ok:#157347; --ok-bg:#edf8f2; --warn:#9a5b00; --warn-bg:#fff7e6; --shadow:0 1px 2px rgba(16,24,40,.06), 0 10px 30px rgba(16,24,40,.05); }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:var(--app-bg); color:var(--text); font:14px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    .layout { display:grid; grid-template-columns:272px minmax(0, 1fr); min-height:100vh; }
+    .sidebar { position:sticky; top:0; height:100vh; overflow:auto; border-right:1px solid var(--line); background:#101820; color:#f7fafc; padding:20px 16px; }
+    .brand { display:grid; gap:6px; margin-bottom:22px; padding:0 4px; }
+    h1 { margin:0; font-size:21px; font-weight:720; letter-spacing:0; }
+    .subtitle { color:#a9b7c5; font-size:12px; }
+    .sidebar-nav { display:grid; gap:4px; margin:0 0 18px; }
+    .sidebar-nav a { display:flex; align-items:center; gap:9px; min-height:36px; color:#d7e3ed; text-decoration:none; padding:8px 10px; border-radius:6px; font-weight:650; }
+    .sidebar-nav a:hover, .sidebar-nav a:focus-visible { background:#1d2a36; color:#fff; outline:0; }
+    .nav-icon { flex:0 0 30px; text-align:center; color:#8bd3e6; }
+    .side-card { display:grid; gap:10px; margin:16px 0; padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:8px; background:#172331; }
+    .side-title { margin:0; color:#e7eef5; font-size:12px; font-weight:760; text-transform:uppercase; }
+    .sidebar .actions { display:grid; gap:8px; }
+    .language-toggle { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+    .language-toggle button { min-height:32px; padding:0 8px; background:#0f1823; border-color:rgba(255,255,255,.2); color:#d7e3ed; }
+    .language-toggle button.active { background:#e7eef5; color:#101820; border-color:#e7eef5; }
     .content { min-width:0; padding:24px; }
-    .brand { margin-bottom:18px; }
-    h1 { margin:0; font-size:20px; font-weight:650; }
-    .toolbar { display:grid; gap:8px; margin:16px 0; }
-    .actions { display:flex; flex-wrap:wrap; gap:8px; }
-    .sidebar .actions, .sidebar .actions button { width:100%; }
-    button { border:1px solid var(--line); background:#fff; color:var(--text); border-radius:6px; min-height:34px; padding:0 12px; font:inherit; cursor:pointer; }
-    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-    button.danger { background:var(--danger); border-color:var(--danger); color:#fff; }
-    button:disabled { opacity:.55; cursor:wait; }
-    input, select, textarea { width:100%; border:1px solid var(--line); border-radius:6px; background:#fff; color:var(--text); font:inherit; padding:8px 10px; }
-    textarea { min-height:260px; resize:vertical; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-    .form-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; padding:16px; }
-    .form-grid .wide { grid-column:1 / -1; }
-    .stack { display:grid; gap:10px; }
-    .schema-list { display:grid; gap:10px; padding:16px; }
-    .schema-table { border:1px solid var(--line); border-radius:8px; overflow:hidden; }
-    .schema-table h3 { margin:0; padding:10px 12px; font-size:14px; border-bottom:1px solid var(--line); background:#fafbfc; }
-    .schema-sql { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
-    .summary { display:grid; grid-template-columns:1fr; gap:10px; margin-top:16px; }
-    .metric, .panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
-    .metric { padding:12px; }
-    .metric strong { display:block; font-size:22px; line-height:1.1; margin-top:4px; }
-    .label { color:var(--muted); font-size:12px; }
-    .panel { margin-bottom:16px; overflow:hidden; }
-    .panel h2 { font-size:16px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line); }
-    table { width:100%; border-collapse:collapse; }
-    th, td { padding:10px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
-    th { font-size:12px; color:var(--muted); background:#fafbfc; font-weight:600; }
+    .topbar { display:flex; align-items:flex-start; justify-content:space-between; gap:18px; margin-bottom:20px; }
+    .page-title { display:grid; gap:4px; }
+    .page-title h2 { margin:0; font-size:24px; line-height:1.2; }
+    .page-title p { margin:0; color:var(--muted); }
+    .message { min-width:280px; max-width:520px; margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); box-shadow:var(--shadow); }
+    .message.error { border-color:#f2b8b5; background:var(--danger-bg); color:var(--danger); }
+    .summary { display:grid; grid-template-columns:repeat(6, minmax(130px, 1fr)); gap:12px; margin-bottom:18px; }
+    .metric { min-height:88px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); }
+    .metric strong { display:block; margin-top:6px; font-size:21px; line-height:1.15; overflow-wrap:anywhere; }
+    .metric:nth-child(2) strong { font-size:18px; }
+    .label, .field-label, th { color:var(--muted); font-size:12px; font-weight:700; }
+    .panel { margin-bottom:18px; border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .summary.page.active { display:grid; }
+    .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:15px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+    .panel-heading { display:grid; gap:3px; }
+    .panel h2 { margin:0; font-size:16px; line-height:1.3; }
+    .panel-description { margin:0; color:var(--muted); font-size:13px; }
+    .table-wrap { width:100%; overflow:auto; }
+    table { width:100%; border-collapse:collapse; min-width:720px; }
+    th, td { padding:11px 12px; text-align:left; border-bottom:1px solid var(--line); vertical-align:top; }
+    th { background:var(--surface-2); text-transform:uppercase; white-space:nowrap; }
     tr:last-child td { border-bottom:0; }
+    .path-cell { max-width:360px; }
+    .pending-cell { min-width:220px; }
     code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; overflow-wrap:anywhere; }
-    .pill { display:inline-block; border-radius:999px; padding:2px 8px; font-size:12px; border:1px solid var(--line); }
-    .ok { color:var(--ok); }
-    .warn { color:var(--warn); }
-    .bad { color:var(--danger); }
+    .pill { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 9px; font-size:12px; font-weight:760; border:1px solid var(--line); background:var(--surface-3); }
+    .ok { color:var(--ok); background:var(--ok-bg); border-color:#bfe8ce; }
+    .warn { color:var(--warn); background:var(--warn-bg); border-color:#f4d49a; }
+    .bad { color:var(--danger); background:var(--danger-bg); border-color:#f2b8b5; }
     .muted { color:var(--muted); }
-    .message { margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
-    .message.error { border-color:#f2b8b5; color:var(--danger); }
-    @media (max-width: 820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary { grid-template-columns:repeat(2, 1fr); } th:nth-child(2), td:nth-child(2) { display:none; } }
+    .actions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+    button { border:1px solid var(--line-strong); background:#fff; color:var(--text); border-radius:6px; min-height:34px; padding:0 12px; font:inherit; font-weight:650; cursor:pointer; white-space:nowrap; }
+    button:hover:not(:disabled) { border-color:var(--accent); color:var(--accent-strong); }
+    button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+    button.primary:hover:not(:disabled) { background:var(--accent-strong); color:#fff; }
+    button.danger { background:var(--danger); border-color:var(--danger); color:#fff; }
+    button.danger:hover:not(:disabled) { filter:brightness(.94); color:#fff; }
+    button:disabled { opacity:.55; cursor:wait; }
+    input, select, textarea { width:100%; border:1px solid var(--line-strong); border-radius:6px; background:#fff; color:var(--text); font:inherit; padding:8px 10px; }
+    input:focus, select:focus, textarea:focus, button:focus-visible { outline:3px solid rgba(15,111,143,.18); outline-offset:1px; border-color:var(--accent); }
+    textarea { min-height:300px; resize:vertical; font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height:1.45; }
+    .form-grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; padding:16px; }
+    .form-grid .wide { grid-column:1 / -1; }
+    .field { display:grid; gap:6px; min-width:0; }
+    .field-label { display:flex; align-items:center; gap:6px; color:#405163; }
+    .tool-tip { position:relative; display:inline-grid; place-items:center; width:18px; height:18px; border:1px solid var(--line-strong); border-radius:50%; color:var(--accent-strong); background:#fff; font-size:12px; font-weight:800; cursor:help; }
+    .tool-tip::after { content:attr(data-tip); position:absolute; z-index:20; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:min(280px, 82vw); padding:9px 10px; border-radius:6px; background:#17212b; color:#fff; font-size:12px; font-weight:500; line-height:1.45; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:opacity .12s ease; }
+    .tool-tip::before { content:""; position:absolute; left:50%; bottom:calc(100% + 3px); transform:translateX(-50%); border:5px solid transparent; border-top-color:#17212b; opacity:0; transition:opacity .12s ease; }
+    .tool-tip:hover::after, .tool-tip:focus::after, .tool-tip:hover::before, .tool-tip:focus::before { opacity:1; }
+    .schema-list { display:grid; gap:12px; padding:16px; }
+    .schema-table { border:1px solid var(--line); border-radius:8px; overflow:hidden; background:#fff; }
+    .schema-table h3 { margin:0; padding:10px 12px; font-size:14px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+    .schema-table table { min-width:640px; }
+    .schema-sql { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
+    .quick-builder { padding-top:0; }
+    .builder-block { display:grid; gap:10px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
+    .builder-block .actions { justify-content:flex-end; }
+    .target-preview { min-height:38px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
+    .topology-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; padding:16px; }
+    .topology-grid h3 { margin:0 0 10px; font-size:14px; }
+    .card-list { display:grid; gap:10px; }
+    .info-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .info-card strong { font-size:14px; overflow-wrap:anywhere; }
+    .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
+    .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
+    .key-grid { display:grid; gap:8px; }
+    .key-item { display:grid; grid-template-columns:140px minmax(0, 1fr); gap:8px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+    .key-item span:first-child { color:var(--muted); font-size:12px; font-weight:700; }
+    .help { padding:16px; display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px; }
+    .help section { padding:14px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .help h3 { margin:0 0 8px; font-size:14px; }
+    .help p, .help ul { margin:0; }
+    .help ul { padding-left:20px; }
+    @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
+    @media (max-width:900px) { .topology-grid { grid-template-columns:1fr; } }
+    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help { grid-template-columns:1fr; } .form-grid .wide { grid-column:auto; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
 <body>
@@ -1762,35 +2551,164 @@ const INDEX_HTML: &str = r#"<!doctype html>
     <aside class="sidebar">
       <div class="brand">
         <h1 id="title">sqlite-fleet</h1>
-        <div class="label">SQLite fleet database manager</div>
+        <div class="subtitle">Fleet migration control plane</div>
       </div>
-      <p id="message" class="message muted">読み込み中...</p>
-      <div class="toolbar">
+      <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
+        <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行計画</a>
+        <a href='#topology-panel' data-page-link="groups"><span class="nav-icon">MAP</span>グループ管理</a>
+        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
+        <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>Migration管理</a>
+        <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL作業</a>
+        <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>Schema作成</a>
+        <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定/権限</a>
+        <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
+      </nav>
+      <section class="side-card" aria-label="主要操作">
+        <p class="side-title">Global</p>
         <div class="actions">
           <button id="refresh">更新</button>
           <button id="check">Check</button>
-          <button id="dryRun" class="primary">Dry run</button>
-          <button id="migrateAll" class="danger">全DBへ適用</button>
         </div>
-      </div>
-      <section class="summary" id="summary"></section>
+      </section>
+      <section class="side-card" aria-label="Language">
+        <p class="side-title">Language</p>
+        <div class="language-toggle" role="group" aria-label="Language">
+          <button type="button" data-locale-button="en">English</button>
+          <button type="button" data-locale-button="ja">日本語</button>
+        </div>
+      </section>
     </aside>
     <main class="content">
-      <section class="panel">
-        <h2>Databases</h2>
-        <table>
-          <thead><tr><th>ID</th><th>Path</th><th>Status</th><th>Applied</th><th>Pending</th><th>Actions</th></tr></thead>
-          <tbody id="databases"></tbody>
-        </table>
-      </section>
-      <section class="panel">
-        <h2>SQL Console</h2>
+      <header class="topbar">
+        <div class="page-title">
+          <h2>実行計画から管理するSQLite fleet</h2>
+          <p>「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。</p>
+        </div>
+        <p id="message" class="message muted">読み込み中...</p>
+      </header>
+      <section class="summary page active" data-page="execute" id="summary" aria-label="状態サマリー"></section>
+
+      <section class="panel page active" data-page="execute" id="command-center">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>実行計画</h2>
+            <p class="panel-description">DBグループ、個別DB、limitを組み合わせて操作対象を決めます。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="DBグループはどこへ適用するか、Migration Groupは各DBに何を適用するかを決めます。">?</span>
+        </div>
         <div class="form-grid">
-          <label>Target DB<select id="sqlDatabase"></select></label>
-          <label>SQL file<input id="sqlFile" type="file" accept=".sql,text/sql,text/plain"></label>
-          <label>SQL template<select id="sqlTemplate"></select></label>
-          <label>Output file name<input id="sqlFileName" value="sqlite-fleet-change.sql"></label>
-          <label class="wide">SQL<textarea id="sqlInput" spellcheck="false" placeholder="CREATE TABLE example(id INTEGER PRIMARY KEY);"></textarea></label>
+          <label class="field"><span class="field-label">DB group <span class="tool-tip" tabindex="0" data-tip="db_groups/groups に定義した対象DBのまとまりです。未指定なら全DBが対象です。">?</span></span><select id="targetGroup"></select></label>
+          <label class="field"><span class="field-label">Database override <span class="tool-tip" tabindex="0" data-tip="選択したDBだけに絞ります。DB groupと併用した場合は両方に一致するDBが対象です。">?</span></span><select id="targetDatabase"></select></label>
+          <label class="field"><span class="field-label">Limit <span class="tool-tip" tabindex="0" data-tip="対象DBを先頭から指定数に制限します。カナリア適用に使います。">?</span></span><input id="targetLimit" inputmode="numeric" placeholder="制限なし"></label>
+          <div class="field">
+            <span class="field-label">Resolved target</span>
+            <div id="targetPreview" class="target-preview muted">読み込み中...</div>
+          </div>
+          <div class="actions wide">
+            <button id="dryRun" class="primary">対象をDry run</button>
+            <button id="backupAll">対象をBackup</button>
+            <button id="migrateAll" class="danger">対象へ適用</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="groups" id="topology-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>グループ設計</h2>
+            <p class="panel-description">Migration Group、DB Group、DBごとの割当をまとめて確認します。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetでは適用内容と適用先を別々のグループで設計します。">?</span>
+        </div>
+        <div class="topology-grid">
+          <section>
+            <h3>Migration Groups</h3>
+            <div class="info-card">
+              <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
+              <label class="field"><span class="field-label">Versions</span><input id="manageMigrationGroupVersions" placeholder="001, 002, 101"></label>
+              <button id="saveMigrationGroup" class="primary">Migration Group保存</button>
+            </div>
+            <div id="migrationGroupCards" class="card-list"></div>
+          </section>
+          <section>
+            <h3>DB Groups</h3>
+            <div class="info-card">
+              <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
+              <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
+              <button id="saveDbGroup" class="primary">DB Group保存</button>
+            </div>
+            <div id="dbGroupCards" class="card-list"></div>
+          </section>
+          <section>
+            <h3>DB -> Migration Groups</h3>
+            <div class="info-card">
+              <label class="field"><span class="field-label">DB selector</span><input id="manageRuleSelector" placeholder="tenant-a"></label>
+              <label class="field"><span class="field-label">Migration groups</span><input id="manageRuleGroups" placeholder="core, premium"></label>
+              <button id="saveDatabaseRule" class="primary">割当保存</button>
+            </div>
+            <div id="databaseRules" class="card-list"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="databases" id="databases-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>DBマトリクス</h2>
+            <p class="panel-description">DBごとの状態、対象Migration Group、未適用内容を比較します。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。">?</span>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span class="field-label">New DB path <span class="tool-tip" tabindex="0" data-tip="設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。">?</span></span><input id="newDatabasePath" placeholder="data/tenant-new.db"></label>
+          <label class="field"><span class="field-label">Add to DB group <span class="tool-tip" tabindex="0" data-tip="任意です。指定すると作成したDBパスをDB group selectorへ追加します。">?</span></span><input id="newDatabaseGroup" placeholder="canary"></label>
+          <div class="actions wide"><button id="createDatabaseFile" class="primary">DB登録</button></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>Status</th><th>Migration Groups</th><th>Applied</th><th>Pending</th><th>Path</th><th>Actions</th></tr></thead>
+            <tbody id="databases"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="migrations" id="migrations-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>Migration台帳</h2>
+            <p class="panel-description">全migrationをversion順に確認し、所属グループとchecksumを追跡します。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。">?</span>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span class="field-label">Version</span><input id="newMigrationVersion" placeholder="005"></label>
+          <label class="field"><span class="field-label">Name</span><input id="newMigrationName" placeholder="add_feature_flag"></label>
+          <label class="field wide"><span class="field-label">Add to migration group</span><input id="newMigrationGroup" placeholder="core"></label>
+          <label class="field wide"><span class="field-label">SQL</span><textarea id="newMigrationSql" spellcheck="false" placeholder="ALTER TABLE ...;"></textarea></label>
+          <div class="actions wide"><button id="createMigrationFile" class="primary">Migrationファイル登録</button></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>
+            <tbody id="migrations"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="sql" id="sql-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>SQL作業</h2>
+            <p class="panel-description">migration履歴に残さない作業用SQLを、dry-runで確認してから適用できます。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。">?</span>
+        </div>
+        <div class="form-grid">
+          <label class="field"><span class="field-label">Target DB <span class="tool-tip" tabindex="0" data-tip="SQLを実行するDBです。Schema Editorの読み込み対象もこのDBになります。">?</span></span><select id="sqlDatabase"></select></label>
+          <label class="field"><span class="field-label">SQL file <span class="tool-tip" tabindex="0" data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。">?</span></span><input id="sqlFile" type="file" accept=".sql,text/sql,text/plain"></label>
+          <label class="field"><span class="field-label">SQL template <span class="tool-tip" tabindex="0" data-tip="よく使うSQLite構文をSQL欄へ挿入します。挿入後に内容を必ず確認してください。">?</span></span><select id="sqlTemplate"></select></label>
+          <label class="field"><span class="field-label">Output file name <span class="tool-tip" tabindex="0" data-tip="SQL欄の内容を保存するときのファイル名です。拡張子.sqlは自動補完されます。">?</span></span><input id="sqlFileName" value="sqlite-fleet-change.sql"></label>
+          <label class="field wide"><span class="field-label">SQL <span class="tool-tip" tabindex="0" data-tip="dry-runは一時コピーで実行します。適用前にchanged件数とエラーを確認してください。">?</span></span><textarea id="sqlInput" spellcheck="false" placeholder="CREATE TABLE example(id INTEGER PRIMARY KEY);"></textarea></label>
           <div class="actions wide">
             <button id="insertTemplate">テンプレート挿入</button>
             <button id="downloadSql">SQLファイル保存</button>
@@ -1800,35 +2718,117 @@ const INDEX_HTML: &str = r#"<!doctype html>
           </div>
         </div>
       </section>
-      <section class="panel">
-        <h2>Schema Editor</h2>
-        <div class="form-grid">
-          <label>New table<input id="newTableName" placeholder="new_table"></label>
-          <label>Columns<input id="newTableColumns" placeholder="id INTEGER PRIMARY KEY, name TEXT"></label>
-          <div class="actions wide"><button id="generateCreateTable">CREATE TABLE SQL生成</button></div>
-
-          <label>Table<input id="alterTableName" placeholder="target_table"></label>
-          <label>New column<input id="newColumnName" placeholder="new_column"></label>
-          <label class="wide">Column definition<input id="newColumnDefinition" placeholder="TEXT NOT NULL DEFAULT ''"></label>
-          <div class="actions wide"><button id="generateAddColumn">ADD COLUMN SQL生成</button></div>
-
-          <label>Rename table from<input id="renameTableFrom" placeholder="old_table"></label>
-          <label>Rename table to<input id="renameTableTo" placeholder="new_table"></label>
-          <div class="actions wide"><button id="generateRenameTable">RENAME TABLE SQL生成</button></div>
-
-          <label>Rename column table<input id="renameColumnTable" placeholder="target_table"></label>
-          <label>Rename column from<input id="renameColumnFrom" placeholder="old_column"></label>
-          <label class="wide">Rename column to<input id="renameColumnTo" placeholder="new_column"></label>
-          <div class="actions wide"><button id="generateRenameColumn">RENAME COLUMN SQL生成</button></div>
+      <section class="panel page" data-page="schema" id="schema-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>Schema作成</h2>
+            <p class="panel-description">よく使うDDLを生成し、現在のschemaと照らし合わせて作業できます。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="ここで生成したSQLはSQL Consoleへ入ります。実行前に必ずdry-runしてください。">?</span>
+        </div>
+        <div class="form-grid quick-builder">
+          <section class="builder-block">
+            <label class="field"><span class="field-label">New table <span class="tool-tip" tabindex="0" data-tip="作成するテーブル名です。識別子は自動でダブルクォートされます。">?</span></span><input id="newTableName" placeholder="new_table"></label>
+            <label class="field"><span class="field-label">Columns <span class="tool-tip" tabindex="0" data-tip="カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。">?</span></span><input id="newTableColumns" placeholder="id INTEGER PRIMARY KEY, name TEXT"></label>
+            <div class="actions"><button id="generateCreateTable">CREATE TABLE SQL生成</button></div>
+          </section>
+          <section class="builder-block">
+            <label class="field"><span class="field-label">Table <span class="tool-tip" tabindex="0" data-tip="カラムを追加する既存テーブル名です。">?</span></span><input id="alterTableName" placeholder="target_table"></label>
+            <label class="field"><span class="field-label">New column <span class="tool-tip" tabindex="0" data-tip="追加するカラム名です。">?</span></span><input id="newColumnName" placeholder="new_column"></label>
+            <label class="field"><span class="field-label">Column definition <span class="tool-tip" tabindex="0" data-tip="型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。">?</span></span><input id="newColumnDefinition" placeholder="TEXT NOT NULL DEFAULT ''"></label>
+            <div class="actions"><button id="generateAddColumn">ADD COLUMN SQL生成</button></div>
+          </section>
+          <section class="builder-block">
+            <label class="field"><span class="field-label">Rename table from <span class="tool-tip" tabindex="0" data-tip="変更前のテーブル名です。">?</span></span><input id="renameTableFrom" placeholder="old_table"></label>
+            <label class="field"><span class="field-label">Rename table to <span class="tool-tip" tabindex="0" data-tip="変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。">?</span></span><input id="renameTableTo" placeholder="new_table"></label>
+            <div class="actions"><button id="generateRenameTable">RENAME TABLE SQL生成</button></div>
+          </section>
+          <section class="builder-block">
+            <label class="field"><span class="field-label">Rename column table <span class="tool-tip" tabindex="0" data-tip="カラム名を変更するテーブルです。">?</span></span><input id="renameColumnTable" placeholder="target_table"></label>
+            <label class="field"><span class="field-label">Rename column from <span class="tool-tip" tabindex="0" data-tip="変更前のカラム名です。">?</span></span><input id="renameColumnFrom" placeholder="old_column"></label>
+            <label class="field"><span class="field-label">Rename column to <span class="tool-tip" tabindex="0" data-tip="変更後のカラム名です。アプリケーション側の参照も更新が必要です。">?</span></span><input id="renameColumnTo" placeholder="new_column"></label>
+            <div class="actions"><button id="generateRenameColumn">RENAME COLUMN SQL生成</button></div>
+          </section>
         </div>
         <div id="schema" class="schema-list"></div>
       </section>
-      <section class="panel">
-        <h2>Migrations</h2>
-        <table>
-          <thead><tr><th>Version</th><th>Name</th><th>Checksum</th></tr></thead>
-          <tbody id="migrations"></tbody>
-        </table>
+
+      <section class="panel page" data-page="settings" id="settings-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>設定/権限</h2>
+            <p class="panel-description">GUIで許可されている操作、backup/report/audit/execution設定を確認します。</p>
+          </div>
+          <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
+        </div>
+        <div class="topology-grid">
+          <section>
+            <h3>GUI permissions</h3>
+            <div id="permissions" class="card-list"></div>
+          </section>
+          <section>
+            <h3>Runtime</h3>
+            <div id="runtimeSettings" class="key-grid"></div>
+          </section>
+          <section>
+            <h3>Paths</h3>
+            <div id="pathSettings" class="key-grid"></div>
+          </section>
+        </div>
+      </section>
+
+      <section class="panel page" data-page="help" id="help">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>ヘルプ</h2>
+            <p class="panel-description">詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。</p>
+          </div>
+        </div>
+        <div class="help">
+          <section>
+            <h3>基本の考え方</h3>
+            <ul>
+              <li>migrationファイルは <code>migrations.dir</code> の固定ディレクトリに置きます。</li>
+              <li><code>[migration_groups]</code> はversionリストで所属を管理します。同じmigrationを複数グループに含められます。</li>
+              <li><code>[database_migration_groups]</code> はDBごとに対象マイグレーショングループを指定します。</li>
+              <li><code>[db_groups]</code> はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>画面の見方</h3>
+            <ul>
+              <li>DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。</li>
+              <li>Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。</li>
+              <li>Migration Groupsでは各グループに属するmigrationと、そのグループの対象DBを確認します。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>操作</h3>
+            <ul>
+              <li>CheckはDB状態、checksum、不明な適用履歴を検査します。</li>
+              <li>Dry runは対象DBの未適用migrationを読み取り確認します。DBは変更しません。</li>
+              <li>適用は対象DBの未適用migrationをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。</li>
+              <li>BackupはSQLite backup APIでDBの一貫したコピーを <code>backup.dir</code> に作成します。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>SQL Console</h3>
+            <ul>
+              <li>作業用SQLを選択DBに対してdry-runまたは適用できます。migration履歴には登録されません。</li>
+              <li>SQL applyはatomic transactionで実行します。途中で失敗した場合はrollbackします。</li>
+              <li><code>ATTACH</code> / <code>DETACH</code> はGUI SQLでは拒否されます。</li>
+              <li><code>VACUUM</code>、<code>VACUUM INTO</code>、<code>PRAGMA journal_mode</code> は単独SQLとしてだけ適用できます。</li>
+            </ul>
+          </section>
+          <section>
+            <h3>安全設定と監査ログ</h3>
+            <ul>
+              <li><code>[gui] allow_check</code>、<code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code> でGUI操作を制限できます。</li>
+              <li><code>audit.path</code> を設定すると、GUIのmigrate、backup、SQL applyもJSONLへ記録されます。</li>
+              <li>監査ログを書けない場合、GUI APIは成功扱いにしません。</li>
+            </ul>
+          </section>
+        </div>
       </section>
     </main>
   </div>
@@ -1892,6 +2892,340 @@ const INDEX_HTML: &str = r#"<!doctype html>
     let state = null;
     let schemaState = null;
     let activeRequests = 0;
+    let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
+    const textNodeSources = new WeakMap();
+    const staticTranslations = {
+      '管理画面ナビゲーション': 'Admin navigation',
+      '実行計画': 'Run plan',
+      'グループ管理': 'Group management',
+      'DB管理': 'Database management',
+      'Migration管理': 'Migration management',
+      'SQL作業': 'SQL workspace',
+      'Schema作成': 'Schema builder',
+      '設定/権限': 'Settings / permissions',
+      'ヘルプ': 'Help',
+      '主要操作': 'Primary actions',
+      '更新': 'Refresh',
+      '実行計画から管理するSQLite fleet': 'SQLite fleet administration by run plan',
+      '「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。': 'Review what will run and where it will run before applying changes across your database fleet.',
+      '読み込み中...': 'Loading...',
+      '状態サマリー': 'Status summary',
+      'DBグループ、個別DB、limitを組み合わせて操作対象を決めます。': 'Choose targets with DB groups, individual DB overrides, and optional limits.',
+      'DBグループはどこへ適用するか、Migration Groupは各DBに何を適用するかを決めます。': 'DB Groups decide where an operation runs. Migration Groups decide what each DB receives.',
+      'db_groups/groups に定義した対象DBのまとまりです。未指定なら全DBが対象です。': 'A configured set of target databases from db_groups/groups. Leave empty to target every DB.',
+      '選択したDBだけに絞ります。DB groupと併用した場合は両方に一致するDBが対象です。': 'Restricts the operation to one DB. With a DB Group, the DB must also be in that group.',
+      '対象DBを先頭から指定数に制限します。カナリア適用に使います。': 'Limits targets to the first N databases. Useful for canary rollout.',
+      '制限なし': 'No limit',
+      '対象をDry run': 'Dry run targets',
+      '対象をBackup': 'Back up targets',
+      '対象へ適用': 'Apply to targets',
+      'グループ設計': 'Group design',
+      'Migration Group、DB Group、DBごとの割当をまとめて確認します。': 'Manage Migration Groups, DB Groups, and DB-to-group assignments in one place.',
+      'sqlite-fleetでは適用内容と適用先を別々のグループで設計します。': 'sqlite-fleet models migration content and database targets as separate groups.',
+      'Migration Group保存': 'Save Migration Group',
+      'DB Group保存': 'Save DB Group',
+      '割当保存': 'Save assignment',
+      'DBマトリクス': 'Database matrix',
+      'DBごとの状態、対象Migration Group、未適用内容を比較します。': 'Compare status, assigned Migration Groups, and pending migrations per database.',
+      'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
+      '設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。': 'Creates an empty SQLite DB under the config directory. Choose a path matched by discovery settings.',
+      '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
+      'DB登録': 'Register DB',
+      'Migration台帳': 'Migration ledger',
+      '全migrationをversion順に確認し、所属グループとchecksumを追跡します。': 'Review every loaded migration by version, group, and checksum.',
+      '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
+      'Migrationファイル登録': 'Register migration file',
+      'migration履歴に残さない作業用SQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
+      'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
+      'SQLを実行するDBです。Schema Editorの読み込み対象もこのDBになります。': 'The DB used for SQL execution and schema loading.',
+      'UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。': 'Loads a UTF-8 .sql or text file. Files over 2 MiB are rejected.',
+      'よく使うSQLite構文をSQL欄へ挿入します。挿入後に内容を必ず確認してください。': 'Inserts a common SQLite template into the SQL editor. Review it before running.',
+      'SQL欄の内容を保存するときのファイル名です。拡張子.sqlは自動補完されます。': 'File name used when saving the SQL editor contents. The .sql extension is added automatically.',
+      'dry-runは一時コピーで実行します。適用前にchanged件数とエラーを確認してください。': 'Dry-run uses a temporary copy. Check changed counts and errors before applying.',
+      'テンプレート挿入': 'Insert template',
+      'SQLファイル保存': 'Save SQL file',
+      'SQLを適用': 'Apply SQL',
+      'Schemaを再読み込み': 'Reload schema',
+      'よく使うDDLを生成し、現在のschemaと照らし合わせて作業できます。': 'Generate common DDL and compare it with the current schema while editing.',
+      'ここで生成したSQLはSQL Consoleへ入ります。実行前に必ずdry-runしてください。': 'Generated SQL is placed in the SQL console. Always dry-run before applying.',
+      '作成するテーブル名です。識別子は自動でダブルクォートされます。': 'The table to create. Identifiers are double-quoted automatically.',
+      'カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。': 'Column definitions inserted directly into CREATE TABLE, including constraints and DEFAULT values.',
+      'CREATE TABLE SQL生成': 'Generate CREATE TABLE SQL',
+      'カラムを追加する既存テーブル名です。': 'The existing table to alter.',
+      '追加するカラム名です。': 'The column to add.',
+      '型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。': 'Type, NOT NULL, DEFAULT, and related definition. Check SQLite ADD COLUMN limitations.',
+      'ADD COLUMN SQL生成': 'Generate ADD COLUMN SQL',
+      '変更前のテーブル名です。': 'Current table name.',
+      '変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。': 'New table name. Check impact on related views and triggers.',
+      'RENAME TABLE SQL生成': 'Generate RENAME TABLE SQL',
+      'カラム名を変更するテーブルです。': 'Table containing the column to rename.',
+      '変更前のカラム名です。': 'Current column name.',
+      '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
+      'RENAME COLUMN SQL生成': 'Generate RENAME COLUMN SQL',
+      'GUIで許可されている操作、backup/report/audit/execution設定を確認します。': 'Review enabled GUI operations and backup/report/audit/execution settings.',
+      'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
+      '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。': 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
+      '基本の考え方': 'Core model',
+      '画面の見方': 'How to read the UI',
+      '操作': 'Operations',
+      '安全設定と監査ログ': 'Safety settings and audit log',
+      'migrationファイルは': 'Migration files are stored in',
+      'の固定ディレクトリに置きます。': '.',
+      'はversionリストで所属を管理します。同じmigrationを複数グループに含められます。': 'assigns migrations by version list. The same migration can belong to multiple groups.',
+      'はDBごとに対象マイグレーショングループを指定します。': 'assigns target Migration Groups per DB.',
+      'はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。': 'defines DB Groups for canaries and other target sets.',
+      'DatabasesではDBごとの適用済み件数、未適用migration、不整合を確認します。': 'Databases shows applied counts, pending migrations, and inconsistencies per DB.',
+      'Migrationsでは読み込まれているmigrationファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
+      'Migration Groupsでは各グループに属するmigrationと、そのグループの対象DBを確認します。': 'Migration Groups shows which migrations belong to each group and which DBs target it.',
+      'CheckはDB状態、checksum、不明な適用履歴を検査します。': 'Check verifies DB state, checksums, and unknown applied history.',
+      'Dry runは対象DBの未適用migrationを読み取り確認します。DBは変更しません。': 'Dry run inspects pending migrations for target DBs without changing them.',
+      '適用は対象DBの未適用migrationをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。': 'Apply runs all pending migrations for the target DBs in version order. It is not a one-file-only apply action.',
+      'BackupはSQLite backup APIでDBの一貫したコピーを': 'Backup uses the SQLite backup API to create a consistent copy under',
+      'に作成します。': '.',
+      '作業用SQLを選択DBに対してdry-runまたは適用できます。migration履歴には登録されません。': 'Ad hoc SQL can be dry-run or applied to the selected DB. It is not recorded in migration history.',
+      'SQL applyはatomic transactionで実行します。途中で失敗した場合はrollbackします。': 'SQL apply runs in an atomic transaction. Failures roll back the batch.',
+      'はGUI SQLでは拒否されます。': 'are rejected by GUI SQL.',
+      '、': ', ',
+      'は単独SQLとしてだけ適用できます。': 'can only be applied as single statements.',
+    };
+    const staticJapaneseTranslations = {
+      'Fleet migration control plane': 'Fleet migration 管理',
+      'Global': '全体操作',
+      'Language': '言語',
+      'Check': 'Check',
+      'DB group': 'DBグループ',
+      'Database override': 'DB指定',
+      'Limit': 'Limit',
+      'Resolved target': '解決済み対象',
+      'Migration Groups': 'Migrationグループ',
+      'DB Groups': 'DBグループ',
+      'DB -> Migration Groups': 'DB -> Migrationグループ',
+      'Group name': 'グループ名',
+      'Versions': 'Versions',
+      'DB selectors': 'DBセレクタ',
+      'DB selector': 'DBセレクタ',
+      'Migration groups': 'Migrationグループ',
+      'New DB path': '新規DBパス',
+      'Add to DB group': 'DBグループへ追加',
+      'Version': 'Version',
+      'Name': '名前',
+      'Add to migration group': 'Migrationグループへ追加',
+      'Target DB': '対象DB',
+      'SQL file': 'SQLファイル',
+      'SQL template': 'SQLテンプレート',
+      'Output file name': '出力ファイル名',
+      'GUI permissions': 'GUI権限',
+      'Runtime': '実行設定',
+      'Paths': 'パス',
+      'Object Definitions': 'Object定義',
+      'Column': 'カラム',
+      'Type': '型',
+      'Not null': 'NOT NULL',
+      'Default': 'デフォルト',
+      'Hidden': 'Hidden',
+    };
+    const localeText = {
+      en: {
+        loaded: 'Showing the latest state',
+        dbCount: 'DB count',
+        failed: 'Failed',
+        corruptMissing: 'Corrupt / missing',
+        none: 'None',
+        noDb: 'No DBs',
+        allDb: 'All DBs',
+        noSelection: 'No override',
+        noTargetDb: 'No target DBs',
+        noMigrations: 'No migrations',
+        noMigrationGroups: 'No migration groups',
+        noDbGroups: 'No DB groups',
+        noRules: 'No explicit rules. Unassigned DBs resolve automatically in core/default/all-groups order.',
+        noTables: 'No tables',
+        selectDbForSchema: 'Select a DB and load schema',
+        unset: 'Unset',
+        saved: 'Saved',
+        savedMigrationGroup: 'Migration Group saved',
+        savedDbGroup: 'DB Group saved',
+        savedDatabaseRule: 'DB assignment saved',
+        createdMigrationFile: 'Migration file registered',
+        createdDatabaseFile: 'DB registered',
+        migrationGroupsLabel: 'Migration Groups',
+        dbGroupsLabel: 'DB Groups',
+        upToDate: 'Up to date',
+        pendingDb: 'Pending DB',
+        migrationsLabel: 'Migrations',
+        targetDbLabel: 'Target DB',
+        selectorsLabel: 'Selectors',
+        previewLabel: 'Preview',
+        allowed: 'allowed',
+        disabled: 'disabled',
+        lockTimeout: 'lock timeout',
+        continueOnError: 'continue on error',
+        backupBeforeMigrate: 'backup before migrate',
+        backupKeepLast: 'backup keep last',
+        column: 'Column',
+        type: 'Type',
+        notNull: 'Not null',
+        defaultValue: 'Default',
+        pk: 'PK',
+        hidden: 'Hidden',
+        objectDefinitions: 'Object Definitions',
+        name: 'Name',
+        tableHeader: 'Table',
+        unknownMigration: 'unknown migration',
+        chooseDb: 'Select a DB',
+        schemaLoaded: (database) => `Schema loaded: ${database}`,
+        enterSql: 'Enter SQL',
+        sqlNul: 'SQL cannot contain NUL characters',
+        sqlTooLarge: 'SQL is too large. Keep it under 2 MiB.',
+        sqlRequestTooLarge: 'SQL request is too large. Reduce quotes/newlines or split the SQL.',
+        confirmSqlApply: 'Apply SQL to the selected DB. Continue?',
+        sqlDone: (mode, changed) => `${mode} complete: changed=${changed}`,
+        chooseTemplate: 'Select a SQL template',
+        templateInserted: (name) => `${name} template inserted. Review and edit before running.`,
+        enterSqlToSave: 'Enter SQL to save',
+        sqlFileSaved: (filename) => `SQL file saved: ${filename}`,
+        sqlGenerated: 'SQL generated. Dry-run before applying.',
+        required: (label) => `Enter ${label}`,
+        allDbTarget: 'All DBs',
+        confirmMigrate: (target) => `Apply migrations to ${target}. Continue?`,
+        migrateDone: (mode, processed, failed) => `${mode} complete: processed=${processed}, failed=${failed}`,
+        checkDone: (ok, failed) => `check complete: ok=${ok}, failed=${failed}`,
+        confirmBackup: (target) => `Create backup for ${target}. Continue?`,
+        backupDone: (success, failed) => `backup complete: success=${success}, failed=${failed}`,
+        fileTooLarge: 'SQL file is too large. Keep it under 2 MiB.',
+        fileUtf8: (error) => `Could not read SQL file as UTF-8: ${error}`,
+        fileNul: 'SQL files cannot contain NUL characters',
+        fileLoaded: (name) => `SQL file loaded: ${name}`,
+        apply: 'Apply',
+        yes: 'yes',
+        no: 'no',
+        table: 'table',
+      },
+      ja: {
+        loaded: '最新状態を表示しています',
+        dbCount: 'DB数',
+        failed: '失敗',
+        corruptMissing: '不整合/欠損',
+        none: 'なし',
+        noDb: 'DBなし',
+        allDb: '全DB',
+        noSelection: '指定なし',
+        noTargetDb: '対象DBなし',
+        noMigrations: 'migration はありません',
+        noMigrationGroups: 'migration group はありません',
+        noDbGroups: 'DB group はありません',
+        noRules: '明示ルールなし。未指定DBは core/default/全グループの順で自動解決されます。',
+        noTables: 'テーブルはありません',
+        selectDbForSchema: 'DBを選択してSchemaを読み込んでください',
+        unset: '未設定',
+        saved: '保存しました',
+        savedMigrationGroup: 'Migration Groupを保存しました',
+        savedDbGroup: 'DB Groupを保存しました',
+        savedDatabaseRule: 'DBの割当を保存しました',
+        createdMigrationFile: 'Migrationファイルを登録しました',
+        createdDatabaseFile: 'DBを登録しました',
+        migrationGroupsLabel: 'Migrationグループ',
+        dbGroupsLabel: 'DBグループ',
+        upToDate: '最新',
+        pendingDb: '未適用DB',
+        migrationsLabel: 'Migrations',
+        targetDbLabel: '対象DB',
+        selectorsLabel: 'セレクタ',
+        previewLabel: 'プレビュー',
+        allowed: '許可',
+        disabled: '無効',
+        lockTimeout: 'lock timeout',
+        continueOnError: 'エラー時に続行',
+        backupBeforeMigrate: 'migrate前backup',
+        backupKeepLast: 'backup保持数',
+        column: 'カラム',
+        type: '型',
+        notNull: 'NOT NULL',
+        defaultValue: 'デフォルト',
+        pk: 'PK',
+        hidden: 'Hidden',
+        objectDefinitions: 'Object定義',
+        name: '名前',
+        tableHeader: 'Table',
+        unknownMigration: '不明なmigration',
+        chooseDb: 'DBを選択してください',
+        schemaLoaded: (database) => `schema 読み込み完了: ${database}`,
+        enterSql: 'SQLを入力してください',
+        sqlNul: 'SQLにNUL文字は指定できません',
+        sqlTooLarge: 'SQLが大きすぎます。2MiB以下にしてください',
+        sqlRequestTooLarge: 'SQLリクエストが大きすぎます。引用符や改行を減らすかSQLを分割してください',
+        confirmSqlApply: '選択DBへSQLを適用します。続行しますか？',
+        sqlDone: (mode, changed) => `${mode} 完了: changed=${changed}`,
+        chooseTemplate: 'SQLテンプレートを選択してください',
+        templateInserted: (name) => `${name} テンプレートを挿入しました。内容を確認・編集してください`,
+        enterSqlToSave: '保存するSQLを入力してください',
+        sqlFileSaved: (filename) => `SQLファイルを保存しました: ${filename}`,
+        sqlGenerated: 'SQLを生成しました。dry-run後に適用してください',
+        required: (label) => `${label} を入力してください`,
+        allDbTarget: '全DB',
+        confirmMigrate: (target) => `${target} へmigrationを適用します。続行しますか？`,
+        migrateDone: (mode, processed, failed) => `${mode} 完了: processed=${processed}, failed=${failed}`,
+        checkDone: (ok, failed) => `check 完了: ok=${ok}, failed=${failed}`,
+        confirmBackup: (target) => `${target} のbackupを作成します。続行しますか？`,
+        backupDone: (success, failed) => `backup 完了: success=${success}, failed=${failed}`,
+        fileTooLarge: 'SQLファイルが大きすぎます。2MiB以下にしてください',
+        fileUtf8: (error) => `SQLファイルをUTF-8として読み込めません: ${error}`,
+        fileNul: 'SQLファイルにNUL文字は指定できません',
+        fileLoaded: (name) => `SQLファイルを読み込みました: ${name}`,
+        apply: '適用',
+        yes: 'yes',
+        no: 'no',
+        table: 'table',
+      },
+    };
+
+    function t(key, ...args) {
+      const value = (localeText[currentLocale] && localeText[currentLocale][key]) || localeText.en[key] || key;
+      return typeof value === 'function' ? value(...args) : value;
+    }
+    function translateStaticDom() {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+        acceptNode(node) {
+          const parent = node.parentElement;
+          if (!parent || ['SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName)) return NodeFilter.FILTER_REJECT;
+          return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+      });
+      const nodes = [];
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+      nodes.forEach((node) => {
+        if (!textNodeSources.has(node)) textNodeSources.set(node, node.nodeValue);
+        const original = textNodeSources.get(node);
+        const trimmed = original.trim();
+        const translated = currentLocale === 'en' ? staticTranslations[trimmed] : staticJapaneseTranslations[trimmed] || trimmed;
+        if (!translated) return;
+        node.nodeValue = original.replace(trimmed, translated);
+      });
+      document.querySelectorAll('[data-tip], [placeholder], [aria-label]').forEach((el) => {
+        ['data-tip', 'placeholder', 'aria-label'].forEach((attr) => {
+          if (!el.hasAttribute(attr)) return;
+          const sourceAttr = `data-l10n-${attr}`;
+          if (!el.hasAttribute(sourceAttr)) el.setAttribute(sourceAttr, el.getAttribute(attr));
+          const original = el.getAttribute(sourceAttr);
+          const translated = currentLocale === 'en' ? staticTranslations[original] : staticJapaneseTranslations[original] || original;
+          if (translated) el.setAttribute(attr, translated);
+        });
+      });
+      document.documentElement.lang = currentLocale;
+      document.querySelectorAll('[data-locale-button]').forEach((button) => {
+        const active = button.dataset.localeButton === currentLocale;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', String(active));
+      });
+    }
+    function setLocale(locale) {
+      currentLocale = locale === 'ja' ? 'ja' : 'en';
+      localStorage.setItem('sqlite-fleet-locale', currentLocale);
+      translateStaticDom();
+      renderSqlTemplates();
+      if (state) render();
+      else message(currentLocale === 'en' ? staticTranslations['読み込み中...'] : '読み込み中...');
+    }
 
     function setBusy(value) {
       activeRequests = value ? activeRequests + 1 : Math.max(0, activeRequests - 1);
@@ -1908,6 +3242,10 @@ const INDEX_HTML: &str = r#"<!doctype html>
       const el = $('message');
       el.textContent = text;
       el.className = `message ${isError ? 'error' : 'muted'}`;
+    }
+    function openPage(page) {
+      document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
+      document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
     }
     async function api(path, options = {}) {
       setBusy(true);
@@ -1942,7 +3280,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
       try {
         state = await api('/api/state');
         render();
-        if (showLoadedMessage) message('最新状態を表示しています');
+        if (showLoadedMessage) message(t('loaded'));
       } catch (error) {
         message(error.message, true);
       }
@@ -1952,13 +3290,15 @@ const INDEX_HTML: &str = r#"<!doctype html>
       $('title').textContent = project;
       const s = state.status;
       renderDatabaseSelectors(s.plans);
+      renderTargetSelectors(s.plans);
       $('summary').innerHTML = [
-        ['DB数', s.database_count],
-        ['最新', s.latest_migration ? `${s.latest_migration.version}_${s.latest_migration.name}` : 'なし'],
-        ['最新適用済み', s.up_to_date],
-        ['未適用あり', s.pending],
-        ['失敗', s.failed],
-        ['不整合', s.corrupt],
+        [t('dbCount'), s.database_count],
+        [t('migrationGroupsLabel'), state.migration_groups.length],
+        [t('dbGroupsLabel'), state.db_groups.length],
+        [t('upToDate'), s.up_to_date],
+        [t('pendingDb'), s.pending],
+        [t('failed'), s.failed],
+        [t('corruptMissing'), s.corrupt + s.missing],
       ].map(([label, value]) => `<div class="metric"><span class="label">${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join('');
 
       $('databases').innerHTML = s.plans.map((plan) => {
@@ -1966,16 +3306,18 @@ const INDEX_HTML: &str = r#"<!doctype html>
         const status = plan.error ? `<span class="pill bad">error</span>` :
           plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
           pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
-        const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && 'unknown migration'].filter(Boolean).join(', ');
+        const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
         return `<tr>
           <td><code>${escapeHtml(plan.database.id)}</code></td>
-          <td><code>${escapeHtml(plan.database.path)}</code></td>
           <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
+          <td>${chips(plan.migration_groups)}</td>
           <td>${escapeHtml(plan.applied_count)}</td>
-          <td>${pending ? escapeHtml(plan.pending.map((m) => `${m.version}_${m.name}`).join(', ')) : '<span class="muted">なし</span>'}</td>
+          <td>${pending ? escapeHtml(plan.pending.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+          <td><code>${escapeHtml(plan.database.path)}</code></td>
           <td class="actions">
             <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
-            <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">適用</button>
+            <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
+            <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">${escapeHtml(t('apply'))}</button>
           </td>
         </tr>`;
       }).join('');
@@ -1983,13 +3325,34 @@ const INDEX_HTML: &str = r#"<!doctype html>
       $('migrations').innerHTML = state.migrations.map((migration) => `<tr>
         <td><code>${escapeHtml(migration.version)}</code></td>
         <td>${escapeHtml(migration.name)}</td>
+        <td>${chips([migration.group])}</td>
         <td><code>${escapeHtml(migration.checksum)}</code></td>
-      </tr>`).join('') || '<tr><td colspan="3" class="muted">migration はありません</td></tr>';
+      </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+
+      $('migrationGroupCards').innerHTML = state.migration_groups.map((group) => `<article class="info-card">
+        <strong>${escapeHtml(group.name)}</strong>
+        <div><span class="label">${escapeHtml(t('migrationsLabel'))}</span><div>${group.migrations.length ? escapeHtml(group.migrations.map((m) => `${m.version}_${m.name}`).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</div></div>
+        <div><span class="label">${escapeHtml(t('targetDbLabel'))}</span><div>${chips(group.databases)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
+
+      $('dbGroupCards').innerHTML = state.db_groups.map((group) => `<article class="info-card">
+        <strong>${escapeHtml(group.name)}</strong>
+        <div><span class="label">${escapeHtml(t('selectorsLabel'))}</span><div>${chips(group.selectors)}</div></div>
+        <div><span class="label">${escapeHtml(t('previewLabel'))}</span><div>${chips(group.database_ids)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noDbGroups'))}</p>`;
+
+      $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
+        <strong>${escapeHtml(rule.selector)}</strong>
+        <div>${chips(rule.migration_groups)}</div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noRules'))}</p>`;
+
+      renderSettings();
+      updateTargetPreview();
     }
     function renderDatabaseSelectors(plans) {
       const current = $('sqlDatabase').value;
       if (!plans.length) {
-        $('sqlDatabase').innerHTML = '<option value="">DBなし</option>';
+        $('sqlDatabase').innerHTML = `<option value="">${escapeHtml(t('noDb'))}</option>`;
         $('sqlDatabase').disabled = true;
         clearSchema();
         return;
@@ -2006,6 +3369,143 @@ const INDEX_HTML: &str = r#"<!doctype html>
         clearSchema();
       }
     }
+    function renderTargetSelectors(plans) {
+      const currentGroup = $('targetGroup').value;
+      const currentDatabase = $('targetDatabase').value;
+      $('targetGroup').innerHTML = `<option value="">${escapeHtml(t('allDb'))}</option>` + state.db_groups.map((group) => `<option value="${escapeHtml(group.name)}">${escapeHtml(group.name)}</option>`).join('');
+      $('targetDatabase').innerHTML = `<option value="">${escapeHtml(t('noSelection'))}</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('');
+      if (currentGroup && state.db_groups.some((group) => group.name === currentGroup)) $('targetGroup').value = currentGroup;
+      if (currentDatabase && plans.some((plan) => plan.database.id === currentDatabase)) $('targetDatabase').value = currentDatabase;
+    }
+    function renderSettings() {
+      const permissions = state.gui_permissions;
+      $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `<article class="info-card"><strong>${escapeHtml(key)}</strong><span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span></article>`).join('');
+      const settings = state.settings;
+      $('runtimeSettings').innerHTML = keyItems([
+        ['discovery', settings.discovery],
+        ['parallel', settings.parallel],
+        [t('lockTimeout'), `${settings.lock_timeout_ms} ms`],
+        [t('continueOnError'), settings.continue_on_error ? 'true' : 'false'],
+        [t('backupBeforeMigrate'), settings.backup_before_migrate ? 'true' : 'false'],
+        [t('backupKeepLast'), settings.backup_keep_last],
+      ]);
+      $('pathSettings').innerHTML = keyItems([
+        ['migrations.dir', settings.migrations_dir],
+        ['migrations.table', settings.migrations_table],
+        ['backup.dir', settings.backup_dir],
+        ['report', settings.report_path || `(${settings.report_format})`],
+        ['audit.path', settings.audit_path || t('unset')],
+      ]);
+    }
+    function keyItems(entries) {
+      return entries.map(([key, value]) => `<div class="key-item"><span>${escapeHtml(key)}</span><code>${escapeHtml(value)}</code></div>`).join('');
+    }
+    function chips(values) {
+      const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
+      return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function selectedTargetQuery() {
+      const params = new URLSearchParams();
+      const group = $('targetGroup').value;
+      const database = $('targetDatabase').value;
+      const limit = $('targetLimit').value.trim();
+      if (group) params.set('group', group);
+      if (database) params.set('database', database);
+      if (limit) params.set('limit', limit);
+      return params;
+    }
+    function resolveTargetPlans(group, database, limit) {
+      let plans = state && state.status ? state.status.plans.slice() : [];
+      if (group) {
+        const dbGroup = state.db_groups.find((item) => item.name === group);
+        const databaseIds = dbGroup ? dbGroup.database_ids : [];
+        const planById = new Map(plans.map((plan) => [plan.database.id, plan]));
+        plans = databaseIds.map((id) => planById.get(id)).filter(Boolean);
+      }
+      if (database) plans = plans.filter((plan) => plan.database.id === database);
+      const parsedLimit = Number.parseInt(limit, 10);
+      if (Number.isInteger(parsedLimit) && parsedLimit > 0) plans = plans.slice(0, parsedLimit);
+      return plans;
+    }
+    function updateTargetPreview() {
+      if (!state) return;
+      const plans = resolveTargetPlans($('targetGroup').value, $('targetDatabase').value, $('targetLimit').value.trim());
+      $('targetPreview').innerHTML = plans.length ? chips(plans.map((plan) => plan.database.id)) : `<span class="bad">${escapeHtml(t('noTargetDb'))}</span>`;
+    }
+    function csvList(value) {
+      return String(value || '').split(',').map((item) => item.trim()).filter(Boolean);
+    }
+    function adminSuccessMessage(path, fallback) {
+      const messages = {
+        '/api/admin/migration-group': 'savedMigrationGroup',
+        '/api/admin/db-group': 'savedDbGroup',
+        '/api/admin/database-migration-group': 'savedDatabaseRule',
+        '/api/admin/migration-file': 'createdMigrationFile',
+        '/api/admin/database-file': 'createdDatabaseFile',
+      };
+      return messages[path] ? t(messages[path]) : (fallback || t('saved'));
+    }
+    async function postAdmin(path, payload) {
+      const result = await api(path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      message(adminSuccessMessage(path, result.message));
+      await load({ showLoadedMessage: false });
+    }
+    async function saveMigrationGroup() {
+      try {
+        await postAdmin('/api/admin/migration-group', {
+          name: $('manageMigrationGroupName').value,
+          versions: csvList($('manageMigrationGroupVersions').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveDbGroup() {
+      try {
+        await postAdmin('/api/admin/db-group', {
+          name: $('manageDbGroupName').value,
+          selectors: csvList($('manageDbGroupSelectors').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveDatabaseRule() {
+      try {
+        await postAdmin('/api/admin/database-migration-group', {
+          selector: $('manageRuleSelector').value,
+          groups: csvList($('manageRuleGroups').value),
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function createMigrationFile() {
+      try {
+        await postAdmin('/api/admin/migration-file', {
+          version: $('newMigrationVersion').value,
+          name: $('newMigrationName').value,
+          group: $('newMigrationGroup').value,
+          sql: $('newMigrationSql').value,
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function createDatabaseFile() {
+      try {
+        await postAdmin('/api/admin/database-file', {
+          path: $('newDatabasePath').value,
+          db_group: $('newDatabaseGroup').value,
+        });
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
     function renderSqlTemplates() {
       $('sqlTemplate').innerHTML = Object.entries(sqlTemplates)
         .map(([key, template]) => `<option value="${escapeHtml(key)}">${escapeHtml(template[0])}</option>`)
@@ -2015,7 +3515,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
       const showLoadedMessage = options.showLoadedMessage !== false;
       const database = $('sqlDatabase').value;
       if (!database) {
-        message('DBを選択してください', true);
+        message(t('chooseDb'), true);
         return;
       }
       try {
@@ -2027,7 +3527,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
         }
         schemaState = nextSchemaState;
         renderSchema();
-        if (showLoadedMessage) message(`schema 読み込み完了: ${database}`);
+        if (showLoadedMessage) message(t('schemaLoaded', database));
       } catch (error) {
         if ($('sqlDatabase').value === database) clearSchema();
         message(error.message, true);
@@ -2037,23 +3537,23 @@ const INDEX_HTML: &str = r#"<!doctype html>
       const tables = schemaState && schemaState.tables ? schemaState.tables : [];
       const objects = schemaState && schemaState.objects ? schemaState.objects : [];
       const tableHtml = tables.map((table) => `<section class="schema-table">
-        <h3><code>${escapeHtml(table.type || 'table')}</code> ${escapeHtml(table.name)}</h3>
+        <h3><code>${escapeHtml(table.type || t('table'))}</code> ${escapeHtml(table.name)}</h3>
         <table>
-          <thead><tr><th>Column</th><th>Type</th><th>Not null</th><th>Default</th><th>PK</th><th>Hidden</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('column'))}</th><th>${escapeHtml(t('type'))}</th><th>${escapeHtml(t('notNull'))}</th><th>${escapeHtml(t('defaultValue'))}</th><th>${escapeHtml(t('pk'))}</th><th>${escapeHtml(t('hidden'))}</th></tr></thead>
           <tbody>${table.columns.map((column) => `<tr>
             <td><code>${escapeHtml(column.name)}</code></td>
             <td><code>${escapeHtml(column.type || '')}</code></td>
-            <td>${column.not_null ? 'yes' : 'no'}</td>
+            <td>${column.not_null ? escapeHtml(t('yes')) : escapeHtml(t('no'))}</td>
             <td><code>${escapeHtml(column.default_value || '')}</code></td>
-            <td>${column.primary_key ? 'yes' : 'no'}</td>
-            <td>${column.hidden ? escapeHtml(hiddenColumnLabel(column.hidden)) : 'no'}</td>
+            <td>${column.primary_key ? escapeHtml(t('yes')) : escapeHtml(t('no'))}</td>
+            <td>${column.hidden ? escapeHtml(hiddenColumnLabel(column.hidden)) : escapeHtml(t('no'))}</td>
           </tr>`).join('')}</tbody>
         </table>
-      </section>`).join('') || '<p class="muted">テーブルはありません</p>';
+      </section>`).join('') || `<p class="muted">${escapeHtml(t('noTables'))}</p>`;
       const objectHtml = objects.length ? `<section class="schema-table">
-        <h3>Object Definitions</h3>
+        <h3>${escapeHtml(t('objectDefinitions'))}</h3>
         <table>
-          <thead><tr><th>Type</th><th>Name</th><th>Table</th><th>SQL</th></tr></thead>
+          <thead><tr><th>${escapeHtml(t('type'))}</th><th>${escapeHtml(t('name'))}</th><th>${escapeHtml(t('tableHeader'))}</th><th>SQL</th></tr></thead>
           <tbody>${objects.map((object) => `<tr>
             <td><code>${escapeHtml(object.type)}</code></td>
             <td><code>${escapeHtml(object.name)}</code></td>
@@ -2066,7 +3566,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     }
     function clearSchema() {
       schemaState = null;
-      $('schema').innerHTML = '<p class="muted">DBを選択してSchemaを読み込んでください</p>';
+      $('schema').innerHTML = `<p class="muted">${escapeHtml(t('selectDbForSchema'))}</p>`;
     }
     function hiddenColumnLabel(hidden) {
       if (hidden === 1) return 'hidden';
@@ -2078,34 +3578,34 @@ const INDEX_HTML: &str = r#"<!doctype html>
       const database = $('sqlDatabase').value;
       const sql = $('sqlInput').value;
       if (!database) {
-        message('DBを選択してください', true);
+        message(t('chooseDb'), true);
         return;
       }
       if (!sql.trim()) {
-        message('SQLを入力してください', true);
+        message(t('enterSql'), true);
         return;
       }
       if (sql.includes('\u0000')) {
-        message('SQLにNUL文字は指定できません', true);
+        message(t('sqlNul'), true);
         return;
       }
       if (new TextEncoder().encode(sql).length > maxSqlBytes) {
-        message('SQLが大きすぎます。2MiB以下にしてください', true);
+        message(t('sqlTooLarge'), true);
         return;
       }
       const sqlBody = JSON.stringify({ sql });
       if (new TextEncoder().encode(sqlBody).length > maxSqlRequestBytes) {
-        message('SQLリクエストが大きすぎます。引用符や改行を減らすかSQLを分割してください', true);
+        message(t('sqlRequestTooLarge'), true);
         return;
       }
-      if (!dryRun && !confirm('選択DBへSQLを適用します。続行しますか？')) return;
+      if (!dryRun && !confirm(t('confirmSqlApply'))) return;
       try {
         const result = await api(`/api/sql?dry_run=${dryRun}&database=${encodeURIComponent(database)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: sqlBody,
         });
-        message(`${dryRun ? 'SQL dry-run' : 'SQL apply'} 完了: changed=${result.changed}`);
+        message(t('sqlDone', dryRun ? 'SQL dry-run' : 'SQL apply', result.changed));
         await refreshAfterSqlRun(database, dryRun);
       } catch (error) {
         message(error.message, true);
@@ -2128,16 +3628,16 @@ const INDEX_HTML: &str = r#"<!doctype html>
     function insertSelectedTemplate() {
       const template = sqlTemplates[$('sqlTemplate').value];
       if (!template) {
-        message('SQLテンプレートを選択してください', true);
+        message(t('chooseTemplate'), true);
         return;
       }
       setSql(template[1]);
-      message(`${template[0]} テンプレートを挿入しました。内容を確認・編集してください`);
+      message(t('templateInserted', template[0]));
     }
     function downloadSqlFile() {
       const sql = $('sqlInput').value;
       if (!sql.trim()) {
-        message('保存するSQLを入力してください', true);
+        message(t('enterSqlToSave'), true);
         return;
       }
       const filename = sanitizeSqlFileName($('sqlFileName').value);
@@ -2150,7 +3650,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
       link.click();
       link.remove();
       URL.revokeObjectURL(url);
-      message(`SQLファイルを保存しました: ${filename}`);
+      message(t('sqlFileSaved', filename));
     }
     function sanitizeSqlFileName(value) {
       const fallback = 'sqlite-fleet-change.sql';
@@ -2164,23 +3664,25 @@ const INDEX_HTML: &str = r#"<!doctype html>
     }
     function requireValue(id, label) {
       const value = $(id).value.trim();
-      if (!value) throw new Error(`${label} を入力してください`);
+      if (!value) throw new Error(t('required', label));
       return value;
     }
     function generateSql(builder) {
       try {
         setSql(builder());
-        message('SQLを生成しました。dry-run後に適用してください');
+        message(t('sqlGenerated'));
       } catch (error) {
         message(error.message, true);
       }
     }
     async function runMigrate(database, dryRun) {
-      if (!dryRun && !confirm(database ? 'このDBへmigrationを適用します。続行しますか？' : '全DBへmigrationを適用します。続行しますか？')) return;
+      const params = database ? new URLSearchParams([['database', database]]) : selectedTargetQuery();
+      const targetText = database || Array.from(params.entries()).map(([key, value]) => `${key}=${value}`).join(', ') || t('allDbTarget');
+      if (!dryRun && !confirm(t('confirmMigrate', targetText))) return;
       try {
-        const suffix = `${database ? `&database=${encodeURIComponent(database)}` : ''}`;
-        const report = await api(`/api/migrate?dry_run=${dryRun}${suffix}`, { method: 'POST' });
-        message(`${dryRun ? 'dry run' : 'migrate'} 完了: processed=${report.processed_databases}, failed=${report.failed_databases}`);
+        params.set('dry_run', String(dryRun));
+        const report = await api(`/api/migrate?${params.toString()}`, { method: 'POST' });
+        message(t('migrateDone', dryRun ? 'dry run' : 'migrate', report.processed_databases, report.failed_databases));
         await load({ showLoadedMessage: false });
         const selectedDatabase = $('sqlDatabase').value;
         if (!dryRun && selectedDatabase && (!database || selectedDatabase === database)) {
@@ -2193,7 +3695,19 @@ const INDEX_HTML: &str = r#"<!doctype html>
     async function runCheck() {
       try {
         const report = await api('/api/check', { method: 'POST' });
-        message(`check 完了: ok=${report.ok}, failed=${report.failed}`);
+        message(t('checkDone', report.ok, report.failed));
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function runBackup(database) {
+      const params = database ? new URLSearchParams([['database', database]]) : selectedTargetQuery();
+      const targetText = database || Array.from(params.entries()).map(([key, value]) => `${key}=${value}`).join(', ') || t('allDbTarget');
+      if (!confirm(t('confirmBackup', targetText))) return;
+      try {
+        const query = params.toString();
+        const report = await api(`/api/backup${query ? `?${query}` : ''}`, { method: 'POST' });
+        message(t('backupDone', report.backed_up, report.failed));
       } catch (error) {
         message(error.message, true);
       }
@@ -2204,6 +3718,7 @@ const INDEX_HTML: &str = r#"<!doctype html>
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
     $('dryRun').addEventListener('click', () => runMigrate('', true));
+    $('backupAll').addEventListener('click', () => runBackup(''));
     $('migrateAll').addEventListener('click', () => runMigrate('', false));
     $('loadSchema').addEventListener('click', loadSchema);
     $('insertTemplate').addEventListener('click', insertSelectedTemplate);
@@ -2211,12 +3726,27 @@ const INDEX_HTML: &str = r#"<!doctype html>
     $('sqlDryRun').addEventListener('click', () => runSql(true));
     $('sqlApply').addEventListener('click', () => runSql(false));
     $('sqlDatabase').addEventListener('change', clearSchema);
+    $('targetGroup').addEventListener('change', updateTargetPreview);
+    $('targetDatabase').addEventListener('change', updateTargetPreview);
+    $('targetLimit').addEventListener('input', updateTargetPreview);
+    document.querySelectorAll('[data-locale-button]').forEach((button) => {
+      button.addEventListener('click', () => setLocale(button.dataset.localeButton));
+    });
+    document.querySelectorAll('[data-page-link]').forEach((link) => link.addEventListener('click', (event) => {
+      event.preventDefault();
+      openPage(link.dataset.pageLink);
+    }));
+    $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
+    $('saveDbGroup').addEventListener('click', saveDbGroup);
+    $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
+    $('createMigrationFile').addEventListener('click', createMigrationFile);
+    $('createDatabaseFile').addEventListener('click', createDatabaseFile);
     $('sqlFile').addEventListener('change', async (event) => {
       const file = event.target.files && event.target.files[0];
       if (!file) return;
       if (file.size > maxSqlBytes) {
         event.target.value = '';
-        message('SQLファイルが大きすぎます。2MiB以下にしてください', true);
+        message(t('fileTooLarge'), true);
         return;
       }
       let sql;
@@ -2225,17 +3755,17 @@ const INDEX_HTML: &str = r#"<!doctype html>
         sql = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
       } catch (error) {
         event.target.value = '';
-        message(`SQLファイルをUTF-8として読み込めません: ${error.message || error}`, true);
+        message(t('fileUtf8', error.message || error), true);
         return;
       }
       if (sql.includes('\u0000')) {
         event.target.value = '';
-        message('SQLファイルにNUL文字は指定できません', true);
+        message(t('fileNul'), true);
         return;
       }
       $('sqlInput').value = sql;
       $('sqlFileName').value = sanitizeSqlFileName(file.name);
-      message(`SQLファイルを読み込みました: ${file.name}`);
+      message(t('fileLoaded', file.name));
     });
     $('generateCreateTable').addEventListener('click', () => generateSql(() => {
       const table = requireValue('newTableName', 'New table');
@@ -2260,10 +3790,15 @@ const INDEX_HTML: &str = r#"<!doctype html>
       return `ALTER TABLE ${quoteIdent(table)} RENAME COLUMN ${quoteIdent(from)} TO ${quoteIdent(to)};`;
     }));
     $('databases').addEventListener('click', (event) => {
-      const button = event.target.closest('button[data-action="migrate"]');
+      const button = event.target.closest('button[data-action]');
       if (!button) return;
-      runMigrate(button.dataset.database || '', button.dataset.dryRun === 'true');
+      if (button.dataset.action === 'backup') {
+        runBackup(button.dataset.database || '');
+      } else if (button.dataset.action === 'migrate') {
+        runMigrate(button.dataset.database || '', button.dataset.dryRun === 'true');
+      }
     });
+    translateStaticDom();
     renderSqlTemplates();
     load();
   </script>
@@ -2548,10 +4083,15 @@ mod tests {
     }
 
     fn send_test_http_request(request_template: &str) -> String {
+        send_test_http_request_with_config(request_template, Config::default())
+    }
+
+    fn send_test_http_request_with_config(request_template: &str, config: Config) -> String {
         let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
         let addr = listener.local_addr().unwrap();
         let state = ServerState {
-            config: Config::default(),
+            config: Mutex::new(config),
+            config_path: std::env::temp_dir().join("sqlite-fleet-test.toml"),
             csrf_token: "token".to_string(),
             script_nonce: "nonce".to_string(),
             bind_ip: addr.ip(),
@@ -2573,6 +4113,462 @@ mod tests {
         client.read_to_string(&mut response).unwrap();
         server.join().unwrap();
         response
+    }
+
+    fn test_server_state(config: Config, config_path: PathBuf) -> ServerState {
+        ServerState {
+            config: Mutex::new(config),
+            config_path,
+            csrf_token: "token".to_string(),
+            script_nonce: "nonce".to_string(),
+            bind_ip: Ipv4Addr::LOCALHOST.into(),
+            port: 0,
+        }
+    }
+
+    #[test]
+    fn gui_post_apis_enforce_allow_flags_server_side() {
+        let mut config = Config::default();
+        config.gui.allow_check = false;
+        let response = send_test_http_request_with_config(
+            "POST /api/check HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI check は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_migrate = false;
+        let response = send_test_http_request_with_config(
+            "POST /api/migrate?dry_run=true HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI migrate は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_sql_apply = false;
+        let response = send_test_http_request_with_config(
+            "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: 19\r\n\r\n{\"sql\":\"SELECT 1;\"}",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI SQL apply は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_backup = false;
+        let response = send_test_http_request_with_config(
+            "POST /api/backup HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI backup は設定で無効化されています"));
+    }
+
+    #[test]
+    fn api_db_groups_resolve_relative_path_selectors_for_preview() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        let database_path = data_dir.join("tenant.db");
+        Connection::open(&database_path).unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config
+            .db_groups
+            .insert("canary".to_string(), vec!["data/tenant.db".to_string()]);
+        let databases = vec![sqlite_fleet::Database {
+            id: "tenant".to_string(),
+            path: database_path,
+            exists: true,
+            readable: true,
+        }];
+
+        let groups = api_db_groups(&config, &databases);
+
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].name, "canary");
+        assert_eq!(groups[0].selectors, vec!["data/tenant.db"]);
+        assert_eq!(groups[0].database_ids, vec!["tenant"]);
+    }
+
+    #[test]
+    fn api_db_groups_preserve_selector_order_for_limit_preview() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        let db1_path = data_dir.join("db1.db");
+        let db2_path = data_dir.join("db2.db");
+        Connection::open(&db1_path).unwrap();
+        Connection::open(&db2_path).unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.db_groups.insert(
+            "canary".to_string(),
+            vec!["db2".to_string(), "db1".to_string()],
+        );
+        let databases = vec![
+            sqlite_fleet::Database {
+                id: "db1".to_string(),
+                path: db1_path,
+                exists: true,
+                readable: true,
+            },
+            sqlite_fleet::Database {
+                id: "db2".to_string(),
+                path: db2_path,
+                exists: true,
+                readable: true,
+            },
+        ];
+
+        let groups = api_db_groups(&config, &databases);
+
+        assert_eq!(groups[0].database_ids, vec!["db2", "db1"]);
+    }
+
+    #[test]
+    fn api_save_migration_group_preserves_existing_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migration_groups.insert(
+            "legacy".to_string(),
+            MigrationGroupConfig {
+                dir: Some("legacy_migrations".to_string()),
+                migrations: vec!["001".to_string()],
+            },
+        );
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(config, config_path.clone());
+
+        api_save_migration_group(
+            &state,
+            br#"{"name":"legacy","versions":["001","002"]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        let group = config.migration_groups.get("legacy").unwrap();
+        assert_eq!(group.dir.as_deref(), Some("legacy_migrations"));
+        assert_eq!(group.migrations, vec!["001", "002"]);
+        let saved = std::fs::read_to_string(config_path).unwrap();
+        assert!(saved.contains("dir = \"legacy_migrations\""), "{saved}");
+    }
+
+    #[test]
+    fn api_create_migration_file_for_dir_group_writes_into_group_dir() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("legacy_migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migration_groups.insert(
+            "legacy".to_string(),
+            MigrationGroupConfig {
+                dir: Some("legacy_migrations".to_string()),
+                migrations: Vec::new(),
+            },
+        );
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"legacy_item","group":"legacy","sql":"CREATE TABLE legacy_item(id INTEGER);"}"#.to_vec(),
+        )
+        .unwrap();
+
+        assert!(dir
+            .path()
+            .join("legacy_migrations")
+            .join("005_legacy_item.sql")
+            .exists());
+        assert!(!dir
+            .path()
+            .join("migrations")
+            .join("005_legacy_item.sql")
+            .exists());
+        let config = state.config.lock().unwrap();
+        let group = config.migration_groups.get("legacy").unwrap();
+        assert_eq!(group.dir.as_deref(), Some("legacy_migrations"));
+        assert!(group.migrations.is_empty());
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["001", "005"]);
+    }
+
+    #[test]
+    fn api_create_migration_file_preserves_implicit_default_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"default_item","group":"default","sql":"CREATE TABLE default_item(id INTEGER);"}"#.to_vec(),
+        )
+        .unwrap();
+
+        assert!(migration_dir.join("005_default_item.sql").exists());
+        let config = state.config.lock().unwrap();
+        assert!(config.migration_groups.is_empty());
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["001", "005"]);
+    }
+
+    #[test]
+    fn api_create_migration_file_requires_group_when_groups_are_explicit() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migration_groups.insert(
+            "core".to_string(),
+            MigrationGroupConfig::versions(vec!["001".to_string()]),
+        );
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let result = api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"untracked","sql":"CREATE TABLE untracked(id INTEGER);"}"#
+                .to_vec(),
+        );
+        assert!(result.is_err());
+        let error = result.err().unwrap();
+
+        assert!(error
+            .to_string()
+            .contains("migration group の指定が必要です"));
+        assert!(!migration_dir.join("005_untracked.sql").exists());
+        let config = state.config.lock().unwrap();
+        assert!(!config
+            .migration_groups
+            .get("core")
+            .unwrap()
+            .migrations
+            .iter()
+            .any(|version| version == "005"));
+    }
+
+    #[test]
+    fn api_create_migration_file_removes_file_when_migration_validation_fails() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let result = api_create_migration_file(
+            &state,
+            br#"{"version":"001","name":"duplicate","group":"default","sql":"CREATE TABLE duplicate(id INTEGER);"}"#.to_vec(),
+        );
+        assert!(result.is_err());
+
+        assert!(!migration_dir.join("001_duplicate.sql").exists());
+        let config = state.config.lock().unwrap();
+        assert!(config.migration_groups.is_empty());
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["001"]);
+    }
+
+    #[test]
+    fn api_create_migration_file_accepts_absolute_migrations_dir_inside_base() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migrations.dir = migration_dir.to_string_lossy().into_owned();
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"absolute_dir","group":"default","sql":"CREATE TABLE absolute_dir(id INTEGER);"}"#.to_vec(),
+        )
+        .unwrap();
+
+        assert!(migration_dir.join("005_absolute_dir.sql").exists());
+        let config = state.config.lock().unwrap();
+        let migrations = load_migrations(&config).unwrap();
+        let versions = migrations
+            .iter()
+            .map(|migration| migration.version.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(versions, vec!["005"]);
+    }
+
+    #[test]
+    fn gui_sql_apply_writes_success_and_failure_audit_events() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        Connection::open(data_dir.join("tenant.db")).unwrap();
+        let config = Config {
+            base_dir: dir.path().to_path_buf(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            audit: sqlite_fleet::AuditConfig {
+                path: Some("audit.jsonl".to_string()),
+            },
+            ..Config::default()
+        };
+
+        let body = r#"{"sql":"CREATE TABLE audit_items(id INTEGER PRIMARY KEY);"}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            config.clone(),
+        );
+        assert!(response.contains(r#""ok":true"#), "{response}");
+
+        let body = r#"{"sql":"CREATE TABLE broken("}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            config,
+        );
+        assert!(response.contains(r#""ok":false"#), "{response}");
+
+        let audit = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
+        assert_eq!(audit.lines().count(), 2);
+        assert!(audit.contains(r#""operation":"gui.sql_apply""#), "{audit}");
+        assert!(audit.contains(r#""success":true"#), "{audit}");
+        assert!(audit.contains(r#""success":false"#), "{audit}");
+    }
+
+    #[test]
+    fn gui_migrate_writes_audit_event() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir(&data_dir).unwrap();
+        std::fs::create_dir(&migrations_dir).unwrap();
+        Connection::open(data_dir.join("tenant.db")).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_audit_items.sql"),
+            "CREATE TABLE audit_items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: dir.path().to_path_buf(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            migrations: sqlite_fleet::MigrationsConfig {
+                dir: "migrations".to_string(),
+                ..sqlite_fleet::MigrationsConfig::default()
+            },
+            audit: sqlite_fleet::AuditConfig {
+                path: Some("audit.jsonl".to_string()),
+            },
+            ..Config::default()
+        };
+
+        let response = send_test_http_request_with_config(
+            "POST /api/migrate?dry_run=false HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let audit = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
+        assert!(audit.contains(r#""operation":"gui.migrate""#), "{audit}");
+    }
+
+    #[test]
+    fn gui_backup_creates_backup_and_writes_audit_event() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        Connection::open(data_dir.join("tenant.db"))
+            .unwrap()
+            .execute_batch("CREATE TABLE items(id INTEGER PRIMARY KEY);")
+            .unwrap();
+        let config = Config {
+            base_dir: dir.path().to_path_buf(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            backup: sqlite_fleet::BackupConfig {
+                dir: "backups".to_string(),
+                keep_last: 10,
+                before_migrate: false,
+            },
+            audit: sqlite_fleet::AuditConfig {
+                path: Some("audit.jsonl".to_string()),
+            },
+            ..Config::default()
+        };
+
+        let response = send_test_http_request_with_config(
+            "POST /api/backup?database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        assert!(response.contains(r#""backed_up":1"#), "{response}");
+        let audit = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
+        assert!(audit.contains(r#""operation":"gui.backup""#), "{audit}");
+        assert!(dir.path().join("backups").exists());
     }
 
     fn assert_response_security_headers(response: &str) {
@@ -3901,8 +5897,7 @@ mod tests {
         assert!(INDEX_HTML.contains("await refreshAfterSqlRun(database, dryRun)"));
         assert!(INDEX_HTML.contains("async function refreshAfterSqlRun(database, dryRun)"));
         assert!(INDEX_HTML.contains("if (dryRun) return"));
-        assert!(INDEX_HTML
-            .contains("if (showLoadedMessage) message(`schema 読み込み完了: ${database}`)"));
+        assert!(INDEX_HTML.contains("if (showLoadedMessage) message(t('schemaLoaded', database))"));
         assert!(INDEX_HTML.contains("if ($('sqlDatabase').value !== database) return"));
         assert!(INDEX_HTML.contains("nextSchemaState.database.id !== database"));
         assert!(INDEX_HTML
@@ -3917,13 +5912,13 @@ mod tests {
     #[test]
     fn html_disables_database_selector_when_no_databases_exist() {
         assert!(INDEX_HTML.contains("if (!plans.length)"));
-        assert!(INDEX_HTML.contains(r#"<option value="">DBなし</option>"#));
+        assert!(INDEX_HTML.contains(r#"`<option value="">${escapeHtml(t('noDb'))}</option>`"#));
         assert!(INDEX_HTML.contains("$('sqlDatabase').disabled = true"));
         assert!(INDEX_HTML.contains("$('sqlDatabase').disabled = activeRequests > 0"));
         assert!(INDEX_HTML.contains("clearSchema()"));
         assert!(INDEX_HTML.contains("$('sqlDatabase').addEventListener('change', clearSchema)"));
         assert!(INDEX_HTML.contains("function clearSchema()"));
-        assert!(INDEX_HTML.contains("DBを選択してSchemaを読み込んでください"));
+        assert!(INDEX_HTML.contains("selectDbForSchema"));
         assert!(INDEX_HTML.contains("const selected = $('sqlDatabase').value"));
         assert!(INDEX_HTML.contains(
             "schemaState && schemaState.database && schemaState.database.id !== selected"
@@ -3951,7 +5946,83 @@ mod tests {
         assert!(INDEX_HTML.contains(r#"<div class="layout">"#));
         assert!(INDEX_HTML.contains(r#"<aside class="sidebar">"#));
         assert!(INDEX_HTML.contains(r#"<main class="content">"#));
-        assert!(INDEX_HTML.contains("grid-template-columns:280px minmax(0, 1fr)"));
+        assert!(INDEX_HTML.contains("grid-template-columns:272px minmax(0, 1fr)"));
+        assert!(INDEX_HTML.contains(r#"<header class="topbar">"#));
+        assert!(INDEX_HTML
+            .contains(r#"<section class="summary page active" data-page="execute" id="summary""#));
+        assert!(INDEX_HTML.contains(
+            r#"<section class="panel page active" data-page="execute" id="command-center">"#
+        ));
+        assert!(INDEX_HTML
+            .contains(r#"<section class="panel page" data-page="groups" id="topology-panel">"#));
+    }
+
+    #[test]
+    fn html_includes_help_page_linked_from_sidebar() {
+        assert!(INDEX_HTML.contains(
+            r#"<a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>"#
+        ));
+        assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="help" id="help">"#));
+        assert!(INDEX_HTML.contains("基本の考え方"));
+        assert!(INDEX_HTML.contains("migrationファイルは <code>migrations.dir</code>"));
+        assert!(INDEX_HTML.contains("選択中の1ファイルだけを飛ばして適用する操作ではありません"));
+        assert!(INDEX_HTML.contains("audit.path"));
+    }
+
+    #[test]
+    fn html_supports_english_default_and_japanese_toggle() {
+        assert!(INDEX_HTML.contains(r#"<html lang="en">"#));
+        assert!(INDEX_HTML
+            .contains(r#"<div class="language-toggle" role="group" aria-label="Language">"#));
+        assert!(INDEX_HTML
+            .contains(r#"<button type="button" data-locale-button="en">English</button>"#));
+        assert!(
+            INDEX_HTML.contains(r#"<button type="button" data-locale-button="ja">日本語</button>"#)
+        );
+        assert!(INDEX_HTML.contains("let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en'"));
+        assert!(INDEX_HTML.contains("function translateStaticDom()"));
+        assert!(INDEX_HTML.contains("function setLocale(locale)"));
+        assert!(INDEX_HTML.contains("'実行計画': 'Run plan'"));
+        assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
+        assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
+        assert!(INDEX_HTML.contains("'Migration Groups': 'Migrationグループ'"));
+        assert!(INDEX_HTML
+            .contains("document.querySelectorAll('[data-locale-button]').forEach((button) =>"));
+        assert!(INDEX_HTML.contains(
+            "button.addEventListener('click', () => setLocale(button.dataset.localeButton))"
+        ));
+        assert!(
+            INDEX_HTML.contains("translateStaticDom();\n    renderSqlTemplates();\n    load();")
+        );
+    }
+
+    #[test]
+    fn html_localizes_dynamic_render_labels() {
+        assert!(INDEX_HTML.contains("[t('migrationGroupsLabel'), state.migration_groups.length]"));
+        assert!(INDEX_HTML.contains("[t('dbGroupsLabel'), state.db_groups.length]"));
+        assert!(INDEX_HTML.contains("[t('upToDate'), s.up_to_date]"));
+        assert!(INDEX_HTML.contains("[t('pendingDb'), s.pending]"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('migrationsLabel'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('targetDbLabel'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('selectorsLabel'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('previewLabel'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
+        assert!(INDEX_HTML.contains("[t('lockTimeout'), `${settings.lock_timeout_ms} ms`]"));
+        assert!(INDEX_HTML.contains("message(adminSuccessMessage(path, result.message))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('column'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('objectDefinitions'))"));
+    }
+
+    #[test]
+    fn html_includes_contextual_tooltips_for_admin_fields() {
+        assert!(INDEX_HTML.contains(r#"class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどこへ適用するか"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="db_groups/groups に定義した対象DBのまとまりです"#));
+        assert!(INDEX_HTML
+            .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="履歴テーブルはversion主キーなので"#));
     }
 
     #[test]
@@ -4029,8 +6100,8 @@ mod tests {
 
     #[test]
     fn html_displays_hidden_schema_columns() {
-        assert!(INDEX_HTML.contains("escapeHtml(table.type || 'table')"));
-        assert!(INDEX_HTML.contains("<th>Hidden</th>"));
+        assert!(INDEX_HTML.contains("escapeHtml(table.type || t('table'))"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('hidden'))"));
         assert!(INDEX_HTML.contains("hiddenColumnLabel(column.hidden)"));
         assert!(INDEX_HTML.contains("generated virtual"));
         assert!(INDEX_HTML.contains("generated stored"));
@@ -4038,7 +6109,8 @@ mod tests {
 
     #[test]
     fn html_displays_schema_object_definitions() {
-        assert!(INDEX_HTML.contains("Object Definitions"));
+        assert!(INDEX_HTML.contains("objectDefinitions: 'Object Definitions'"));
+        assert!(INDEX_HTML.contains("escapeHtml(t('objectDefinitions'))"));
         assert!(INDEX_HTML.contains("schemaState.objects"));
         assert!(INDEX_HTML.contains("object.table_name"));
         assert!(INDEX_HTML.contains("schema-sql"));

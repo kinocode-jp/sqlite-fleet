@@ -44,6 +44,11 @@ sqlite-fleet plan
 sqlite-fleet migrate
 sqlite-fleet migrate --dry-run
 sqlite-fleet --parallel 8 migrate --continue-on-error
+sqlite-fleet migrate --backup
+sqlite-fleet migrate --group canary --limit 1 --backup
+sqlite-fleet backup --database tenant-a
+sqlite-fleet restore --database tenant-a --from ./backups/tenant-a/1770000000000000000_tenant-a.db
+sqlite-fleet drift
 sqlite-fleet check
 sqlite-fleet doctor
 sqlite-fleet --json doctor
@@ -66,9 +71,17 @@ sqlite-fleet --config sqlite-fleet.toml --parallel 8 migrate
 sqlite-fleet --config sqlite-fleet.toml gui
 ```
 
-デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、`--host` にはループバックアドレスだけ指定できます。画面上で対象DB、適用済み件数、未適用migration、checksum不一致などを確認でき、`check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate` を実行できます。
+デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、`--host` にはループバックアドレスだけ指定できます。
 
-GUIにはSQL ConsoleとSchema Editorも含まれます。SQLファイルを読み込んで内容を確認・編集し、選択DBに対してSQL dry-runまたは適用を実行できます。Schema Editorでは現在のテーブル、ビュー、インデックス、トリガー、カラム情報を読み込み、CREATE TABLE、制約、generated columns、ALTER TABLE、DROP、VIEW、INDEX、TRIGGER、RETURNING、PRAGMA、VACUUM、VACUUM INTO、ANALYZE、REINDEX、EXPLAIN、SAVEPOINT、ATTACH DATABASEなどのSQLite SQLテンプレートを生成・編集してSQLファイルとして保存できます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` は単独SQLとしてだけ適用でき、外部DBへ影響する `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
+管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
+
+- マイグレーション: マイグレーショングループで絞り込み、SQL内容、適用済DB、未適用DBを確認します。
+- DB一覧: DBグループで絞り込み、DBごとの対象マイグレーショングループ、適用済み件数、未適用migration、checksum不一致などを確認します。
+- オーバービュー: 最新migration、未適用があるDB、失敗・不整合の有無をまとめて確認します。
+
+画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
+
+`新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` は単独SQLとしてだけ適用でき、外部DBへ影響する `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
 ## 設定例
 
@@ -84,6 +97,14 @@ path_glob = "./data/**/*.db"
 dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
+[migration_groups]
+core = ["001", "002"]
+premium = ["001", "002", "101"]
+
+[database_migration_groups]
+tenant-a = ["core", "premium"]
+tenant-b = ["core"]
+
 [execution]
 parallel = 4
 lock_timeout_ms = 5000
@@ -92,7 +113,30 @@ continue_on_error = true
 [report]
 format = "json"
 path = "./sqlite-fleet-report.json"
+
+[backup]
+dir = "./backups"
+before_migrate = false
+keep_last = 10
+
+[audit]
+path = "./sqlite-fleet-audit.jsonl"
+
+[gui]
+allow_check = true
+allow_migrate = true
+allow_backup = true
+allow_restore = true
+allow_sql_apply = true
+allow_migration_edit = true
+
+[db_groups]
+canary = ["tenant-a", "tenant-b"]
 ```
+
+`migrate`、`backup`、`restore` はDBファイルごとに `*.sqlite-fleet.lock` を作り、同じDBに対する sqlite-fleet 経由の変更操作を直列化します。別プロセスやGUIから同じDBへ同時操作した場合、後続操作は `execution.lock_timeout_ms` まで待機し、取得できなければ `DBは別のsqlite-fleet操作中です` として失敗します。処理が正常終了または通常のエラーで戻る場合、ロックファイルは自動削除されます。
+
+`lock_timeout_ms` はSQLiteの `busy_timeout` と sqlite-fleet のDB操作ロック待ち時間の両方に使います。外部アプリや `sqlite3` が直接DBを書く操作はこのロックを見ないため、完全に止めたい場合はアプリ側でも同じ運用ルールに揃えてください。
 
 設定ファイルでは未知フィールドを拒否します。`path_globb` のような typo は無視せずエラーになります。
 
@@ -111,15 +155,24 @@ path_template = "./data/tenants/{id:08:split2}.db"
 
 `{id:08:split2}` は `1234` を `00/00/00001234` のように展開します。
 
-## migration ファイル
+## マイグレーションファイル
 
-`migrations` ディレクトリに `<version>_<name>.sql` 形式で置きます。
+マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` 形式で置きます。マイグレーショングループはファイルの物理配置ではなく、`[migration_groups]` の version リストで所属を管理します。同じmigrationを複数グループへ所属させても、同じSQLファイルとchecksumを参照するため、履歴は壊れません。
 
 ```text
 migrations/
   001_create_items.sql
   002_add_item_index.sql
+  101_create_subscription.sql
 ```
+
+```toml
+[migration_groups]
+core = ["001", "002"]
+premium = ["001", "002", "101"]
+```
+
+`[migration_groups]` を使わない既存設定では、従来通り `migrations.dir` が `default` グループとして扱われます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + version リスト形式を推奨します。
 
 各DBには `_sqlite_fleet_migrations` が作成され、適用済み version、name、checksum、適用時刻、実行時間が保存されます。
 
@@ -133,6 +186,54 @@ migrations/
 
 `doctor --json` は、設定ファイルの検証エラーや TOML 解析エラーも構造化されたJSONとして標準出力へ返します。`report.path` への書き込みに失敗しても、標準出力の診断結果を優先します。
 
+## バックアップ、復元、監査
+
+`backup` は対象DBの一貫したSQLiteコピーを `backup.dir` 配下へ作成します。`migrate --backup` または `backup.before_migrate = true` を使うと、本適用前にDBごとのbackupを取得します。
+
+```bash
+sqlite-fleet backup
+sqlite-fleet backup --database tenant-a
+sqlite-fleet migrate --backup
+```
+
+`restore` は復元前に現在のDBをbackupしてから、指定したbackupファイルでDBを置き換えます。
+
+```bash
+sqlite-fleet restore --database tenant-a --from ./backups/tenant-a/1770000000000000000_tenant-a.db
+```
+
+`audit.path` を設定すると、`migrate`、`backup`、`restore`、`drift` とGUI経由の主要操作がJSONLで追記されます。
+
+## マイグレーショングループ、DBグループ、カナリア
+
+`[migration_groups]` で「どのmigration versionがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `core` があれば `core`、なければ全マイグレーショングループが対象です。
+
+`[db_groups]` でDB IDまたはDBパスselectorのまとまりを定義できます。`--limit` と組み合わせるとカナリア適用に使えます。旧設定名 `[groups]` も互換のため読み込めます。
+
+```bash
+sqlite-fleet migrate --group canary --limit 1 --backup
+sqlite-fleet migrate --group canary --backup
+```
+
+この場合、「何を適用するか」はマイグレーショングループ、「どこへ適用するか」はDBグループで分かれます。
+
+```text
+tenant-a -> core + premium
+tenant-b -> core
+canary   -> tenant-a, tenant-b
+```
+
+注意: 現在の履歴テーブルは `version` を主キーにするため、複数のマイグレーショングループを使う場合も migration version は全体で一意にしてください。例えば `core/001_...sql` と `premium/001_...sql` の同時使用は拒否されます。
+
+## スキーマdrift
+
+`drift` は最初のDBをbaselineとして、他DBのtable/index/view/trigger定義差分を検出します。
+
+```bash
+sqlite-fleet drift
+sqlite-fleet drift --group canary
+```
+
 ## 終了コード
 
 - `0`: コマンドが成功した
@@ -143,10 +244,12 @@ CI/CD では `migrate`、`check`、`doctor` の非0終了を失敗として扱�
 ## 本番運用チェックリスト
 
 - 本番DBのバックアップを取得してから `migrate` を実行する
+- `migrate --backup` または `backup.before_migrate = true` で本適用前backupを自動化する
 - `sqlite-fleet doctor` で設定、DB discovery、migration ファイルを検証する
 - `sqlite-fleet plan` で対象DBと適用予定を確認する
 - `sqlite-fleet migrate --dry-run` で読み取り専用の事前確認を行う
 - `report.path` を設定し、JSONレポートをCI/CD成果物として保存する
+- `audit.path` を設定し、GUI/CLIの変更操作を監査ログとして保存する
 - `--parallel` はDB数、ディスクI/O、ロック状況に合わせて控えめに設定する
 - 失敗時はレポートの `failed_databases` / `databases[].error` を確認し、原因を直して再実行する
 

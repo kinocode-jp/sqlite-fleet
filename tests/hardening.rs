@@ -2,8 +2,10 @@ use rusqlite::Connection;
 use sqlite_fleet::{
     build_database_plan, check, check_database, discover_databases, ensure_migrations_table,
     load_migrations, migrate, migrate_database, status_report, write_report_json, Config, Database,
-    DatabasesConfig, ExecutionConfig, Migration, MigrationsConfig, ReportConfig,
+    DatabasesConfig, ExecutionConfig, Migration, MigrationGroupConfig, MigrationsConfig,
+    ReportConfig,
 };
+use std::collections::HashMap;
 use std::fs;
 use tempfile::tempdir;
 
@@ -120,6 +122,49 @@ fn build_plan_rejects_zero_parallel_execution_without_config_load() {
         .error
         .unwrap()
         .contains("execution.parallel は1以上が必要です"));
+}
+
+#[test]
+fn config_allows_unicode_group_names() {
+    let dir = tempdir().unwrap();
+    let mut config = Config {
+        base_dir: dir.path().to_path_buf(),
+        migration_groups: HashMap::from([(
+            "顧客管理".to_string(),
+            MigrationGroupConfig::legacy_dir("migrations/customer".to_string()),
+        )]),
+        database_migration_groups: HashMap::from([(
+            "tenant-a".to_string(),
+            vec!["顧客管理".to_string()],
+        )]),
+        db_groups: HashMap::from([("本番".to_string(), vec!["tenant-a".to_string()])]),
+        ..Config::default()
+    };
+
+    config.validate().unwrap();
+
+    config.migration_groups.insert(
+        "顧客 管理".to_string(),
+        MigrationGroupConfig::legacy_dir("migrations/customer-space".to_string()),
+    );
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("空白なしの非空文字列"));
+
+    config.migration_groups.clear();
+    config.migration_groups.insert(
+        ".".to_string(),
+        MigrationGroupConfig::legacy_dir("migrations/dot".to_string()),
+    );
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("特殊なパス成分"));
+
+    config.migration_groups.clear();
+    config.migration_groups.insert(
+        "..".to_string(),
+        MigrationGroupConfig::legacy_dir("migrations/dotdot".to_string()),
+    );
+    let error = config.validate().unwrap_err().to_string();
+    assert!(error.contains("特殊なパス成分"));
 }
 
 #[test]
@@ -536,6 +581,7 @@ fn migration_summary_input(
 ) -> Migration {
     let sql = format!("CREATE TABLE {name}(id);");
     Migration {
+        group: "default".to_string(),
         version: version.to_string(),
         version_number,
         name: name.to_string(),

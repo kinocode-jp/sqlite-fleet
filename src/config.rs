@@ -5,7 +5,10 @@ use crate::{
     sqlite_ident::validate_identifier,
 };
 use anyhow::{anyhow, bail, Context, Result};
-use serde::{Deserialize, Serialize};
+use serde::de::Error as DeError;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -22,9 +25,23 @@ pub struct Config {
     #[serde(default)]
     pub migrations: MigrationsConfig,
     #[serde(default)]
+    pub migration_groups: HashMap<String, MigrationGroupConfig>,
+    #[serde(default)]
+    pub database_migration_groups: HashMap<String, Vec<String>>,
+    #[serde(default)]
     pub execution: ExecutionConfig,
     #[serde(default)]
     pub report: ReportConfig,
+    #[serde(default)]
+    pub backup: BackupConfig,
+    #[serde(default)]
+    pub audit: AuditConfig,
+    #[serde(default)]
+    pub gui: GuiConfig,
+    #[serde(default)]
+    pub groups: HashMap<String, Vec<String>>,
+    #[serde(default)]
+    pub db_groups: HashMap<String, Vec<String>>,
     #[serde(skip)]
     pub base_dir: PathBuf,
 }
@@ -57,6 +74,83 @@ pub struct MigrationsConfig {
     pub table: String,
 }
 
+#[derive(Debug, Clone)]
+pub struct MigrationGroupConfig {
+    pub dir: Option<String>,
+    pub migrations: Vec<String>,
+}
+
+impl MigrationGroupConfig {
+    pub fn legacy_dir(dir: impl Into<String>) -> Self {
+        Self {
+            dir: Some(dir.into()),
+            migrations: Vec::new(),
+        }
+    }
+
+    pub fn versions(versions: Vec<String>) -> Self {
+        Self {
+            dir: None,
+            migrations: versions,
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum MigrationGroupConfigInput {
+    Versions(Vec<String>),
+    Table(MigrationGroupConfigTable),
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationGroupConfigTable {
+    dir: Option<String>,
+    #[serde(default)]
+    migrations: Vec<String>,
+}
+
+impl<'de> Deserialize<'de> for MigrationGroupConfig {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        match MigrationGroupConfigInput::deserialize(deserializer)? {
+            MigrationGroupConfigInput::Versions(migrations) => {
+                Ok(MigrationGroupConfig::versions(migrations))
+            }
+            MigrationGroupConfigInput::Table(MigrationGroupConfigTable { dir, migrations }) => {
+                if dir.is_none() && migrations.is_empty() {
+                    return Err(D::Error::custom(
+                        "migration group table には dir または migrations が必要です",
+                    ));
+                }
+                Ok(MigrationGroupConfig { dir, migrations })
+            }
+        }
+    }
+}
+
+impl Serialize for MigrationGroupConfig {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        if self.dir.is_none() {
+            return self.migrations.serialize(serializer);
+        }
+        let mut state = serializer.serialize_struct("MigrationGroupConfig", 2)?;
+        if let Some(dir) = &self.dir {
+            state.serialize_field("dir", dir)?;
+        }
+        if !self.migrations.is_empty() {
+            state.serialize_field("migrations", &self.migrations)?;
+        }
+        state.end()
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionConfig {
@@ -76,6 +170,40 @@ pub struct ReportConfig {
     pub path: Option<String>,
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct BackupConfig {
+    #[serde(default = "default_backup_dir")]
+    pub dir: String,
+    #[serde(default)]
+    pub before_migrate: bool,
+    #[serde(default = "default_backup_keep_last")]
+    pub keep_last: usize,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct AuditConfig {
+    pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuiConfig {
+    #[serde(default = "default_true")]
+    pub allow_check: bool,
+    #[serde(default = "default_true")]
+    pub allow_migrate: bool,
+    #[serde(default = "default_true")]
+    pub allow_backup: bool,
+    #[serde(default = "default_true")]
+    pub allow_restore: bool,
+    #[serde(default = "default_true")]
+    pub allow_sql_apply: bool,
+    #[serde(default = "default_true")]
+    pub allow_migration_edit: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Database {
     pub id: String,
@@ -86,6 +214,7 @@ pub struct Database {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Migration {
+    pub group: String,
     pub version: String,
     #[serde(skip_serializing)]
     pub version_number: u64,
@@ -108,6 +237,7 @@ pub struct AppliedMigration {
 #[derive(Debug, Clone, Serialize)]
 pub struct DatabasePlan {
     pub database: Database,
+    pub migration_groups: Vec<String>,
     pub applied_count: usize,
     pub pending: Vec<MigrationSummary>,
     pub checksum_errors: Vec<ChecksumError>,
@@ -117,6 +247,7 @@ pub struct DatabasePlan {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct MigrationSummary {
+    pub group: String,
     pub version: String,
     pub name: String,
     pub checksum: String,
@@ -157,6 +288,7 @@ pub struct DatabaseMigrationResult {
     pub database: Database,
     pub applied: Vec<MigrationSummary>,
     pub pending: Vec<MigrationSummary>,
+    pub pre_backup: Option<DatabaseBackupResult>,
     pub success: bool,
     pub error: Option<String>,
 }
@@ -192,14 +324,67 @@ pub struct DoctorReport {
     pub errors: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct BackupReport {
+    pub database_count: usize,
+    pub backed_up: usize,
+    pub failed: usize,
+    pub backups: Vec<DatabaseBackupResult>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DatabaseBackupResult {
+    pub database: Database,
+    pub path: Option<PathBuf>,
+    pub bytes: Option<u64>,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RestoreReport {
+    pub database: Database,
+    pub restored_from: PathBuf,
+    pub pre_restore_backup: Option<DatabaseBackupResult>,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SchemaDriftReport {
+    pub database_count: usize,
+    pub baseline_database: Option<Database>,
+    pub drifted: usize,
+    pub failed: usize,
+    pub databases: Vec<DatabaseSchemaDriftResult>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DatabaseSchemaDriftResult {
+    pub database: Database,
+    pub matches_baseline: bool,
+    pub missing_objects: Vec<String>,
+    pub extra_objects: Vec<String>,
+    pub changed_objects: Vec<String>,
+    pub success: bool,
+    pub error: Option<String>,
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
             project: ProjectConfig::default(),
             databases: DatabasesConfig::default(),
             migrations: MigrationsConfig::default(),
+            migration_groups: HashMap::new(),
+            database_migration_groups: HashMap::new(),
             execution: ExecutionConfig::default(),
             report: ReportConfig::default(),
+            backup: BackupConfig::default(),
+            audit: AuditConfig::default(),
+            gui: GuiConfig::default(),
+            groups: HashMap::new(),
+            db_groups: HashMap::new(),
             base_dir: PathBuf::from("."),
         }
     }
@@ -243,6 +428,29 @@ impl Default for ReportConfig {
         Self {
             format: default_report_format(),
             path: None,
+        }
+    }
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            dir: default_backup_dir(),
+            before_migrate: false,
+            keep_last: default_backup_keep_last(),
+        }
+    }
+}
+
+impl Default for GuiConfig {
+    fn default() -> Self {
+        Self {
+            allow_check: true,
+            allow_migrate: true,
+            allow_backup: true,
+            allow_restore: true,
+            allow_sql_apply: true,
+            allow_migration_edit: true,
         }
     }
 }
@@ -309,6 +517,7 @@ impl Config {
         if let Some(path) = self.report.path.as_deref() {
             validate_configured_db_path(self, "report.path", path)?;
         }
+        self.validate_extended_runtime()?;
         Ok(())
     }
 
@@ -320,8 +529,66 @@ impl Config {
         }
         validate_configured_db_path(self, "migrations.dir", &self.migrations.dir)?;
         validate_identifier(&self.migrations.table)?;
+        for (group, config) in &self.migration_groups {
+            validate_group_name("migration_groups", group)?;
+            if config.dir.is_none() && config.migrations.is_empty() {
+                bail!("migration_groups.{group} は dir または migrations が必要です");
+            }
+            if let Some(dir) = config.dir.as_deref() {
+                if dir.trim().is_empty() {
+                    bail!("migration_groups.{group}.dir は空にできません");
+                }
+                validate_configured_db_path(self, &format!("migration_groups.{group}.dir"), dir)?;
+            }
+            let mut versions = std::collections::HashSet::new();
+            for version in &config.migrations {
+                if version.trim().is_empty() || version.trim() != version {
+                    bail!("migration_groups.{group} のversionは空白なしの非空文字列である必要があります");
+                }
+                if !version.chars().all(|ch| ch.is_ascii_digit()) {
+                    bail!(
+                        "migration_groups.{group} のversionはASCII数字のみ使用できます: {version}"
+                    );
+                }
+                if !versions.insert(version) {
+                    bail!("migration_groups.{group} のversionが重複しています: {version}");
+                }
+            }
+        }
+        self.validate_database_migration_groups()?;
         if self.execution.parallel == 0 {
             bail!("execution.parallel は1以上が必要です");
+        }
+        self.validate_extended_runtime()?;
+        Ok(())
+    }
+
+    fn validate_extended_runtime(&self) -> Result<()> {
+        if self.backup.dir.trim().is_empty() {
+            bail!("backup.dir は空にできません");
+        }
+        validate_configured_db_path(self, "backup.dir", &self.backup.dir)?;
+        if self.backup.keep_last > 10_000 {
+            bail!("backup.keep_last が大きすぎます");
+        }
+        if let Some(path) = self.audit.path.as_deref() {
+            if path.trim().is_empty() {
+                bail!("audit.path は空にできません");
+            }
+            validate_configured_db_path(self, "audit.path", path)?;
+        }
+        for (group, selectors) in self.effective_db_groups() {
+            validate_group_name("db_groups", &group)?;
+            if selectors.is_empty() {
+                bail!("db_groups.{group} は1件以上のDB selectorが必要です");
+            }
+            for selector in selectors {
+                if selector.trim().is_empty() || selector.trim() != selector {
+                    bail!(
+                        "db_groups.{group} のDB selectorは空白なしの非空文字列である必要があります"
+                    );
+                }
+            }
         }
         Ok(())
     }
@@ -410,6 +677,25 @@ impl Config {
         Ok(())
     }
 
+    pub fn validate_database_migration_groups(&self) -> Result<()> {
+        let migration_groups = self.effective_migration_groups();
+        for (selector, groups) in &self.database_migration_groups {
+            if selector.trim().is_empty() || selector.trim() != selector {
+                bail!("database_migration_groups のDB selectorは空白なしの非空文字列である必要があります");
+            }
+            if groups.is_empty() {
+                bail!("database_migration_groups.{selector} は1件以上のマイグレーショングループが必要です");
+            }
+            for group in groups {
+                validate_group_name(&format!("database_migration_groups.{selector}"), group)?;
+                if !migration_groups.contains_key(group) {
+                    bail!("database_migration_groups.{selector} のマイグレーショングループが見つかりません: {group}");
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn resolve_path(&self, path: impl AsRef<Path>) -> PathBuf {
         let path = path.as_ref();
         if path.is_absolute() {
@@ -421,6 +707,60 @@ impl Config {
 
     pub fn migrations_table(&self) -> &str {
         &self.migrations.table
+    }
+
+    pub fn effective_migration_groups(&self) -> HashMap<String, MigrationGroupConfig> {
+        if self.migration_groups.is_empty() {
+            HashMap::from([(
+                "default".to_string(),
+                MigrationGroupConfig {
+                    dir: Some(self.migrations.dir.clone()),
+                    migrations: Vec::new(),
+                },
+            )])
+        } else {
+            self.migration_groups.clone()
+        }
+    }
+
+    pub fn effective_db_groups(&self) -> HashMap<String, Vec<String>> {
+        let mut groups = self.groups.clone();
+        for (name, selectors) in &self.db_groups {
+            groups.insert(name.clone(), selectors.clone());
+        }
+        groups
+    }
+
+    pub fn migration_groups_for_database(&self, database: &Database) -> Vec<String> {
+        let configured = self.effective_migration_groups();
+        let mut groups = self
+            .database_migration_groups
+            .iter()
+            .filter(|(selector, _groups)| {
+                database_matches_config_selector(self, database, selector)
+            })
+            .flat_map(|(_selector, groups)| groups.iter().cloned())
+            .collect::<Vec<_>>();
+        if groups.is_empty() {
+            groups = {
+                if configured.contains_key("default") {
+                    vec!["default".to_string()]
+                } else if configured.contains_key("core") {
+                    vec!["core".to_string()]
+                } else {
+                    let mut names = configured.keys().cloned().collect::<Vec<_>>();
+                    names.sort();
+                    names
+                }
+            };
+        }
+        groups.sort();
+        groups.dedup();
+        groups
+    }
+
+    pub fn database_matches_selector(&self, database: &Database, selector: &str) -> bool {
+        database_matches_config_selector(self, database, selector)
     }
 
     pub(crate) fn validate_path_within_base(&self, label: &str, path: &str) -> Result<()> {
@@ -485,6 +825,15 @@ path_glob = "./data/**/*.db"
 dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
+[migration_groups]
+core = ["001", "002"]
+
+# [db_groups]
+# canary = ["tenant-a"]
+
+# [database_migration_groups]
+# tenant-a = ["core"]
+
 [execution]
 parallel = 4
 lock_timeout_ms = 5000
@@ -493,11 +842,51 @@ continue_on_error = false
 [report]
 format = "json"
 path = "./sqlite-fleet-report.json"
+
+[backup]
+dir = "./backups"
+before_migrate = false
+keep_last = 10
+
+[audit]
+path = "./sqlite-fleet-audit.jsonl"
+
+[gui]
+allow_check = true
+allow_migrate = true
+allow_backup = true
+allow_restore = true
+allow_sql_apply = true
+allow_migration_edit = true
 "#
 }
 
 fn is_blank(value: Option<&str>) -> bool {
     value.is_none_or(|value| value.trim().is_empty())
+}
+
+fn validate_group_name(label: &str, name: &str) -> Result<()> {
+    if name.trim().is_empty() || name.trim() != name || name.chars().any(char::is_whitespace) {
+        bail!("{label} の名前は空白なしの非空文字列である必要があります");
+    }
+    if name.chars().any(char::is_control) {
+        bail!("{label} の名前に制御文字は使用できません: {name}");
+    }
+    if name.contains('/') || name.contains('\\') {
+        bail!("{label} の名前にパス区切り文字は使用できません: {name}");
+    }
+    if name == "." || name == ".." {
+        bail!("{label} の名前に特殊なパス成分は使用できません: {name}");
+    }
+    Ok(())
+}
+
+fn database_matches_config_selector(config: &Config, database: &Database, selector: &str) -> bool {
+    if database.id == selector {
+        return true;
+    }
+    let selector_path = config.resolve_path(selector);
+    normalize_path_for_comparison(&selector_path) == normalize_path_for_comparison(&database.path)
 }
 
 fn default_discovery() -> String {
@@ -522,4 +911,16 @@ fn default_lock_timeout_ms() -> u64 {
 
 fn default_report_format() -> String {
     "json".to_string()
+}
+
+fn default_backup_dir() -> String {
+    "./backups".to_string()
+}
+
+fn default_backup_keep_last() -> usize {
+    10
+}
+
+fn default_true() -> bool {
+    true
 }

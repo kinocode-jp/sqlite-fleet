@@ -1,2 +1,4 @@
 /target
 PLAN.md
+sqlite-fleet-report.json
+data/demo/*.db

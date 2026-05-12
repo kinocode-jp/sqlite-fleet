@@ -1,8 +1,9 @@
 use anyhow::{bail, Error, Result};
 use clap::{Parser, Subcommand};
 use sqlite_fleet::{
-    check, discover_databases, doctor_and_write_report, init_project, load_migrations, migrate,
-    status_report, write_report_json, Config, DEFAULT_CONFIG_PATH,
+    backup, check, discover_databases, doctor_and_write_report, init_project, load_migrations,
+    migrate_with_options, restore, schema_drift, status_report, write_audit_event,
+    write_report_json, Config, DatabaseSelection, MigrateOptions, DEFAULT_CONFIG_PATH,
 };
 use std::path::{Path, PathBuf};
 
@@ -35,6 +36,36 @@ enum Commands {
         continue_on_error: bool,
         #[arg(long)]
         database: Option<String>,
+        #[arg(long)]
+        group: Option<String>,
+        #[arg(long)]
+        limit: Option<usize>,
+        #[arg(long)]
+        backup: bool,
+        #[arg(long)]
+        no_backup: bool,
+    },
+    Backup {
+        #[arg(long)]
+        database: Option<String>,
+        #[arg(long)]
+        group: Option<String>,
+        #[arg(long)]
+        limit: Option<usize>,
+    },
+    Restore {
+        #[arg(long)]
+        database: String,
+        #[arg(long)]
+        from: PathBuf,
+    },
+    Drift {
+        #[arg(long)]
+        database: Option<String>,
+        #[arg(long)]
+        group: Option<String>,
+        #[arg(long)]
+        limit: Option<usize>,
     },
     Check,
     Doctor,
@@ -152,7 +183,10 @@ fn main() -> Result<()> {
                         println!("  適用予定なし");
                     } else {
                         for migration in &plan.pending {
-                            println!("  {}_{}", migration.version, migration.name);
+                            println!(
+                                "  [{}] {}_{}",
+                                migration.group, migration.version, migration.name
+                            );
                         }
                     }
                 }
@@ -167,12 +201,34 @@ fn main() -> Result<()> {
             dry_run,
             continue_on_error,
             database,
+            group,
+            limit,
+            backup,
+            no_backup,
         } => {
             let mut config = load_config_with_overrides(&config, parallel)?;
             if continue_on_error {
                 config.execution.continue_on_error = true;
             }
-            let report = migrate(&config, dry_run, database.as_deref())?;
+            let backup_before_migrate = if backup {
+                Some(true)
+            } else if no_backup {
+                Some(false)
+            } else {
+                None
+            };
+            let report = migrate_with_options(
+                &config,
+                MigrateOptions {
+                    dry_run,
+                    selection: DatabaseSelection {
+                        database,
+                        group,
+                        limit,
+                    },
+                    backup_before_migrate,
+                },
+            )?;
             if json {
                 println!("{}", serde_json::to_string_pretty(&report)?);
             } else {
@@ -183,6 +239,11 @@ fn main() -> Result<()> {
                 println!("適用DB数: {}", report.applied_databases);
                 println!("失敗DB数: {}", report.failed_databases);
                 for database in &report.databases {
+                    if let Some(backup) = &database.pre_backup {
+                        if let Some(path) = &backup.path {
+                            println!("backup: {} -> {}", database.database.id, path.display());
+                        }
+                    }
                     if !database.success {
                         println!(
                             "失敗: {} {}",
@@ -192,6 +253,7 @@ fn main() -> Result<()> {
                     }
                 }
             }
+            let audit_error = write_audit_event(&config, "migrate", &report).err();
             let report_write_error = write_report_json(&config, &report).err();
             if report.failed_databases > 0 {
                 bail!(
@@ -199,6 +261,130 @@ fn main() -> Result<()> {
                     report.failed_databases
                 );
             }
+            fail_if_report_write_failed(audit_error)?;
+            fail_if_report_write_failed(report_write_error)?;
+        }
+        Commands::Backup {
+            database,
+            group,
+            limit,
+        } => {
+            let config = load_config_with_overrides(&config, parallel)?;
+            let report = backup(
+                &config,
+                DatabaseSelection {
+                    database,
+                    group,
+                    limit,
+                },
+            )?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("DB数: {}", report.database_count);
+                println!("backup成功: {}", report.backed_up);
+                println!("失敗: {}", report.failed);
+                for backup in &report.backups {
+                    if let Some(path) = &backup.path {
+                        println!("{} -> {}", backup.database.id, path.display());
+                    }
+                    if !backup.success {
+                        println!(
+                            "失敗: {} {}",
+                            backup.database.path.display(),
+                            backup.error.as_deref().unwrap_or("backupに失敗しました")
+                        );
+                    }
+                }
+            }
+            let audit_error = write_audit_event(&config, "backup", &report).err();
+            let report_write_error = write_report_json(&config, &report).err();
+            if report.failed > 0 {
+                bail!("{}件のDB backupに失敗しました", report.failed);
+            }
+            fail_if_report_write_failed(audit_error)?;
+            fail_if_report_write_failed(report_write_error)?;
+        }
+        Commands::Restore { database, from } => {
+            let config = load_config_with_overrides(&config, parallel)?;
+            let report = restore(&config, &database, &from)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else if report.success {
+                println!("復元しました: {} <- {}", report.database.id, from.display());
+                if let Some(backup) = &report.pre_restore_backup {
+                    if let Some(path) = &backup.path {
+                        println!("復元前backup: {}", path.display());
+                    }
+                }
+            } else {
+                println!(
+                    "復元に失敗しました: {}",
+                    report.error.as_deref().unwrap_or("不明なエラー")
+                );
+            }
+            let audit_error = write_audit_event(&config, "restore", &report).err();
+            let report_write_error = write_report_json(&config, &report).err();
+            if !report.success {
+                bail!("restore に失敗しました");
+            }
+            fail_if_report_write_failed(audit_error)?;
+            fail_if_report_write_failed(report_write_error)?;
+        }
+        Commands::Drift {
+            database,
+            group,
+            limit,
+        } => {
+            let config = load_config_with_overrides(&config, parallel)?;
+            let report = schema_drift(
+                &config,
+                DatabaseSelection {
+                    database,
+                    group,
+                    limit,
+                },
+            )?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report)?);
+            } else {
+                println!("DB数: {}", report.database_count);
+                println!("drift: {}", report.drifted);
+                println!("失敗: {}", report.failed);
+                for database in &report.databases {
+                    if !database.success {
+                        println!(
+                            "失敗: {} {}",
+                            database.database.path.display(),
+                            database
+                                .error
+                                .as_deref()
+                                .unwrap_or("schema drift検査に失敗しました")
+                        );
+                    } else if !database.matches_baseline {
+                        println!("drift: {}", database.database.id);
+                        for object in &database.missing_objects {
+                            println!("  missing: {object}");
+                        }
+                        for object in &database.extra_objects {
+                            println!("  extra: {object}");
+                        }
+                        for object in &database.changed_objects {
+                            println!("  changed: {object}");
+                        }
+                    }
+                }
+            }
+            let audit_error = write_audit_event(&config, "drift", &report).err();
+            let report_write_error = write_report_json(&config, &report).err();
+            if report.failed > 0 || report.drifted > 0 {
+                bail!(
+                    "schema drift を検出しました: drifted={}, failed={}",
+                    report.drifted,
+                    report.failed
+                );
+            }
+            fail_if_report_write_failed(audit_error)?;
             fail_if_report_write_failed(report_write_error)?;
         }
         Commands::Check => {
@@ -249,8 +435,8 @@ fn main() -> Result<()> {
             }
         }
         Commands::Gui { host, port } => {
-            let config = load_config_with_overrides(&config, parallel)?;
-            gui::serve(config, &host, port)?;
+            let loaded_config = load_config_with_overrides(&config, parallel)?;
+            gui::serve(loaded_config, config.clone(), &host, port)?;
         }
     }
 

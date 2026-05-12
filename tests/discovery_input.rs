@@ -264,6 +264,47 @@ path_glob = "data/*.db"
 }
 
 #[test]
+fn config_load_rejects_unknown_migration_group_table_fields() {
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("sqlite-fleet.toml");
+    fs::write(
+        &config_path,
+        r#"
+[databases]
+discovery = "glob"
+path_glob = "data/*.db"
+
+[migration_groups.core]
+dr = "migrations/core"
+"#,
+    )
+    .unwrap();
+
+    let error = Config::load(&config_path).unwrap_err().to_string();
+    assert!(error.contains("TOML解析に失敗しました"), "{error}");
+}
+
+#[test]
+fn config_load_rejects_empty_migration_group_table() {
+    let dir = tempdir().unwrap();
+    let config_path = dir.path().join("sqlite-fleet.toml");
+    fs::write(
+        &config_path,
+        r#"
+[databases]
+discovery = "glob"
+path_glob = "data/*.db"
+
+[migration_groups.core]
+"#,
+    )
+    .unwrap();
+
+    let error = Config::load(&config_path).unwrap_err().to_string();
+    assert!(error.contains("dir または migrations が必要"), "{error}");
+}
+
+#[test]
 fn query_discovery_rejects_id_with_surrounding_whitespace() {
     let dir = tempdir().unwrap();
     let source = dir.path().join("shared.db");

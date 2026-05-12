@@ -10,16 +10,98 @@ use std::fs;
 use std::path::Path;
 
 pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
-    if config.migrations.dir.trim().is_empty() {
-        bail!("migrations.dir は空にできません");
-    }
-    validate_configured_db_path(config, "migrations.dir", &config.migrations.dir)?;
-    let dir = config.resolve_path(&config.migrations.dir);
     let mut migrations = Vec::new();
+    if config.migration_groups.is_empty() {
+        migrations.extend(load_migrations_from_dir(
+            config,
+            "migrations.dir",
+            &config.migrations.dir,
+            "default",
+        )?);
+    } else {
+        let group_configs = config.effective_migration_groups();
+        let base_migrations = if group_configs
+            .values()
+            .any(|group_config| group_config.dir.is_none())
+        {
+            Some(load_migrations_from_dir(
+                config,
+                "migrations.dir",
+                &config.migrations.dir,
+                "default",
+            )?)
+        } else {
+            None
+        };
+        for (group, group_config) in group_configs {
+            if let Some(dir) = group_config.dir.as_deref() {
+                let dir_label = format!("migration_groups.{group}.dir");
+                let mut group_migrations =
+                    load_migrations_from_dir(config, &dir_label, dir, &group)?;
+                if !group_config.migrations.is_empty() {
+                    let versions = group_config
+                        .migrations
+                        .iter()
+                        .map(String::as_str)
+                        .collect::<HashSet<_>>();
+                    group_migrations
+                        .retain(|migration| versions.contains(migration.version.as_str()));
+                    ensure_group_versions_exist(
+                        &group,
+                        &group_config.migrations,
+                        &group_migrations,
+                    )?;
+                }
+                migrations.extend(group_migrations);
+            } else {
+                let base_migrations = base_migrations
+                    .as_ref()
+                    .expect("base migrations are loaded for version-list migration groups");
+                let mut group_migrations = Vec::new();
+                for version in &group_config.migrations {
+                    let mut migration = base_migrations
+                        .iter()
+                        .find(|migration| &migration.version == version)
+                        .cloned()
+                        .with_context(|| {
+                            format!(
+                                "migration_groups.{group} が存在しないversionを参照しています: {version}"
+                            )
+                        })?;
+                    migration.group = group.clone();
+                    group_migrations.push(migration);
+                }
+                migrations.extend(group_migrations);
+            }
+        }
+    }
+
+    migrations.sort_by(|a, b| {
+        a.version_number
+            .cmp(&b.version_number)
+            .then_with(|| a.version.cmp(&b.version))
+            .then_with(|| a.group.cmp(&b.group))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    validate_migrations(config, &migrations)?;
+    Ok(migrations)
+}
+
+fn load_migrations_from_dir(
+    config: &Config,
+    dir_label: &str,
+    dir_value: &str,
+    group: &str,
+) -> Result<Vec<Migration>> {
+    if dir_value.trim().is_empty() {
+        bail!("{dir_label} は空にできません");
+    }
+    validate_configured_db_path(config, dir_label, dir_value)?;
+    let dir = config.resolve_path(dir_value);
     if !dir.exists() {
         bail!("migrations ディレクトリが存在しません: {}", dir.display());
     }
-
+    let mut migrations = Vec::new();
     for entry in fs::read_dir(&dir)
         .with_context(|| format!("migrations ディレクトリを読めません: {}", dir.display()))?
     {
@@ -42,17 +124,31 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
                 path.display()
             );
         }
-        migrations.push(parse_migration_file(&path)?);
+        let mut migration = parse_migration_file(&path)?;
+        migration.group = group.to_string();
+        migrations.push(migration);
     }
-
-    migrations.sort_by(|a, b| {
-        a.version_number
-            .cmp(&b.version_number)
-            .then_with(|| a.version.cmp(&b.version))
-            .then_with(|| a.name.cmp(&b.name))
-    });
-    validate_migrations(config, &migrations)?;
     Ok(migrations)
+}
+
+fn ensure_group_versions_exist(
+    group: &str,
+    versions: &[String],
+    migrations: &[Migration],
+) -> Result<()> {
+    for version in versions {
+        if !migrations
+            .iter()
+            .any(|migration| &migration.version == version)
+        {
+            bail!("migration_groups.{group} が存在しないversionを参照しています: {version}");
+        }
+    }
+    Ok(())
+}
+
+pub fn validate_migration(config: &Config, migration: &Migration) -> Result<()> {
+    validate_migrations(config, std::slice::from_ref(migration))
 }
 
 pub fn parse_migration_file(path: &Path) -> Result<Migration> {
@@ -99,6 +195,7 @@ pub fn parse_migration_file(path: &Path) -> Result<Migration> {
     let checksum = checksum_sql(&sql);
     Ok(Migration {
         version: version.to_string(),
+        group: "default".to_string(),
         version_number,
         name: name.to_string(),
         checksum,
@@ -114,9 +211,14 @@ pub fn checksum_sql(sql: &str) -> String {
 }
 
 pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> Result<()> {
-    let mut seen_versions = HashSet::new();
-    let mut seen_numbers = HashSet::new();
+    let mut seen_versions: std::collections::HashMap<&str, &Migration> =
+        std::collections::HashMap::new();
+    let mut seen_numbers: std::collections::HashMap<u64, &Migration> =
+        std::collections::HashMap::new();
     for migration in migrations {
+        if migration.group.trim().is_empty() || migration.group.trim() != migration.group {
+            bail!("migration group は空白なしの非空文字列である必要があります");
+        }
         config.validate_resolved_path_within_base("migration ファイル", &migration.path)?;
         let expected_file_name = format!("{}_{}.sql", migration.version, migration.name);
         if migration.path.file_name().and_then(|name| name.to_str()) != Some(&expected_file_name) {
@@ -170,14 +272,28 @@ pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> 
                 migration.checksum
             );
         }
-        if !seen_versions.insert(&migration.version) {
-            bail!("migration version が重複しています: {}", migration.version);
+        if let Some(previous) = seen_versions.insert(&migration.version, migration) {
+            if previous.name != migration.name
+                || previous.checksum != migration.checksum
+                || previous.path != migration.path
+            {
+                bail!(
+                    "migration version が重複しています: {}。同じversionを複数グループで共有する場合は同じファイルを参照してください",
+                    migration.version
+                );
+            }
         }
-        if !seen_numbers.insert(migration.version_number) {
-            bail!(
-                "migration version が数値として重複しています: {}",
-                migration.version_number
-            );
+        if let Some(previous) = seen_numbers.insert(migration.version_number, migration) {
+            if previous.version != migration.version
+                || previous.name != migration.name
+                || previous.checksum != migration.checksum
+                || previous.path != migration.path
+            {
+                bail!(
+                    "migration version が数値として重複しています: {}",
+                    migration.version_number
+                );
+            }
         }
     }
     Ok(())
