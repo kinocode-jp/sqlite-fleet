@@ -898,18 +898,21 @@
       $('databaseFileModal').hidden = true;
     }
     function renderSqlTemplates() {
-      $('sqlTemplate').innerHTML = Object.entries(sqlTemplates)
-        .map(([key, template]) => `<option value="${escapeHtml(key)}">${escapeHtml(template[0])}</option>`)
+      $('sqlTemplateOptions').innerHTML = Object.entries(sqlTemplates)
+        .map(([key, template]) => `<option value="${escapeHtml(template[0])}" data-key="${escapeHtml(key)}"></option>`)
         .join('');
       $('newMigrationTemplateOptions').innerHTML = Object.entries(sqlTemplates)
         .map(([key, template]) => `<option value="${escapeHtml(template[0])}" data-key="${escapeHtml(key)}"></option>`)
         .join('');
       const firstTemplate = Object.entries(sqlTemplates)[0];
       if (firstTemplate) {
+        $('sqlTemplate').value = firstTemplate[0];
+        $('sqlTemplateSearch').value = firstTemplate[1][0];
         $('newMigrationSqlTemplate').value = firstTemplate[0];
         $('newMigrationTemplateSearch').value = firstTemplate[1][0];
       }
-      renderMigrationSnippets();
+      renderAllSqlSnippets();
+      updateSqlInputMeta();
     }
     function renderMigrationFileGroupOptions() {
       const groups = (state && state.migration_groups ? state.migration_groups : []).map((group) => group.name);
@@ -941,6 +944,16 @@
       const partial = Object.entries(sqlTemplates).find(([key, template]) => key.toLowerCase().includes(lowerQuery) || template[0].toLowerCase().includes(lowerQuery));
       return partial ? partial[0] : null;
     }
+    function resolveSqlTemplateKey() {
+      const query = $('sqlTemplateSearch').value.trim();
+      if (!query) return $('sqlTemplate').value;
+      if (sqlTemplates[query]) return query;
+      const lowerQuery = query.toLowerCase();
+      const exact = Object.entries(sqlTemplates).find(([_key, template]) => template[0].toLowerCase() === lowerQuery);
+      if (exact) return exact[0];
+      const partial = Object.entries(sqlTemplates).find(([key, template]) => key.toLowerCase().includes(lowerQuery) || template[0].toLowerCase().includes(lowerQuery));
+      return partial ? partial[0] : null;
+    }
     function formatSqlText(sql) {
       return String(sql || '')
         .replace(/\r\n?/g, '\n')
@@ -955,10 +968,20 @@
       $('newMigrationSql').value = formatted ? `${formatted}\n` : '';
       updateNewMigrationSqlMeta();
     }
+    function formatSqlInput() {
+      const formatted = formatSqlText($('sqlInput').value);
+      $('sqlInput').value = formatted ? `${formatted}\n` : '';
+      updateSqlInputMeta();
+    }
     function clearNewMigrationSql() {
       $('newMigrationSql').value = '';
       updateNewMigrationSqlMeta();
       $('newMigrationSql').focus();
+    }
+    function clearSqlInput() {
+      $('sqlInput').value = '';
+      updateSqlInputMeta();
+      $('sqlInput').focus();
     }
     function updateNewMigrationSqlMeta() {
       const editor = $('newMigrationSql');
@@ -972,15 +995,29 @@
       renderSqlEditorVisuals();
       renderSqlCompletions();
     }
+    function updateSqlInputMeta() {
+      const editor = $('sqlInput');
+      const sql = editor.value || '';
+      const beforeCursor = sql.slice(0, editor.selectionStart || 0);
+      const lines = sql.split('\n');
+      const currentLine = beforeCursor.split('\n');
+      const bytes = new TextEncoder().encode(sql).length;
+      $('sqlInputCursor').textContent = `Ln ${currentLine.length}, Col ${currentLine[currentLine.length - 1].length + 1}`;
+      $('sqlInputStats').textContent = `${bytes} bytes / ${lines.length} lines`;
+      renderSqlInputVisuals();
+      renderSqlInputCompletions();
+    }
     function handleSqlEditorKeydown(event) {
       if (event.key === 'Tab') {
         event.preventDefault();
         insertIntoTextarea(event.target, '  ');
-        updateNewMigrationSqlMeta();
+        if (event.target.id === 'sqlInput') updateSqlInputMeta();
+        else updateNewMigrationSqlMeta();
         return;
       }
       if (event.key === 'Escape') {
-        $('newMigrationSqlCompletions').hidden = true;
+        const completionsId = event.target.id === 'sqlInput' ? 'sqlInputCompletions' : 'newMigrationSqlCompletions';
+        $(completionsId).hidden = true;
       }
     }
     function renderSqlEditorVisuals() {
@@ -996,6 +1033,20 @@
       $('newMigrationSqlHighlight').scrollTop = editor.scrollTop;
       $('newMigrationSqlHighlight').scrollLeft = editor.scrollLeft;
       $('newMigrationSqlLines').scrollTop = editor.scrollTop;
+    }
+    function renderSqlInputVisuals() {
+      const editor = $('sqlInput');
+      const sql = editor.value || '';
+      const lineCount = Math.max(1, sql.split('\n').length);
+      $('sqlInputLines').textContent = Array.from({ length: lineCount }, (_item, index) => String(index + 1)).join('\n');
+      $('sqlInputHighlight').innerHTML = highlightSql(sql || ' ');
+      syncSqlInputScroll();
+    }
+    function syncSqlInputScroll() {
+      const editor = $('sqlInput');
+      $('sqlInputHighlight').scrollTop = editor.scrollTop;
+      $('sqlInputHighlight').scrollLeft = editor.scrollLeft;
+      $('sqlInputLines').scrollTop = editor.scrollTop;
     }
     function highlightSql(sql) {
       const keywordPattern = new RegExp(`^(${sqlCompletionWords.join('|')})\\b`, 'i');
@@ -1055,9 +1106,29 @@
       const match = beforeCursor.match(/[A-Za-z_][A-Za-z0-9_]*$/);
       return match ? match[0] : '';
     }
+    function currentSqlInputToken() {
+      const editor = $('sqlInput');
+      const beforeCursor = (editor.value || '').slice(0, editor.selectionStart || 0);
+      const match = beforeCursor.match(/[A-Za-z_][A-Za-z0-9_]*$/);
+      return match ? match[0] : '';
+    }
     function renderSqlCompletions() {
       const token = currentSqlToken();
       const panel = $('newMigrationSqlCompletions');
+      if (token.length < 2) {
+        panel.hidden = true;
+        return;
+      }
+      const lowerToken = token.toLowerCase();
+      const snippets = Object.keys(loadMigrationSnippets());
+      const words = Array.from(new Set([...sqlCompletionWords, ...Object.values(sqlTemplates).map((template) => template[0]), ...snippets]));
+      const matches = words.filter((word) => word.toLowerCase().startsWith(lowerToken)).slice(0, 8);
+      panel.innerHTML = matches.map((word) => `<button type="button" data-completion="${escapeHtml(word)}">${escapeHtml(word)}</button>`).join('');
+      panel.hidden = matches.length === 0;
+    }
+    function renderSqlInputCompletions() {
+      const token = currentSqlInputToken();
+      const panel = $('sqlInputCompletions');
       if (token.length < 2) {
         panel.hidden = true;
         return;
@@ -1078,6 +1149,15 @@
       $('newMigrationSqlCompletions').hidden = true;
       updateNewMigrationSqlMeta();
     }
+    function applySqlInputCompletion(value) {
+      const editor = $('sqlInput');
+      const token = currentSqlInputToken();
+      const start = (editor.selectionStart || 0) - token.length;
+      editor.setSelectionRange(start, editor.selectionStart || 0);
+      insertIntoTextarea(editor, value);
+      $('sqlInputCompletions').hidden = true;
+      updateSqlInputMeta();
+    }
     function loadMigrationSnippets() {
       try {
         const parsed = JSON.parse(localStorage.getItem(migrationSnippetStorageKey) || '{}');
@@ -1088,12 +1168,23 @@
     }
     function saveMigrationSnippets(snippets) {
       localStorage.setItem(migrationSnippetStorageKey, JSON.stringify(snippets));
+      renderAllSqlSnippets();
+    }
+    function renderAllSqlSnippets() {
       renderMigrationSnippets();
+      renderSqlSnippets();
     }
     function renderMigrationSnippets() {
       const snippets = loadMigrationSnippets();
       const names = Object.keys(snippets).sort();
       $('newMigrationSnippetSelect').innerHTML = names.length
+        ? names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
+        : `<option value="">${escapeHtml(t('noSnippets'))}</option>`;
+    }
+    function renderSqlSnippets() {
+      const snippets = loadMigrationSnippets();
+      const names = Object.keys(snippets).sort();
+      $('sqlSnippetSelect').innerHTML = names.length
         ? names.map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join('')
         : `<option value="">${escapeHtml(t('noSnippets'))}</option>`;
     }
@@ -1109,6 +1200,18 @@
       $('newMigrationSnippetSelect').value = name;
       message(t('snippetSaved', name));
     }
+    function saveSqlSnippet() {
+      const name = $('sqlSnippetName').value.trim();
+      if (!name) {
+        message(t('enterSnippetName'), true);
+        return;
+      }
+      const snippets = loadMigrationSnippets();
+      snippets[name] = $('sqlInput').value;
+      saveMigrationSnippets(snippets);
+      $('sqlSnippetSelect').value = name;
+      message(t('snippetSaved', name));
+    }
     function insertNewMigrationSnippet() {
       const name = $('newMigrationSnippetSelect').value;
       const snippets = loadMigrationSnippets();
@@ -1120,8 +1223,31 @@
       updateNewMigrationSqlMeta();
       message(t('snippetInserted', name));
     }
+    function insertSqlSnippet() {
+      const name = $('sqlSnippetSelect').value;
+      const snippets = loadMigrationSnippets();
+      if (!name || !Object.prototype.hasOwnProperty.call(snippets, name)) {
+        message(t('chooseSnippet'), true);
+        return;
+      }
+      insertIntoTextarea($('sqlInput'), snippets[name]);
+      updateSqlInputMeta();
+      message(t('snippetInserted', name));
+    }
     function deleteNewMigrationSnippet() {
       const name = $('newMigrationSnippetSelect').value;
+      const snippets = loadMigrationSnippets();
+      if (!name || !Object.prototype.hasOwnProperty.call(snippets, name)) {
+        message(t('chooseSnippet'), true);
+        return;
+      }
+      pendingSnippetDeleteName = name;
+      $('snippetDeleteMessage').textContent = t('confirmSnippetDelete', name);
+      $('snippetDeleteModal').hidden = false;
+      $('confirmSnippetDelete').focus();
+    }
+    function deleteSqlSnippet() {
+      const name = $('sqlSnippetSelect').value;
       const snippets = loadMigrationSnippets();
       if (!name || !Object.prototype.hasOwnProperty.call(snippets, name)) {
         message(t('chooseSnippet'), true);
@@ -1261,6 +1387,7 @@
     }
     function setSql(sql) {
       $('sqlInput').value = sql;
+      updateSqlInputMeta();
       $('sqlInput').focus();
     }
     function insertIntoTextarea(textarea, text) {
@@ -1273,12 +1400,16 @@
       textarea.focus();
     }
     function insertSelectedTemplate() {
-      const template = sqlTemplates[$('sqlTemplate').value];
+      const key = resolveSqlTemplateKey();
+      const template = key ? sqlTemplates[key] : null;
       if (!template) {
         message(t('chooseTemplate'), true);
         return;
       }
-      setSql(template[1]);
+      $('sqlTemplate').value = key;
+      $('sqlTemplateSearch').value = template[0];
+      insertIntoTextarea($('sqlInput'), template[1]);
+      updateSqlInputMeta();
       message(t('templateInserted', template[0]));
     }
     function downloadSqlFile() {
@@ -1535,21 +1666,39 @@
     $('insertNewMigrationTemplate').addEventListener('click', insertNewMigrationTemplate);
     $('formatNewMigrationSql').addEventListener('click', formatNewMigrationSql);
     $('clearNewMigrationSql').addEventListener('click', clearNewMigrationSql);
+    $('formatSqlInput').addEventListener('click', formatSqlInput);
+    $('clearSqlInput').addEventListener('click', clearSqlInput);
     $('newMigrationTemplateSearch').addEventListener('input', () => {
       const key = resolveMigrationTemplateKey();
       if (key) $('newMigrationSqlTemplate').value = key;
     });
+    $('sqlTemplateSearch').addEventListener('input', () => {
+      const key = resolveSqlTemplateKey();
+      if (key) $('sqlTemplate').value = key;
+    });
     $('saveNewMigrationSnippet').addEventListener('click', saveNewMigrationSnippet);
     $('insertNewMigrationSnippet').addEventListener('click', insertNewMigrationSnippet);
     $('deleteNewMigrationSnippet').addEventListener('click', deleteNewMigrationSnippet);
+    $('saveSqlSnippet').addEventListener('click', saveSqlSnippet);
+    $('insertSqlSnippet').addEventListener('click', insertSqlSnippet);
+    $('deleteSqlSnippet').addEventListener('click', deleteSqlSnippet);
     $('newMigrationSql').addEventListener('input', updateNewMigrationSqlMeta);
     $('newMigrationSql').addEventListener('click', updateNewMigrationSqlMeta);
     $('newMigrationSql').addEventListener('keyup', updateNewMigrationSqlMeta);
     $('newMigrationSql').addEventListener('keydown', handleSqlEditorKeydown);
     $('newMigrationSql').addEventListener('scroll', syncSqlEditorScroll);
+    $('sqlInput').addEventListener('input', updateSqlInputMeta);
+    $('sqlInput').addEventListener('click', updateSqlInputMeta);
+    $('sqlInput').addEventListener('keyup', updateSqlInputMeta);
+    $('sqlInput').addEventListener('keydown', handleSqlEditorKeydown);
+    $('sqlInput').addEventListener('scroll', syncSqlInputScroll);
     $('newMigrationSqlCompletions').addEventListener('click', (event) => {
       const button = event.target.closest('button[data-completion]');
       if (button) applySqlCompletion(button.dataset.completion);
+    });
+    $('sqlInputCompletions').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-completion]');
+      if (button) applySqlInputCompletion(button.dataset.completion);
     });
     $('sqlFile').addEventListener('change', async (event) => {
       const file = event.target.files && event.target.files[0];
@@ -1574,6 +1723,7 @@
         return;
       }
       $('sqlInput').value = sql;
+      updateSqlInputMeta();
       $('sqlFileName').value = sanitizeSqlFileName(file.name);
       message(t('fileLoaded', file.name));
     });

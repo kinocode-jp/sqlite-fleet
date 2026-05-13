@@ -98,7 +98,7 @@
     fn html_escapes_dynamic_attribute_values_consistently() {
         assert!(INDEX_HTML.contains(r#"data-database="${escapeHtml(plan.database.id)}""#));
         assert!(INDEX_HTML.contains(r#"<option value="${escapeHtml(plan.database.id)}">"#));
-        assert!(INDEX_HTML.contains(r#"<option value="${escapeHtml(key)}">"#));
+        assert!(INDEX_HTML.contains(r#"<option value="${escapeHtml(template[0])}" data-key="${escapeHtml(key)}"></option>"#));
         assert!(!INDEX_HTML.contains(r#"data-database="${plan.database.id}""#));
         assert!(!INDEX_HTML.contains(r#"<option value="${plan.database.id}">"#));
     }
@@ -522,10 +522,17 @@
         assert!(INDEX_HTML.contains("基本的にはdry-runで確認してから適用してください"));
         assert!(INDEX_HTML.contains("GUI applyは自動的にatomic transactionで実行されます"));
         assert!(INDEX_HTML.contains("PRAGMA journal_modeは単独SQLとしてだけ適用できます"));
-        assert!(INDEX_HTML.contains(r#"<select id="sqlTemplate">"#));
+        assert!(INDEX_HTML.contains(r#"<input id="sqlTemplateSearch" list="sqlTemplateOptions""#));
+        assert!(INDEX_HTML.contains(r#"<input id="sqlTemplate" type="hidden">"#));
+        assert!(INDEX_HTML.contains(r#"<select id="sqlSnippetSelect" aria-label="Snippet">"#));
+        assert!(INDEX_HTML.contains(r#"<pre id="sqlInputLines" class="sql-line-numbers""#));
+        assert!(INDEX_HTML.contains(r#"<pre id="sqlInputHighlight" class="sql-highlight""#));
+        assert!(INDEX_HTML.contains(r#"id="sqlInputCompletions" class="sql-completion-list""#));
         assert!(INDEX_HTML.contains(r#"<input id="sqlFile" type="file""#));
         assert!(INDEX_HTML.contains(r#"<textarea id="sqlInput""#));
         assert!(INDEX_HTML.contains(r#"<button id="downloadSql">SQLファイル保存</button>"#));
+        assert!(INDEX_HTML.contains("$('sqlInput').addEventListener('keydown', handleSqlEditorKeydown)"));
+        assert!(INDEX_HTML.contains("function updateSqlInputMeta()"));
         assert!(INDEX_HTML.contains("new Blob([sql]"));
         assert!(INDEX_HTML.contains("sql.includes('\\u0000')"));
         assert!(INDEX_HTML.contains("SQLにNUL文字は指定できません"));

@@ -511,11 +511,41 @@
         <div class="form-grid">
           <label class="field"><span class="field-label">Target DB <span class="tool-tip" tabindex="0" data-tip="SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。">?</span></span><select id="sqlDatabase"></select></label>
           <label class="field"><span class="field-label">SQL file <span class="tool-tip" tabindex="0" data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。">?</span></span><input id="sqlFile" type="file" accept=".sql,text/sql,text/plain"></label>
-          <label class="field"><span class="field-label">SQL template <span class="tool-tip" tabindex="0" data-tip="よく使うSQLite構文をSQL欄へ挿入します。挿入後に内容を必ず確認してください。">?</span></span><select id="sqlTemplate"></select></label>
           <label class="field"><span class="field-label">Output file name <span class="tool-tip" tabindex="0" data-tip="SQL欄の内容を保存するときのファイル名です。拡張子.sqlは自動補完されます。">?</span></span><input id="sqlFileName" value="sqlite-fleet-change.sql"></label>
-          <label class="field wide"><span class="field-label">SQL <span class="tool-tip" tabindex="0" data-tip="dry-runは一時コピーで実行します。適用前にchanged件数とエラーを確認してください。">?</span></span><textarea id="sqlInput" spellcheck="false" placeholder="CREATE TABLE example(id INTEGER PRIMARY KEY);"></textarea></label>
+          <div class="field wide sql-editor">
+            <div class="sql-control-row">
+              <span class="field-label">テンプレート</span>
+              <input id="sqlTemplateSearch" list="sqlTemplateOptions" placeholder="テンプレート検索" aria-label="SQL template">
+              <datalist id="sqlTemplateOptions"></datalist>
+              <input id="sqlTemplate" type="hidden">
+              <button id="insertTemplate" type="button">テンプレート挿入</button>
+            </div>
+            <div class="sql-control-row sql-snippet-toolbar">
+              <span class="field-label">スニペット</span>
+              <select id="sqlSnippetSelect" aria-label="Snippet"></select>
+              <button id="insertSqlSnippet" type="button">挿入</button>
+              <button id="deleteSqlSnippet" type="button">削除</button>
+              <input id="sqlSnippetName" placeholder="スニペット名">
+              <button id="saveSqlSnippet" type="button">現在のSQLをスニペット保存</button>
+            </div>
+            <div class="editor-command-row">
+              <button id="formatSqlInput" type="button">フォーマット</button>
+              <button id="clearSqlInput" type="button">クリア</button>
+            </div>
+            <div class="sql-editor-shell">
+              <pre id="sqlInputLines" class="sql-line-numbers" aria-hidden="true">1</pre>
+              <div class="sql-editor-layer">
+                <pre id="sqlInputHighlight" class="sql-highlight" aria-hidden="true"></pre>
+                <textarea id="sqlInput" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="CREATE TABLE example(id INTEGER PRIMARY KEY);"></textarea>
+                <div id="sqlInputCompletions" class="sql-completion-list" hidden></div>
+              </div>
+            </div>
+            <div class="editor-meta">
+              <span id="sqlInputCursor">Ln 1, Col 1</span>
+              <span id="sqlInputStats">0 bytes / 0 lines</span>
+            </div>
+          </div>
           <div class="actions wide">
-            <button id="insertTemplate">テンプレート挿入</button>
             <button id="downloadSql">SQLファイル保存</button>
             <button id="sqlDryRun" class="primary">SQL dry-run</button>
             <button id="sqlApply" class="danger">SQLを適用</button>
