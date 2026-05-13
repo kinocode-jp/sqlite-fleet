@@ -137,6 +137,8 @@
     .check-row input { width:auto; margin:0; }
     .check-row strong { font-size:13px; overflow-wrap:anywhere; }
     .check-row span { color:var(--muted); font-size:12px; }
+    .db-selector-list { display:grid; gap:6px; max-height:360px; overflow:auto; padding:8px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
+    .db-selector-list .check-row { background:#fff; }
     .migration-assignment-editor { display:grid; grid-template-columns:320px minmax(0, 1fr); gap:14px; padding:16px; border-top:1px solid var(--line); background:var(--surface-2); }
     .migration-assignment-editor[hidden] { display:none; }
     .card-list { display:grid; gap:10px; }
@@ -328,14 +330,17 @@
       </div>
 
       <div id="dbGroupModal" class="modal-backdrop" hidden>
-        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="dbGroupModalTitle">
+        <section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="dbGroupModalTitle">
           <div class="modal-header">
             <h2 id="dbGroupModalTitle">新規DBグループ</h2>
             <button id="closeDbGroupModal" type="button" aria-label="Close">×</button>
           </div>
           <div class="modal-body">
             <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
-            <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
+            <div class="field">
+              <span class="field-label">Linked DBs</span>
+              <div id="manageDbGroupDatabases" class="db-selector-list"></div>
+            </div>
           </div>
           <div class="modal-actions">
             <button id="cancelDbGroup" type="button">キャンセル</button>
@@ -865,8 +870,9 @@
       'DB Groups': 'DBグループ',
       'Group name': 'グループ名',
       'Versions': 'Versions',
-      'DB selectors': 'DBセレクタ',
-      'DB selector': 'DBセレクタ',
+      'DB selectors': '紐づけるDB',
+      'DB selector': 'DB指定',
+      'Linked DBs': '紐づけるDB',
       'Migration groups': 'マイグレーショングループ',
       'Applied Migration Groups': '適用マイグレーショングループ',
       'Migration files': 'マイグレーションファイル',

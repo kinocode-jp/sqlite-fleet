@@ -464,6 +464,17 @@
     function truncateCode(value) {
       return `<span class="truncate-text" title="${escapeHtml(value)}"><code>${escapeHtml(value)}</code></span>`;
     }
+    function renderDbGroupDatabaseOptions() {
+      const plans = state.status && state.status.plans ? state.status.plans : [];
+      $('manageDbGroupDatabases').innerHTML = plans.length ? plans.map((plan) => {
+        const id = plan.database.id;
+        const path = plan.database.path;
+        return `<label class="check-row" title="${escapeHtml(`${id} - ${path}`)}">
+          <input type="checkbox" value="${escapeHtml(id)}">
+          <span><strong class="truncate-text">${escapeHtml(id)}</strong><span class="truncate-text">${escapeHtml(path)}</span></span>
+        </label>`;
+      }).join('') : `<span class="muted">${escapeHtml(t('noDb'))}</span>`;
+    }
     function otherGroupsText(groups) {
       const text = groups && groups.length ? `${t('otherGroupsLabel')}: ${groups.join(', ')}` : '';
       return text ? `<div class="muted truncate-text" title="${escapeHtml(text)}">${escapeHtml(text)}</div>` : '';
@@ -766,7 +777,7 @@
     }
     function openDbGroupModal() {
       $('manageDbGroupName').value = '';
-      $('manageDbGroupSelectors').value = '';
+      renderDbGroupDatabaseOptions();
       $('dbGroupModal').hidden = false;
       $('manageDbGroupName').focus();
     }
@@ -775,9 +786,10 @@
     }
     async function saveDbGroup() {
       try {
+        const selectors = Array.from($('manageDbGroupDatabases').querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
         await postAdmin('/api/admin/db-group', {
           name: $('manageDbGroupName').value,
-          selectors: csvList($('manageDbGroupSelectors').value),
+          selectors,
         });
         closeDbGroupModal();
       } catch (error) {
