@@ -241,6 +241,85 @@ fn migration_group_membership_can_share_fixed_migration_files() {
 }
 
 #[test]
+fn shared_filename_across_groups_is_only_applied_once_per_database() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("data")).unwrap();
+    fs::create_dir_all(dir.path().join("migrations")).unwrap();
+    let db = dir.path().join("data").join("tenant.db");
+    create_db(&db, "base_items");
+    fs::write(
+        dir.path().join("migrations").join("001_shared.sql"),
+        "CREATE TABLE shared_items(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("migrations").join("001_other.sql"),
+        "CREATE TABLE other_items(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+
+    let mut config = base_config(&dir);
+    config.migration_groups = HashMap::from([
+        (
+            "a".to_string(),
+            MigrationGroupConfig::versions(vec!["001_shared.sql".to_string()]),
+        ),
+        (
+            "m".to_string(),
+            MigrationGroupConfig::versions(vec!["001_other.sql".to_string()]),
+        ),
+        (
+            "z".to_string(),
+            MigrationGroupConfig::versions(vec!["001_shared.sql".to_string()]),
+        ),
+    ]);
+    config.database_migration_groups = HashMap::from([(
+        "tenant".to_string(),
+        vec!["a".to_string(), "m".to_string(), "z".to_string()],
+    )]);
+
+    let report = migrate_with_options(
+        &config,
+        MigrateOptions {
+            dry_run: false,
+            selection: DatabaseSelection::default(),
+            backup_before_migrate: Some(false),
+        },
+    )
+    .unwrap();
+
+    assert_eq!(report.databases[0].applied.len(), 2);
+    assert!(table_exists(&db, "shared_items"));
+    assert!(table_exists(&db, "other_items"));
+}
+
+#[test]
+fn migration_group_version_reference_rejects_ambiguous_duplicate_versions() {
+    let dir = tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("data")).unwrap();
+    fs::create_dir_all(dir.path().join("migrations")).unwrap();
+    fs::write(
+        dir.path().join("migrations").join("001_a.sql"),
+        "CREATE TABLE a(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("migrations").join("001_b.sql"),
+        "CREATE TABLE b(id INTEGER PRIMARY KEY);",
+    )
+    .unwrap();
+
+    let mut config = base_config(&dir);
+    config.migration_groups = HashMap::from([(
+        "premium".to_string(),
+        MigrationGroupConfig::versions(vec!["001".to_string()]),
+    )]);
+
+    let error = load_migrations(&config).unwrap_err().to_string();
+    assert!(error.contains("versionとして曖昧です"));
+}
+
+#[test]
 fn runtime_migrate_rejects_unknown_database_migration_group() {
     let dir = tempdir().unwrap();
     fs::create_dir_all(dir.path().join("data")).unwrap();

@@ -21,7 +21,8 @@ fn operation_failure_takes_precedence_over_report_write_failure() {
     let conn = Connection::open(&db_path).unwrap();
     conn.execute(
         "CREATE TABLE _sqlite_fleet_migrations (
-            version TEXT PRIMARY KEY NOT NULL,
+            filename TEXT PRIMARY KEY NOT NULL,
+            version TEXT NOT NULL,
             name TEXT NOT NULL,
             checksum TEXT NOT NULL,
             applied_at INTEGER NOT NULL,
@@ -31,8 +32,8 @@ fn operation_failure_takes_precedence_over_report_write_failure() {
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO _sqlite_fleet_migrations (version, name, checksum, applied_at, execution_ms)
-         VALUES ('999', 'future_change', 'abc', 1, 1)",
+        "INSERT INTO _sqlite_fleet_migrations (filename, version, name, checksum, applied_at, execution_ms)
+         VALUES ('999_future_change.sql', '999', 'future_change', 'abc', 1, 1)",
         [],
     )
     .unwrap();

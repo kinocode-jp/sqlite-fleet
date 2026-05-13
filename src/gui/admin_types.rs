@@ -15,6 +15,7 @@ struct StateData {
 #[derive(Serialize)]
 struct MigrationData {
     group: String,
+    filename: String,
     version: String,
     name: String,
     checksum: String,
@@ -282,6 +283,19 @@ fn clean_version(value: &str) -> Result<String> {
     if !value.chars().all(|ch| ch.is_ascii_digit()) {
         bail!("version はASCII数字だけ使用できます: {value}");
     }
+    Ok(value)
+}
+
+fn clean_migration_id(value: &str) -> Result<String> {
+    let value = clean_name(value, "migration file name")?;
+    if value.contains('/') || value.contains('\\') {
+        let path = PathBuf::from(&value);
+        let Some(filename) = path.file_name().and_then(|filename| filename.to_str()) else {
+            bail!("migration file name が不正です: {value}");
+        };
+        return clean_migration_id(filename);
+    }
+    sqlite_fleet::parse_migration_file_name(&value)?;
     Ok(value)
 }
 

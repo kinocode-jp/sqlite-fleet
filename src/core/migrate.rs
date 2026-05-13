@@ -219,9 +219,9 @@ fn migrate_database_inner(
     dry_run: bool,
 ) -> Result<DatabaseMigrationResult> {
     let migrations = migrations_for_database(config, database, migrations);
-    let known_versions = migrations
+    let known_filenames = migrations
         .iter()
-        .map(|migration| migration.version.as_str())
+        .map(|migration| migration.filename.as_str())
         .collect::<HashSet<_>>();
     validate_runtime_config(config)?;
     validate_database_id(&database.id)?;
@@ -238,28 +238,29 @@ fn migrate_database_inner(
     conn.busy_timeout(std::time::Duration::from_millis(
         config.execution.lock_timeout_ms,
     ))?;
-    let applied = read_applied_migrations(&conn, config.migrations_table())?;
-    let applied_by_version: HashMap<&str, &AppliedMigration> =
-        applied.iter().map(|m| (m.version.as_str(), m)).collect();
-    let unknown_versions = applied
+    let applied =
+        read_applied_migrations_with_catalog(&conn, config.migrations_table(), &migrations)?;
+    let applied_by_filename: HashMap<&str, &AppliedMigration> =
+        applied.iter().map(|m| (m.filename.as_str(), m)).collect();
+    let unknown_filenames = applied
         .iter()
-        .filter(|migration| !known_versions.contains(migration.version.as_str()))
-        .map(|migration| migration.version.as_str())
+        .filter(|migration| !known_filenames.contains(migration.filename.as_str()))
+        .map(|migration| migration.filename.as_str())
         .collect::<Vec<_>>();
-    if !unknown_versions.is_empty() {
+    if !unknown_filenames.is_empty() {
         bail!(
             "対象外またはローカルに存在しない適用済みmigrationがあります: {}",
-            unknown_versions.join(", ")
+            unknown_filenames.join(", ")
         );
     }
 
     let mut checksum_errors = Vec::new();
     for migration in &migrations {
-        if let Some(applied) = applied_by_version.get(migration.version.as_str()) {
+        if let Some(applied) = applied_by_filename.get(migration.filename.as_str()) {
             if applied.checksum != migration.checksum {
                 checksum_errors.push(format!(
                     "{} のchecksumが一致しません expected={} actual={}",
-                    migration.version, migration.checksum, applied.checksum
+                    migration.filename, migration.checksum, applied.checksum
                 ));
             }
         }
@@ -267,10 +268,13 @@ fn migrate_database_inner(
     if !checksum_errors.is_empty() {
         bail!("{}", checksum_errors.join(", "));
     }
+    if !dry_run {
+        migrate_legacy_migrations_table(&mut conn, config.migrations_table(), &migrations)?;
+    }
 
     let pending_migrations: Vec<&Migration> = migrations
         .iter()
-        .filter(|migration| !applied_by_version.contains_key(migration.version.as_str()))
+        .filter(|migration| !applied_by_filename.contains_key(migration.filename.as_str()))
         .collect();
     let pending = pending_migrations
         .iter()
@@ -336,10 +340,11 @@ fn migrate_database_inner(
         let execution_ms = start.elapsed().as_millis().min(i64::MAX as u128) as i64;
         if let Err(error) = tx.execute(
             &format!(
-                "INSERT INTO main.{} (version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO main.{} (filename, version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 config.migrations_table()
             ),
             params![
+                migration.filename,
                 migration.version,
                 migration.name,
                 migration.checksum,
@@ -352,7 +357,7 @@ fn migrate_database_inner(
                 &pending,
                 format!(
                     "migration 履歴を保存できません: {}: {error}",
-                    migration.version
+                    migration.filename
                 ),
             ));
         }
@@ -390,4 +395,3 @@ fn failed_migration_result(
         error: Some(error),
     }
 }
-

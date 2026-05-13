@@ -66,15 +66,17 @@ fn api_migrations(
         .map(|migration| {
             Ok(MigrationData {
                 group: migration.group.clone(),
+                filename: migration.filename.clone(),
                 version: migration.version.clone(),
                 name: migration.name.clone(),
                 checksum: migration.checksum.clone(),
                 path: migration.path.clone(),
                 sql: migration.sql.clone(),
-                applied_databases: applied_databases_for_version(
+                applied_databases: applied_databases_for_filename(
                     config,
                     databases,
-                    &migration.version,
+                    migrations,
+                    &migration.filename,
                     false,
                 )?,
             })
@@ -82,10 +84,11 @@ fn api_migrations(
         .collect()
 }
 
-fn applied_databases_for_version(
+fn applied_databases_for_filename(
     config: &Config,
     databases: &[sqlite_fleet::Database],
-    version: &str,
+    migrations: &[sqlite_fleet::Migration],
+    filename: &str,
     strict: bool,
 ) -> Result<Vec<String>> {
     let mut applied_databases = Vec::new();
@@ -94,13 +97,15 @@ fn applied_databases_for_version(
             continue;
         }
         let applied = match open_gui_database(config, database, true)
-            .and_then(|conn| read_applied_migrations(&conn, config.migrations_table()))
+            .and_then(|conn| {
+                read_applied_migrations_with_catalog(&conn, config.migrations_table(), migrations)
+            })
         {
             Ok(applied) => applied,
             Err(error) if strict => return Err(error),
             Err(_) => continue,
         };
-        if applied.iter().any(|migration| migration.version == version) {
+        if applied.iter().any(|migration| migration.filename == filename) {
             applied_databases.push(database.id.clone());
         }
     }
@@ -374,14 +379,14 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     let request: MigrationGroupRequest =
         serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
     let name = clean_name(&request.name, "Migration group name")?;
-    let mut versions = clean_version_list(request.versions)?;
+    let mut migrations = clean_migration_id_list(request.versions)?;
     let mut config = locked_config(state)?;
     let existed = config.migration_groups.contains_key(&name);
     if config.migration_groups.is_empty() && name != MAIN_MIGRATION_GROUP {
         let main_versions = if config.resolve_path(&config.migrations.dir).exists() {
             load_migrations(&config)?
                 .into_iter()
-                .map(|migration| migration.version)
+                .map(|migration| migration.filename)
                 .collect::<Vec<_>>()
         } else {
             Vec::new()
@@ -391,19 +396,19 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
             MigrationGroupConfig::versions(main_versions),
         );
     }
-    if !existed && name != MAIN_MIGRATION_GROUP && versions.is_empty() {
-        versions = config
+    if !existed && name != MAIN_MIGRATION_GROUP && migrations.is_empty() {
+        migrations = config
             .migration_groups
             .get(MAIN_MIGRATION_GROUP)
             .map(|group| group.migrations.clone())
             .unwrap_or_default();
     }
     match config.migration_groups.get_mut(&name) {
-        Some(group) => group.migrations = versions,
+        Some(group) => group.migrations = migrations,
         None => {
             config
                 .migration_groups
-                .insert(name.clone(), MigrationGroupConfig::versions(versions));
+                .insert(name.clone(), MigrationGroupConfig::versions(migrations));
         }
     }
     persist_config(state, config)?;
@@ -412,10 +417,10 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     )))
 }
 
-fn clean_version_list(values: Vec<String>) -> Result<Vec<String>> {
+fn clean_migration_id_list(values: Vec<String>) -> Result<Vec<String>> {
     let mut cleaned = Vec::new();
     for value in values {
-        let value = clean_version(&value)?;
+        let value = clean_migration_id(&value)?;
         if !cleaned.contains(&value) {
             cleaned.push(value);
         }
@@ -499,7 +504,7 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
             migrations_dir.display()
         )
     })?;
-    let path = migrations_dir.join(filename);
+    let path = migrations_dir.join(&filename);
     validate_path_stays_in_base(&config, &path, "migration file")?;
     if path.exists() {
         bail!("migration file は既に存在します: {}", path.display());
@@ -514,8 +519,8 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
             .entry(group)
             .or_insert_with(|| MigrationGroupConfig::versions(Vec::new()));
         let tracks_all_dir_migrations = entry.dir.is_some() && entry.migrations.is_empty();
-        if !tracks_all_dir_migrations && !entry.migrations.iter().any(|item| item == &version) {
-            entry.migrations.push(version.clone());
+        if !tracks_all_dir_migrations && !entry.migrations.iter().any(|item| item == &filename) {
+            entry.migrations.push(filename.clone());
         }
     }
     if let Err(error) = load_migrations(&config) {
@@ -535,7 +540,7 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
 fn api_update_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationFileUpdateRequest =
         serde_json::from_slice(&body).context("migration file update request body のJSONが不正です")?;
-    let version = clean_version(&request.version)?;
+    let request_version = clean_version(&request.version)?;
     let group = clean_name(&request.group, "Migration group name")?;
     let sql = request.sql.trim();
     if sql.is_empty() {
@@ -546,24 +551,31 @@ fn api_update_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
     }
     let config = locked_config(state)?;
     let databases = discover_databases(&config)?;
-    let applied_databases = applied_databases_for_version(&config, &databases, &version, true)?;
+    let migrations = load_migrations(&config)?;
+    let requested_path = PathBuf::from(request.path.trim());
+    if requested_path.as_os_str().is_empty() {
+        bail!("migration file path は空にできません");
+    }
+    validate_path_stays_in_base(&config, &requested_path, "migration file")?;
+    let filename = requested_path
+        .file_name()
+        .and_then(|filename| filename.to_str())
+        .ok_or_else(|| anyhow::anyhow!("migration file name が不正です"))?;
+    let filename = clean_migration_id(filename)?;
+    let applied_databases =
+        applied_databases_for_filename(&config, &databases, &migrations, &filename, true)?;
     if !applied_databases.is_empty() {
         bail!(
             "このmigrationは既にDBへ適用済みのため編集できません: {}",
             applied_databases.join(", ")
         );
     }
-    let requested_path = PathBuf::from(request.path.trim());
-    if requested_path.as_os_str().is_empty() {
-        bail!("migration file path は空にできません");
-    }
-    validate_path_stays_in_base(&config, &requested_path, "migration file")?;
-    let migrations = load_migrations(&config)?;
     let migration = migrations
         .iter()
         .find(|migration| {
             migration.group == group
-                && migration.version == version
+                && migration.filename == filename
+                && migration.version == request_version
                 && paths_equal(&migration.path, &requested_path)
         })
         .ok_or_else(|| anyhow::anyhow!("指定されたmigration fileが見つかりません"))?;

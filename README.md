@@ -98,8 +98,8 @@ dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
 [migration_groups]
-main = ["001", "002"]
-premium = ["001", "002", "101"]
+main = ["001_create_items.sql", "002_add_item_index.sql"]
+premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscription.sql"]
 
 [database_migration_groups]
 tenant-a = ["main", "premium"]
@@ -157,7 +157,7 @@ path_template = "./data/tenants/{id:08:split2}.db"
 
 ## マイグレーションファイル
 
-マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` 形式で置きます。マイグレーショングループはファイルの物理配置ではなく、`[migration_groups]` の version リストで所属を管理します。同じmigrationを複数グループへ所属させても、同じSQLファイルとchecksumを参照するため、履歴は壊れません。
+マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` または `<name>_<version>.sql` 形式で置きます。マイグレーショングループはファイルの物理配置ではなく、`[migration_groups]` のファイル名リストで所属を管理します。同じmigrationを複数グループへ所属させても、同じファイル名はDBごとに1回だけ適用されます。
 
 ```text
 migrations/
@@ -168,13 +168,13 @@ migrations/
 
 ```toml
 [migration_groups]
-main = ["001", "002"]
-premium = ["001", "002", "101"]
+main = ["001_create_items.sql", "002_add_item_index.sql"]
+premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscription.sql"]
 ```
 
-`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + version リスト形式を推奨します。
+`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + ファイル名リスト形式を推奨します。古い設定向けに `001` のようなversion指定も単一ファイルに一致する場合だけ読み込めますが、同じversionのファイルが複数ある場合は曖昧として拒否されます。
 
-各DBには `_sqlite_fleet_migrations` が作成され、適用済み version、name、checksum、適用時刻、実行時間が保存されます。
+各DBには `_sqlite_fleet_migrations` が作成され、適用済みファイル名、version、name、checksum、適用時刻、実行時間が保存されます。
 
 `status`、`plan`、`check`、`migrate --dry-run` は読み取り系コマンドとして扱い、対象DBに管理テーブルを作成しません。管理テーブルは実際に `migrate` で適用するときだけ作成します。
 
@@ -206,7 +206,7 @@ sqlite-fleet restore --database tenant-a --from ./backups/tenant-a/1770000000000
 
 ## マイグレーショングループ、DBグループ、カナリア
 
-`[migration_groups]` で「どのmigration versionがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `main` が対象です。
+`[migration_groups]` で「どのmigrationファイルがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `main` が対象です。
 
 `[db_groups]` でDB IDまたはDBパスselectorのまとまりを定義できます。DB Groupの標準は全DBを表す `all` です。`--limit` と組み合わせるとカナリア適用に使えます。旧設定名 `[groups]` も互換のため読み込めます。
 
@@ -223,7 +223,7 @@ tenant-b -> main
 canary   -> tenant-a, tenant-b
 ```
 
-注意: 現在の履歴テーブルは `version` を主キーにするため、複数のマイグレーショングループを使う場合も migration version は全体で一意にしてください。例えば `main` と `premium` で別内容の `001_...sql` を同時使用する構成は拒否されます。
+注意: 現在の履歴テーブルはマイグレーションファイル名を主キーにします。同じ `001` や日付バージョンを複数のファイル名で使えますが、同じファイル名を別内容で重複させる構成は拒否されます。
 
 ## スキーマdrift
 

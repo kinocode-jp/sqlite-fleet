@@ -410,7 +410,7 @@ fn load_migrations_rejects_sql_directory_entry() {
 }
 
 #[test]
-fn direct_database_apis_reject_duplicate_migration_versions() {
+fn direct_database_apis_allow_duplicate_versions_with_different_filenames() {
     let dir = tempdir().unwrap();
     let db_path = dir.path().join("tenant.db");
     Connection::open(&db_path).unwrap();
@@ -430,15 +430,15 @@ fn direct_database_apis_reject_duplicate_migration_versions() {
     ];
 
     let plan = build_database_plan(&config, &database, &migrations);
-    assert!(plan.error.unwrap().contains("数値として重複"));
+    assert!(plan.error.is_none());
+    assert_eq!(plan.pending.len(), 2);
 
     let migrate_result = migrate_database(&config, &database, &migrations, true);
-    assert!(!migrate_result.success);
-    assert!(migrate_result.error.unwrap().contains("数値として重複"));
+    assert!(migrate_result.success);
+    assert_eq!(migrate_result.pending.len(), 2);
 
     let check_result = check_database(&config, &database, &migrations);
-    assert!(!check_result.success);
-    assert!(check_result.error.unwrap().contains("数値として重複"));
+    assert!(check_result.success);
 }
 
 #[test]
@@ -580,13 +580,15 @@ fn migration_summary_input(
     base_dir: &std::path::Path,
 ) -> Migration {
     let sql = format!("CREATE TABLE {name}(id);");
+    let filename = format!("{version}_{name}.sql");
     Migration {
         group: "main".to_string(),
+        filename: filename.clone(),
         version: version.to_string(),
         version_number,
         name: name.to_string(),
         checksum: sqlite_fleet::checksum_sql(&sql),
-        path: base_dir.join(format!("{version}_{name}.sql")),
+        path: base_dir.join(filename),
         sql,
     }
 }

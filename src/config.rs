@@ -211,6 +211,7 @@ pub struct Database {
 #[derive(Debug, Clone, Serialize)]
 pub struct Migration {
     pub group: String,
+    pub filename: String,
     pub version: String,
     #[serde(skip_serializing)]
     pub version_number: u64,
@@ -223,6 +224,7 @@ pub struct Migration {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct AppliedMigration {
+    pub filename: String,
     pub version: String,
     pub name: String,
     pub checksum: String,
@@ -244,6 +246,7 @@ pub struct DatabasePlan {
 #[derive(Debug, Clone, Serialize)]
 pub struct MigrationSummary {
     pub group: String,
+    pub filename: String,
     pub version: String,
     pub name: String,
     pub checksum: String,
@@ -251,6 +254,7 @@ pub struct MigrationSummary {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ChecksumError {
+    pub filename: String,
     pub version: String,
     pub expected: String,
     pub actual: String,
@@ -533,18 +537,20 @@ impl Config {
                 }
                 validate_configured_db_path(self, &format!("migration_groups.{group}.dir"), dir)?;
             }
-            let mut versions = std::collections::HashSet::new();
-            for version in &config.migrations {
-                if version.trim().is_empty() || version.trim() != version {
-                    bail!("migration_groups.{group} のversionは空白なしの非空文字列である必要があります");
-                }
-                if !version.chars().all(|ch| ch.is_ascii_digit()) {
+            let mut migrations = std::collections::HashSet::new();
+            for migration in &config.migrations {
+                if migration.trim().is_empty() || migration.trim() != migration {
                     bail!(
-                        "migration_groups.{group} のversionはASCII数字のみ使用できます: {version}"
+                        "migration_groups.{group} のmigrationは空白なしの非空文字列である必要があります"
                     );
                 }
-                if !versions.insert(version) {
-                    bail!("migration_groups.{group} のversionが重複しています: {version}");
+                if migration.contains('/') || migration.contains('\\') {
+                    bail!(
+                        "migration_groups.{group} のmigrationにパス区切りは使用できません: {migration}"
+                    );
+                }
+                if !migrations.insert(migration) {
+                    bail!("migration_groups.{group} のmigrationが重複しています: {migration}");
                 }
             }
         }

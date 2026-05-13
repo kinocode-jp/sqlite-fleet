@@ -205,7 +205,8 @@ fn unknown_applied_migration_is_reported_as_corrupt_and_blocks_migrate() {
     let conn = Connection::open(&db_path).unwrap();
     conn.execute(
         "CREATE TABLE _sqlite_fleet_migrations (
-            version TEXT PRIMARY KEY NOT NULL,
+            filename TEXT PRIMARY KEY NOT NULL,
+            version TEXT NOT NULL,
             name TEXT NOT NULL,
             checksum TEXT NOT NULL,
             applied_at INTEGER NOT NULL,
@@ -215,8 +216,8 @@ fn unknown_applied_migration_is_reported_as_corrupt_and_blocks_migrate() {
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO _sqlite_fleet_migrations (version, name, checksum, applied_at, execution_ms)
-         VALUES ('999', 'future_change', 'abc', 1, 1)",
+        "INSERT INTO _sqlite_fleet_migrations (filename, version, name, checksum, applied_at, execution_ms)
+         VALUES ('999_future_change.sql', '999', 'future_change', 'abc', 1, 1)",
         [],
     )
     .unwrap();
@@ -260,7 +261,8 @@ fn checksum_error_reports_local_expected_and_database_actual() {
     let conn = Connection::open(&db_path).unwrap();
     conn.execute(
         "CREATE TABLE _sqlite_fleet_migrations (
-            version TEXT PRIMARY KEY NOT NULL,
+            filename TEXT PRIMARY KEY NOT NULL,
+            version TEXT NOT NULL,
             name TEXT NOT NULL,
             checksum TEXT NOT NULL,
             applied_at INTEGER NOT NULL,
@@ -270,8 +272,8 @@ fn checksum_error_reports_local_expected_and_database_actual() {
     )
     .unwrap();
     conn.execute(
-        "INSERT INTO _sqlite_fleet_migrations (version, name, checksum, applied_at, execution_ms)
-         VALUES ('001', 'create_items', 'stored-checksum', 1, 1)",
+        "INSERT INTO _sqlite_fleet_migrations (filename, version, name, checksum, applied_at, execution_ms)
+         VALUES ('001_create_items.sql', '001', 'create_items', 'stored-checksum', 1, 1)",
         [],
     )
     .unwrap();

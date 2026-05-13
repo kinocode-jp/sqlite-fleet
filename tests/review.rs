@@ -125,7 +125,7 @@ fn migrate_rejects_invalid_history_table_before_applying_sql() {
     let db_path = data_dir.join("tenant.db");
     let conn = Connection::open(&db_path).unwrap();
     conn.execute(
-        "CREATE TABLE _sqlite_fleet_migrations (version TEXT PRIMARY KEY)",
+        "CREATE TABLE _sqlite_fleet_migrations (filename TEXT PRIMARY KEY)",
         [],
     )
     .unwrap();

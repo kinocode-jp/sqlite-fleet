@@ -135,7 +135,7 @@ fn sorts_migrations_by_numeric_version() {
 }
 
 #[test]
-fn rejects_numeric_duplicate_migration_versions() {
+fn allows_same_numeric_version_with_different_filenames() {
     let dir = tempdir().unwrap();
     let migrations_dir = dir.path().join("migrations");
     fs::create_dir_all(&migrations_dir).unwrap();
@@ -154,8 +154,42 @@ fn rejects_numeric_duplicate_migration_versions() {
         ..Config::default()
     };
 
-    let error = load_migrations(&config).unwrap_err().to_string();
-    assert!(error.contains("数値として重複"));
+    let migrations = load_migrations(&config).unwrap();
+    assert_eq!(migrations.len(), 2);
+    assert_eq!(migrations[0].filename, "001_one.sql");
+    assert_eq!(migrations[1].filename, "1_duplicate.sql");
+}
+
+#[test]
+fn sorts_same_version_and_name_by_filename() {
+    let dir = tempdir().unwrap();
+    let migrations_dir = dir.path().join("migrations");
+    fs::create_dir_all(&migrations_dir).unwrap();
+    fs::write(
+        migrations_dir.join("add_user_001.sql"),
+        "CREATE TABLE add_user_suffix(id);",
+    )
+    .unwrap();
+    fs::write(
+        migrations_dir.join("001_add_user.sql"),
+        "CREATE TABLE add_user_prefix(id);",
+    )
+    .unwrap();
+    let config = Config {
+        base_dir: dir.path().to_path_buf(),
+        migrations: MigrationsConfig {
+            dir: "migrations".to_string(),
+            ..MigrationsConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let migrations = load_migrations(&config).unwrap();
+    let filenames = migrations
+        .iter()
+        .map(|migration| migration.filename.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(filenames, vec!["001_add_user.sql", "add_user_001.sql"]);
 }
 
 #[test]

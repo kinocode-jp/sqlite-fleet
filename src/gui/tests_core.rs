@@ -434,7 +434,7 @@
             "legacy".to_string(),
             MigrationGroupConfig {
                 dir: Some("legacy_migrations".to_string()),
-                migrations: vec!["001".to_string()],
+                migrations: vec!["001_initial.sql".to_string()],
             },
         );
         let config_path = dir.path().join("sqlite-fleet.toml");
@@ -442,14 +442,14 @@
 
         api_save_migration_group(
             &state,
-            br#"{"name":"legacy","versions":["001","002"]}"#.to_vec(),
+            br#"{"name":"legacy","versions":["001_initial.sql","002_more.sql"]}"#.to_vec(),
         )
         .unwrap();
 
         let config = state.config.lock().unwrap();
         let group = config.migration_groups.get("legacy").unwrap();
         assert_eq!(group.dir.as_deref(), Some("legacy_migrations"));
-        assert_eq!(group.migrations, vec!["001", "002"]);
+        assert_eq!(group.migrations, vec!["001_initial.sql", "002_more.sql"]);
         let saved = std::fs::read_to_string(config_path).unwrap();
         assert!(saved.contains("dir = \"legacy_migrations\""), "{saved}");
     }
@@ -488,7 +488,7 @@
                 .get("main")
                 .unwrap()
                 .migrations,
-            vec!["001", "002"]
+            vec!["001_initial.sql", "002_more.sql"]
         );
         assert_eq!(
             config
@@ -496,7 +496,7 @@
                 .get("premium")
                 .unwrap()
                 .migrations,
-            vec!["001", "002"]
+            vec!["001_initial.sql", "002_more.sql"]
         );
         let migrations = load_migrations(&config).unwrap();
         let versions = migrations
@@ -684,6 +684,45 @@
     }
 
     #[test]
+    fn api_create_migration_file_adds_filename_to_explicit_group() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::write(
+            migration_dir.join("001_initial.sql"),
+            "CREATE TABLE initial(id INTEGER);",
+        )
+        .unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        config.migration_groups.insert(
+            "premium".to_string(),
+            MigrationGroupConfig::versions(vec!["001_initial.sql".to_string()]),
+        );
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_create_migration_file(
+            &state,
+            br#"{"version":"001","name":"second","group":"premium","sql":"CREATE TABLE second(id INTEGER);"}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(
+            config
+                .migration_groups
+                .get("premium")
+                .unwrap()
+                .migrations,
+            vec!["001_initial.sql", "001_second.sql"]
+        );
+        let migrations = load_migrations(&config).unwrap();
+        assert_eq!(migrations.len(), 2);
+    }
+
+    #[test]
     fn api_update_migration_file_allows_unapplied_migration() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");
@@ -695,6 +734,34 @@
             ..Config::default()
         };
         let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+        let body = serde_json::json!({
+            "path": migration_path,
+            "version": "001",
+            "group": "main",
+            "sql": "CREATE TABLE initial(id INTEGER PRIMARY KEY);"
+        });
+
+        api_update_migration_file(&state, serde_json::to_vec(&body).unwrap()).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&migration_path).unwrap(),
+            "CREATE TABLE initial(id INTEGER PRIMARY KEY);"
+        );
+    }
+
+    #[test]
+    fn api_update_migration_file_allows_parent_path_with_spaces() {
+        let dir = tempfile::tempdir().unwrap();
+        let project_dir = dir.path().join("project with spaces");
+        let migration_dir = project_dir.join("migrations");
+        std::fs::create_dir_all(&migration_dir).unwrap();
+        let migration_path = migration_dir.join("001_initial.sql");
+        std::fs::write(&migration_path, "CREATE TABLE initial(id INTEGER);").unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(&project_dir).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, project_dir.join("sqlite-fleet.toml"));
         let body = serde_json::json!({
             "path": migration_path,
             "version": "001",
@@ -733,10 +800,10 @@
         sqlite_fleet::ensure_migrations_table(&conn, config.migrations_table()).unwrap();
         conn.execute(
             &format!(
-                "INSERT INTO {} (version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5)",
+                "INSERT INTO {} (filename, version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 config.migrations_table()
             ),
-            ("001", "initial", "old", 1_i64, 1_i64),
+            ("001_initial.sql", "001", "initial", "old", 1_i64, 1_i64),
         )
         .unwrap();
         config.validate().unwrap();
@@ -872,11 +939,11 @@
 
         let result = api_create_migration_file(
             &state,
-            br#"{"version":"001","name":"duplicate","group":"main","sql":"CREATE TABLE duplicate(id INTEGER);"}"#.to_vec(),
+            br#"{"version":"002","name":"bad","group":"main","sql":"VACUUM;"}"#.to_vec(),
         );
         assert!(result.is_err());
 
-        assert!(!migration_dir.join("001_duplicate.sql").exists());
+        assert!(!migration_dir.join("002_bad.sql").exists());
         let config = state.config.lock().unwrap();
         assert!(config.migration_groups.is_empty());
         let migrations = load_migrations(&config).unwrap();

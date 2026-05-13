@@ -2,6 +2,7 @@ impl From<&Migration> for MigrationSummary {
     fn from(migration: &Migration) -> Self {
         Self {
             group: migration.group.clone(),
+            filename: migration.filename.clone(),
             version: migration.version.clone(),
             name: migration.name.clone(),
             checksum: migration.checksum.clone(),
@@ -13,6 +14,7 @@ impl From<&AppliedMigration> for MigrationSummary {
     fn from(migration: &AppliedMigration) -> Self {
         Self {
             group: "unknown".to_string(),
+            filename: migration.filename.clone(),
             version: migration.version.clone(),
             name: migration.name.clone(),
             checksum: migration.checksum.clone(),

@@ -35,7 +35,7 @@ table = "_sqlite_fleet_migrations"
 
 # Uncomment after creating matching files in migrations/.
 # [migration_groups]
-# main = ["001", "002"]
+# main = ["001_create_items.sql", "002_add_item_index.sql"]
 
 # [db_groups]
 # canary = ["tenant-a"]

@@ -5,7 +5,6 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Context, Result};
 use sha2::{Digest, Sha256};
-use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
@@ -39,14 +38,7 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
                 let mut group_migrations =
                     load_migrations_from_dir(config, &dir_label, dir, &group)?;
                 if !group_config.migrations.is_empty() {
-                    let versions = group_config
-                        .migrations
-                        .iter()
-                        .map(String::as_str)
-                        .collect::<HashSet<_>>();
-                    group_migrations
-                        .retain(|migration| versions.contains(migration.version.as_str()));
-                    ensure_group_versions_exist(
+                    group_migrations = resolve_group_migrations(
                         &group,
                         &group_config.migrations,
                         &group_migrations,
@@ -60,20 +52,14 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
                 let base_migrations = base_migrations
                     .as_ref()
                     .expect("base migrations are loaded for version-list migration groups");
-                let mut group_migrations = Vec::new();
-                for version in &group_config.migrations {
-                    let mut migration = base_migrations
-                        .iter()
-                        .find(|migration| &migration.version == version)
-                        .cloned()
-                        .with_context(|| {
-                            format!(
-                                "migration_groups.{group} が存在しないversionを参照しています: {version}"
-                            )
-                        })?;
-                    migration.group = group.clone();
-                    group_migrations.push(migration);
-                }
+                let group_migrations =
+                    resolve_group_migrations(&group, &group_config.migrations, base_migrations)?
+                        .into_iter()
+                        .map(|mut migration| {
+                            migration.group = group.clone();
+                            migration
+                        })
+                        .collect::<Vec<_>>();
                 migrations.extend(group_migrations);
             }
         }
@@ -85,6 +71,7 @@ pub fn load_migrations(config: &Config) -> Result<Vec<Migration>> {
             .then_with(|| a.version.cmp(&b.version))
             .then_with(|| a.group.cmp(&b.group))
             .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.filename.cmp(&b.filename))
     });
     validate_migrations(config, &migrations)?;
     Ok(migrations)
@@ -134,20 +121,36 @@ fn load_migrations_from_dir(
     Ok(migrations)
 }
 
-fn ensure_group_versions_exist(
+fn resolve_group_migrations(
     group: &str,
-    versions: &[String],
+    migration_ids: &[String],
     migrations: &[Migration],
-) -> Result<()> {
-    for version in versions {
-        if !migrations
+) -> Result<Vec<Migration>> {
+    let mut resolved = Vec::new();
+    for migration_id in migration_ids {
+        let filename_matches = migrations
             .iter()
-            .any(|migration| &migration.version == version)
-        {
-            bail!("migration_groups.{group} が存在しないversionを参照しています: {version}");
+            .filter(|migration| &migration.filename == migration_id)
+            .collect::<Vec<_>>();
+        if let Some(migration) = filename_matches.first() {
+            resolved.push((*migration).clone());
+            continue;
+        }
+        let version_matches = migrations
+            .iter()
+            .filter(|migration| &migration.version == migration_id)
+            .collect::<Vec<_>>();
+        match version_matches.as_slice() {
+            [] => {
+                bail!("migration_groups.{group} が存在しないmigrationを参照しています: {migration_id}");
+            }
+            [migration] => resolved.push((*migration).clone()),
+            _ => bail!(
+                "migration_groups.{group} のmigration指定がversionとして曖昧です: {migration_id}。ファイル名で指定してください"
+            ),
         }
     }
-    Ok(())
+    Ok(resolved)
 }
 
 pub fn validate_migration(config: &Config, migration: &Migration) -> Result<()> {
@@ -176,6 +179,7 @@ pub fn parse_migration_file(path: &Path) -> Result<Migration> {
     validate_migration_sql(&sql)?;
     let checksum = checksum_sql(&sql);
     Ok(Migration {
+        filename: file_name.to_string(),
         version: version.to_string(),
         group: MAIN_MIGRATION_GROUP.to_string(),
         version_number,
@@ -232,9 +236,7 @@ pub fn checksum_sql(sql: &str) -> String {
 }
 
 pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> Result<()> {
-    let mut seen_versions: std::collections::HashMap<&str, &Migration> =
-        std::collections::HashMap::new();
-    let mut seen_numbers: std::collections::HashMap<u64, &Migration> =
+    let mut seen_filenames: std::collections::HashMap<&str, &Migration> =
         std::collections::HashMap::new();
     for migration in migrations {
         if migration.group.trim().is_empty() || migration.group.trim() != migration.group {
@@ -255,6 +257,12 @@ pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> 
         if file_version != migration.version || file_name_stem != migration.name {
             bail!(
                 "migration path のファイル名がversion/nameと一致しません: actual={}",
+                migration.path.display()
+            );
+        }
+        if file_name != migration.filename {
+            bail!(
+                "migration path のファイル名がfilenameと一致しません: actual={}",
                 migration.path.display()
             );
         }
@@ -302,26 +310,15 @@ pub(crate) fn validate_migrations(config: &Config, migrations: &[Migration]) -> 
                 migration.checksum
             );
         }
-        if let Some(previous) = seen_versions.insert(&migration.version, migration) {
-            if previous.name != migration.name
-                || previous.checksum != migration.checksum
-                || previous.path != migration.path
-            {
-                bail!(
-                    "migration version が重複しています: {}。同じversionを複数グループで共有する場合は同じファイルを参照してください",
-                    migration.version
-                );
-            }
-        }
-        if let Some(previous) = seen_numbers.insert(migration.version_number, migration) {
+        if let Some(previous) = seen_filenames.insert(&migration.filename, migration) {
             if previous.version != migration.version
                 || previous.name != migration.name
                 || previous.checksum != migration.checksum
                 || previous.path != migration.path
             {
                 bail!(
-                    "migration version が数値として重複しています: {}",
-                    migration.version_number
+                    "migration ファイル名が重複しています: {}。同じファイル名を複数グループで共有する場合は同じファイルを参照してください",
+                    migration.filename
                 );
             }
         }

@@ -324,8 +324,8 @@
         $('migrationGroupChecklist').innerHTML = `<p class="muted">${escapeHtml(t('noMigrationGroups'))}</p>`;
         return;
       }
-      const selectedVersions = new Set(selectedGroup.migrations.map((migration) => migration.version));
-      const uniqueMigrations = uniqueMigrationsByVersion(state.migrations);
+      const selectedFilenames = new Set(selectedGroup.migrations.map((migration) => migrationFileName(migration)));
+      const uniqueMigrations = uniqueMigrationsByFilename(state.migrations);
       if (simpleMode) {
         $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => `<div class="migration-row">
           <strong>${escapeHtml(migrationFileName(migration))}</strong><br><span>${escapeHtml(migration.checksum)}</span>
@@ -333,22 +333,25 @@
         return;
       }
       $('migrationGroupChecklist').innerHTML = uniqueMigrations.map((migration) => {
-        const checked = selectedVersions.has(migration.version) ? ' checked' : '';
-        const id = `migrationGroupVersion-${escapeHtml(migration.version)}`;
+        const filename = migrationFileName(migration);
+        const checked = selectedFilenames.has(filename) ? ' checked' : '';
+        const id = `migrationGroupFile-${escapeHtml(filename)}`;
         return `<label class="check-row" for="${id}">
-          <input id="${id}" type="checkbox" data-migration-version="${escapeHtml(migration.version)}"${checked}>
+          <input id="${id}" type="checkbox" data-migration-version="${escapeHtml(filename)}"${checked}>
           <span><strong>${escapeHtml(migrationFileName(migration))}</strong><br><span>${escapeHtml(migration.checksum)}</span></span>
         </label>`;
       }).join('') || `<p class="muted">${escapeHtml(t('noMigrations'))}</p>`;
     }
-    function uniqueMigrationsByVersion(migrations) {
-      const byVersion = new Map();
+    function uniqueMigrationsByFilename(migrations) {
+      const byFilename = new Map();
       for (const migration of migrations || []) {
-        if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration);
+        const filename = migrationFileName(migration);
+        if (!byFilename.has(filename)) byFilename.set(filename, migration);
       }
-      return Array.from(byVersion.values());
+      return Array.from(byFilename.values());
     }
     function migrationFileName(migration) {
+      if (migration && typeof migration.filename === 'string' && migration.filename) return migration.filename;
       if (migration && typeof migration.path === 'string') {
         const parts = migration.path.split(/[\\/]/);
         const filename = parts[parts.length - 1];
@@ -779,7 +782,7 @@
       }
     }
     function nextMigrationFileName() {
-      const versions = uniqueMigrationsByVersion(state && state.migrations ? state.migrations : [])
+      const versions = uniqueMigrationsByFilename(state && state.migrations ? state.migrations : [])
         .map((migration) => String(migration.version || ''))
         .filter((version) => /^[0-9]+$/.test(version));
       const width = Math.max(3, ...versions.map((version) => version.length));
@@ -787,7 +790,7 @@
       return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`;
     }
     function latestMigrationFileName() {
-      const migrations = uniqueMigrationsByVersion(state && state.migrations ? state.migrations : [])
+      const migrations = uniqueMigrationsByFilename(state && state.migrations ? state.migrations : [])
         .filter((migration) => /^[0-9]+$/.test(String(migration.version || '')));
       if (!migrations.length) return null;
       const latest = migrations.reduce((current, migration) => {

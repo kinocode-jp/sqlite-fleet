@@ -255,10 +255,10 @@
         assert!(INDEX_HTML.contains("function closeMigrationGroupModal()"));
         assert!(INDEX_HTML.contains("function renderMigrationGroupEditor()"));
         assert!(INDEX_HTML.contains("function saveMigrationGroupMembership()"));
-        assert!(INDEX_HTML.contains("function uniqueMigrationsByVersion(migrations)"));
+        assert!(INDEX_HTML.contains("function uniqueMigrationsByFilename(migrations)"));
         assert!(INDEX_HTML.contains("function migrationFileName(migration)"));
-        assert!(INDEX_HTML.contains("const byVersion = new Map()"));
-        assert!(INDEX_HTML.contains("if (!byVersion.has(migration.version)) byVersion.set(migration.version, migration)"));
+        assert!(INDEX_HTML.contains("const byFilename = new Map()"));
+        assert!(INDEX_HTML.contains("if (!byFilename.has(filename)) byFilename.set(filename, migration)"));
         assert!(INDEX_HTML.contains("escapeHtml(migrationFileName(migration))"));
         assert!(INDEX_HTML.contains(r#"<div id="migrationGroupChecklist" class="migration-checklist"></div>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveMigrationGroupMembership" class="primary">保存</button>"#));

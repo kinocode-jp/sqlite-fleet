@@ -747,7 +747,7 @@
       'DBを追加': 'Add DB',
       'マイグレーション一覧': 'Migrations',
       '読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.',
-      '履歴テーブルはversion主キーなので、複数グループでもversionは全体で一意にしてください。': 'The history table uses version as the primary key, so versions must be globally unique across groups.',
+      '履歴テーブルはマイグレーションファイル名を主キーにします。同じバージョンでもファイル名が異なれば別のマイグレーションとして扱います。': 'The history table uses the migration file name as the primary key. Files with the same version are treated as separate migrations when their file names differ.',
       'マイグレーション履歴に残さないSQLを、dry-runで確認してから適用できます。': 'Run ad hoc SQL outside migration history after checking it with dry-run.',
       'SQL apply は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。': 'SQL apply runs in an atomic transaction when possible. ATTACH/DETACH are rejected in the GUI.',
       'SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。': 'The DB used for SQL execution and schema loading.',

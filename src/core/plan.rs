@@ -47,8 +47,11 @@ fn migrations_for_database(
             .cmp(&b.version_number)
             .then_with(|| a.version.cmp(&b.version))
             .then_with(|| a.group.cmp(&b.group))
+            .then_with(|| a.name.cmp(&b.name))
+            .then_with(|| a.filename.cmp(&b.filename))
     });
-    selected.dedup_by(|left, right| left.version == right.version);
+    let mut seen_filenames = HashSet::new();
+    selected.retain(|migration| seen_filenames.insert(migration.filename.clone()));
     selected
 }
 
@@ -58,9 +61,9 @@ pub fn build_database_plan(
     migrations: &[Migration],
 ) -> DatabasePlan {
     let migrations = migrations_for_database(config, database, migrations);
-    let known_versions = migrations
+    let known_filenames = migrations
         .iter()
-        .map(|migration| migration.version.as_str())
+        .map(|migration| migration.filename.as_str())
         .collect::<HashSet<_>>();
     let migration_groups = config.migration_groups_for_database(database);
     if let Err(error) = validate_runtime_config(config) {
@@ -127,24 +130,25 @@ pub fn build_database_plan(
             ))?;
             Ok(conn)
         })
-        .and_then(|conn| read_applied_migrations(&conn, config.migrations_table()))
+        .and_then(|conn| read_applied_migrations_with_catalog(&conn, config.migrations_table(), &migrations))
     {
         Ok(applied) => {
-            let applied_by_version: HashMap<&str, &AppliedMigration> =
-                applied.iter().map(|m| (m.version.as_str(), m)).collect();
-            let applied_versions: HashSet<&str> = applied_by_version.keys().copied().collect();
+            let applied_by_filename: HashMap<&str, &AppliedMigration> =
+                applied.iter().map(|m| (m.filename.as_str(), m)).collect();
+            let applied_filenames: HashSet<&str> = applied_by_filename.keys().copied().collect();
             let pending = migrations
                 .iter()
-                .filter(|migration| !applied_versions.contains(migration.version.as_str()))
+                .filter(|migration| !applied_filenames.contains(migration.filename.as_str()))
                 .map(MigrationSummary::from)
                 .collect();
             let checksum_errors = migrations
                 .iter()
                 .filter_map(|migration| {
-                    applied_by_version
-                        .get(migration.version.as_str())
+                    applied_by_filename
+                        .get(migration.filename.as_str())
                         .and_then(|applied| {
                             (applied.checksum != migration.checksum).then(|| ChecksumError {
+                                filename: migration.filename.clone(),
                                 version: migration.version.clone(),
                                 expected: migration.checksum.clone(),
                                 actual: applied.checksum.clone(),
@@ -154,7 +158,7 @@ pub fn build_database_plan(
                 .collect();
             let unknown_applied = applied
                 .iter()
-                .filter(|migration| !known_versions.contains(migration.version.as_str()))
+                .filter(|migration| !known_filenames.contains(migration.filename.as_str()))
                 .map(MigrationSummary::from)
                 .collect();
             DatabasePlan {
@@ -178,4 +182,3 @@ pub fn build_database_plan(
         },
     }
 }
-

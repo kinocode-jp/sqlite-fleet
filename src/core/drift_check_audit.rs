@@ -162,9 +162,9 @@ fn check_database_inner(
     migrations: &[Migration],
 ) -> Result<DatabaseCheckResult> {
     let migrations = migrations_for_database(config, database, migrations);
-    let known_versions = migrations
+    let known_filenames = migrations
         .iter()
-        .map(|migration| migration.version.as_str())
+        .map(|migration| migration.filename.as_str())
         .collect::<HashSet<_>>();
     validate_runtime_config(config)?;
     validate_database_id(&database.id)?;
@@ -183,14 +183,16 @@ fn check_database_inner(
     let integrity_check: String = conn
         .query_row("PRAGMA integrity_check", [], |row| row.get(0))
         .context("PRAGMA integrity_check に失敗しました")?;
-    let applied = read_applied_migrations(&conn, config.migrations_table())?;
+    let applied =
+        read_applied_migrations_with_catalog(&conn, config.migrations_table(), &migrations)?;
     let known: HashMap<&str, &Migration> =
-        migrations.iter().map(|m| (m.version.as_str(), m)).collect();
+        migrations.iter().map(|m| (m.filename.as_str(), m)).collect();
     let checksum_errors = applied
         .iter()
         .filter_map(|applied| {
-            known.get(applied.version.as_str()).and_then(|migration| {
+            known.get(applied.filename.as_str()).and_then(|migration| {
                 (applied.checksum != migration.checksum).then(|| ChecksumError {
+                    filename: applied.filename.clone(),
                     version: applied.version.clone(),
                     expected: migration.checksum.clone(),
                     actual: applied.checksum.clone(),
@@ -200,7 +202,7 @@ fn check_database_inner(
         .collect::<Vec<_>>();
     let unknown_applied = applied
         .iter()
-        .filter(|migration| !known_versions.contains(migration.version.as_str()))
+        .filter(|migration| !known_filenames.contains(migration.filename.as_str()))
         .map(MigrationSummary::from)
         .collect::<Vec<_>>();
     let success = quick_check == "ok"

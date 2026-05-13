@@ -43,7 +43,8 @@ pub use discovery::{
     discover_by_glob, discover_by_query, discover_databases, render_path_template,
 };
 use discovery::{validate_database_id, validate_database_set};
-use history::create_migrations_table_sql;
+pub use history::read_applied_migrations_with_catalog;
+use history::{create_migrations_table_sql, migrate_legacy_migrations_table};
 pub use history::{ensure_migrations_table, read_applied_migrations};
 use migration::validate_migrations;
 pub use migration::{
