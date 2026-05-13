@@ -124,6 +124,7 @@
     .chip.action-chip { gap:4px; padding-right:4px; }
     .chip-link { border:0; background:transparent; color:var(--accent-strong); padding:0; min-height:0; font:inherit; text-decoration:none; box-shadow:none; }
     .chip-remove { min-height:18px; width:18px; padding:0; border-radius:50%; border:1px solid var(--line-strong); background:#fff; color:var(--danger); font-size:12px; line-height:1; }
+    .chip-remove:disabled { background:var(--surface-2); color:var(--muted); border-color:var(--line); cursor:not-allowed; opacity:.7; }
     .checksum-short { display:inline-flex; align-items:center; max-width:120px; padding:0; border:0; background:transparent; color:var(--accent-strong); font:inherit; text-decoration:none; }
     .key-grid { display:grid; gap:8px; }
     .key-item { display:grid; grid-template-columns:140px minmax(0, 1fr); gap:8px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
@@ -896,6 +897,7 @@
         migrationAppliedReadonly: (databases) => `Applied to DBs and read-only: ${databases}`,
         confirmCloseMigrationSql: 'Discard unsaved SQL changes?',
         removeDbMigrationLink: (database) => `Remove migration link for ${database}`,
+        migrationDbLinkAppliedDisabled: 'Already migrated, so it cannot be removed',
         createdDatabaseFile: 'DB registered',
         duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
         newMigrationGroup: 'New group',

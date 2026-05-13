@@ -5,6 +5,7 @@
         migrationAppliedReadonly: (databases) => `適用済みのため編集できません: ${databases}`,
         confirmCloseMigrationSql: '保存していないSQLの変更を破棄しますか？',
         removeDbMigrationLink: (database) => `${database} との紐づけを外す`,
+        migrationDbLinkAppliedDisabled: 'すでにマイグレーション済のため削除できない',
         createdDatabaseFile: 'DBを追加しました',
         duplicateMigrationGroup: (name) => `マイグレーショングループは既に存在します: ${name}`,
         newMigrationGroup: 'グループ作成',
@@ -164,7 +165,9 @@
     }
     function syncControlState() {
       const disabled = activeRequests > 0;
-      document.querySelectorAll('button, input, select, textarea').forEach((control) => control.disabled = disabled);
+      document.querySelectorAll('button, input, select, textarea').forEach((control) => {
+        control.disabled = control.dataset.alwaysDisabled === 'true' || disabled;
+      });
       if (!disabled && state && state.status && state.status.plans.length === 0) {
         $('sqlDatabase').disabled = true;
       }
@@ -191,6 +194,10 @@
       const link = hash ? document.querySelector(`[data-page-link][href="${CSS.escape(hash)}"]`) : null;
       return link ? link.dataset.pageLink : 'execute';
     }
+    function hashForPage(page) {
+      const link = document.querySelector(`[data-page-link="${CSS.escape(page)}"]`);
+      return link ? link.getAttribute('href') : '#command-center';
+    }
     function updatePageHeading(page) {
       const titles = pageTitles[currentLocale] || pageTitles.en;
       $('pageHeading').textContent = titles[page] || titles.execute;
@@ -199,6 +206,13 @@
       document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
       document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
       updatePageHeading(page);
+    }
+    function navigateToPage(page, options = {}) {
+      openPage(page);
+      const hash = hashForPage(page);
+      if (window.location.hash === hash) return;
+      if (options.replace) history.replaceState(null, '', hash);
+      else history.pushState(null, '', hash);
     }
     function updateConditionalNav() {
       if (!state) return;
@@ -505,14 +519,15 @@
       if (!databases.length) return `<span class="muted">${escapeHtml(t('none'))}</span>`;
       return `<div class="chip-row">${databases.map((databaseId) => {
         const canRemove = !applied.has(databaseId);
+        const disabledTitle = t('migrationDbLinkAppliedDisabled');
         return `<span class="chip action-chip">
           <button class="chip-link" type="button" data-open-database="${escapeHtml(databaseId)}">${escapeHtml(databaseId)}</button>
-          ${canRemove ? `<button class="chip-remove" type="button" data-unassign-migration-db="${escapeHtml(databaseId)}" data-unassign-migration-group="${escapeHtml(migration.group)}" aria-label="${escapeHtml(t('removeDbMigrationLink', databaseId))}">×</button>` : ''}
+          <button class="chip-remove" type="button" ${canRemove ? `data-unassign-migration-db="${escapeHtml(databaseId)}" data-unassign-migration-group="${escapeHtml(migration.group)}" aria-label="${escapeHtml(t('removeDbMigrationLink', databaseId))}"` : `disabled data-always-disabled="true" title="${escapeHtml(disabledTitle)}" aria-label="${escapeHtml(disabledTitle)}"`}>×</button>
         </span>`;
       }).join('')}</div>`;
     }
     function openDatabaseFromMigration(databaseId) {
-      openPage('databases');
+      navigateToPage('databases');
       const rowCell = document.querySelector(`[data-database-row="${CSS.escape(databaseId)}"]`);
       if (rowCell) rowCell.scrollIntoView({ block: 'center' });
     }
@@ -1274,9 +1289,10 @@
     });
     document.querySelectorAll('[data-page-link]').forEach((link) => link.addEventListener('click', (event) => {
       event.preventDefault();
-      openPage(link.dataset.pageLink);
-      history.replaceState(null, '', link.getAttribute('href'));
+      navigateToPage(link.dataset.pageLink);
     }));
+    window.addEventListener('popstate', () => openPage(pageFromHash()));
+    window.addEventListener('hashchange', () => openPage(pageFromHash()));
     $('saveMigrationGroup').addEventListener('click', saveMigrationGroup);
     $('saveMigrationGroupMembership').addEventListener('click', saveMigrationGroupMembership);
     $('migrationGroupCards').addEventListener('click', (event) => {

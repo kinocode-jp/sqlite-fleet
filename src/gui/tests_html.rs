@@ -35,7 +35,9 @@
         assert!(INDEX_HTML.contains("function syncControlState()"));
         assert!(INDEX_HTML.contains("const disabled = activeRequests > 0"));
         assert!(INDEX_HTML.contains("button, input, select, textarea"));
-        assert!(INDEX_HTML.contains("control.disabled = disabled"));
+        assert!(INDEX_HTML.contains(
+            "control.disabled = control.dataset.alwaysDisabled === 'true' || disabled"
+        ));
         assert!(!INDEX_HTML.contains("let busy = false"));
     }
 
@@ -121,6 +123,10 @@
         ));
         assert!(INDEX_HTML.contains("const pageTitles = {"));
         assert!(INDEX_HTML.contains("function updatePageHeading(page)"));
+        assert!(INDEX_HTML.contains("function hashForPage(page)"));
+        assert!(INDEX_HTML.contains("function navigateToPage(page, options = {})"));
+        assert!(INDEX_HTML.contains("history.pushState(null, '', hash)"));
+        assert!(INDEX_HTML.contains("window.addEventListener('popstate', () => openPage(pageFromHash()))"));
         assert!(INDEX_HTML
             .contains(r#"<section class="summary page active" data-page="execute" id="summary""#));
         assert!(INDEX_HTML.contains(
@@ -371,6 +377,10 @@
         assert!(INDEX_HTML.contains(r#"data-migration-detail-index="${escapeHtml(index)}""#));
         assert!(INDEX_HTML.contains(r#"data-open-database="${escapeHtml(databaseId)}""#));
         assert!(INDEX_HTML.contains(r#"data-unassign-migration-db="${escapeHtml(databaseId)}""#));
+        assert!(INDEX_HTML.contains(r#"disabled data-always-disabled="true" title="${escapeHtml(disabledTitle)}""#));
+        assert!(INDEX_HTML.contains("migrationDbLinkAppliedDisabled: 'すでにマイグレーション済のため削除できない'"));
+        assert!(INDEX_HTML.contains("migrationDbLinkAppliedDisabled: 'Already migrated, so it cannot be removed'"));
+        assert!(INDEX_HTML.contains(".chip-remove:disabled"));
         assert!(INDEX_HTML.contains(r#"data-checksum="${escapeHtml(migration.checksum)}""#));
         assert!(INDEX_HTML.contains("$('migrations').addEventListener('click', (event) =>"));
         assert!(INDEX_HTML.contains("openDatabaseFromMigration(databaseButton.dataset.openDatabase)"));
