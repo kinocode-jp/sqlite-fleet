@@ -195,7 +195,7 @@
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行</a>
         <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>マイグレーショングループ</a>
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション</a>
-        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB一覧</a>
+        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL実行</a>
         <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>スキーマ作成</a>
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
@@ -327,7 +327,7 @@
       <section class="panel page" data-page="databases" id="databases-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2 class="panel-title">DB一覧 <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
+            <h2 class="panel-title">DB <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
           </div>
           <div class="panel-actions">
             <button id="openDatabaseFileModal" class="primary">新規作成</button>
@@ -575,7 +575,7 @@
           <section>
             <h3>画面の見方</h3>
             <ul>
-              <li>DB一覧ではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。</li>
+              <li>DBではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。</li>
               <li>マイグレーションでは読み込まれているマイグレーションファイルとchecksumを確認します。</li>
               <li>マイグレーショングループではmainから分岐した各グループのマイグレーションをチェックボックスで編集できます。</li>
             </ul>
@@ -692,7 +692,7 @@
       '実行': 'Run',
       'マイグレーショングループ': 'Migration Groups',
       'DBグループ': 'DB Groups',
-      'DB一覧': 'Databases',
+      'DB': 'DB',
       'マイグレーション': 'Migrations',
       'SQL実行': 'SQL runner',
       'スキーマ作成': 'Schema builder',
@@ -736,7 +736,7 @@
       '登録済みルール': 'Saved rules',
       'Version': 'Version',
       'File name': 'File name',
-      'DB一覧': 'Databases',
+      'DB一覧': 'DB',
       'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。': 'Check status, assigned Migration Groups, and pending migrations per database.',
       'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
       '設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。': 'Creates an empty SQLite DB under the config directory. Choose a path matched by discovery settings.',
@@ -806,7 +806,7 @@
       'を使います。': '.',
       'はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の': 'defines DB Groups for canaries and other target sets. The built-in',
       'は全DBです。': 'means all DBs.',
-      'DB一覧ではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。': 'Databases shows applied counts, pending migrations, and inconsistencies per DB.',
+      'DBではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。': 'DB shows applied counts, pending migrations, and inconsistencies per database.',
       'マイグレーションでは読み込まれているマイグレーションファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
       'マイグレーショングループではmainから分岐した各グループのマイグレーションをチェックボックスで編集できます。': 'Migration Groups edits migrations for each group branched from main with checkboxes.',
       'CheckはDB状態、checksum、不明な適用履歴を検査します。': 'Check verifies DB state, checksums, and unknown applied history.',
@@ -875,8 +875,8 @@
       'Hidden': 'Hidden',
       'Run': '実行',
       'SQL runner': 'SQL実行',
-      'Databases': 'DB一覧',
-      'Database management': 'DB一覧',
+      'Databases': 'DB',
+      'Database management': 'DB',
       'Migration management': 'マイグレーション',
       'Migrations': 'マイグレーション',
       'Schema builder': 'スキーマ作成',
