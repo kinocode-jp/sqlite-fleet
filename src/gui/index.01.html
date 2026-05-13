@@ -223,6 +223,7 @@
         link.hidden = !visibility[link.dataset.conditionalNav];
       });
       $('openMigrationGroupModalFromMigrations').hidden = hasMigrationGroups;
+      $('openDbGroupModalFromDatabases').hidden = hasDbGroups;
       const page = activePage();
       if (page === 'migration-groups' && !hasMigrationGroups) openPage('migrations');
       if (page === 'db-groups' && !hasDbGroups) openPage('databases');
@@ -1390,6 +1391,7 @@
     });
     $('clearMessage').addEventListener('click', clearMessage);
     $('openDbGroupModal').addEventListener('click', openDbGroupModal);
+    $('openDbGroupModalFromDatabases').addEventListener('click', openDbGroupModal);
     $('closeDbGroupModal').addEventListener('click', closeDbGroupModal);
     $('cancelDbGroup').addEventListener('click', closeDbGroupModal);
     $('saveDbGroup').addEventListener('click', saveDbGroup);
