@@ -272,6 +272,7 @@
         assert!(INDEX_HTML.contains("duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`"));
         assert!(INDEX_HTML.contains("body: JSON.stringify({ name, versions: [] })"));
         assert!(INDEX_HTML.contains(".map((input) => input.dataset.migrationVersion)"));
+        assert!(INDEX_HTML.contains(r#"<div class="panel-actions">"#));
         assert!(!INDEX_HTML.contains("manageMigrationGroupVersions"));
     }
 
@@ -428,7 +429,9 @@
         assert!(INDEX_HTML
             .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
-        assert!(INDEX_HTML.contains(r#"data-tip="履歴テーブルはversion主キーなので"#));
+        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション一覧 <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます"#));
+        assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));
     }
 
     #[test]
