@@ -362,7 +362,6 @@
           </div>
           <div class="modal-body">
             <label class="field"><span class="field-label">New DB path <span class="tool-tip" tabindex="0" data-tip="設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。">?</span></span><input id="newDatabasePath" placeholder="data/tenant-new.db"></label>
-            <label class="field"><span class="field-label">Add to DB group <span class="tool-tip" tabindex="0" data-tip="任意です。指定すると作成したDBパスをDB group selectorへ追加します。">?</span></span><input id="newDatabaseGroup" placeholder="canary"></label>
           </div>
           <div class="modal-actions">
             <button id="cancelDatabaseFile" type="button">キャンセル</button>
@@ -752,7 +751,6 @@
       'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。': 'Check status, assigned Migration Groups, and pending migrations per database.',
       'pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。': 'pending means unapplied work, corrupt means checksum or unknown history issues, and error means DB read or validation failure.',
       '設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。': 'Creates an empty SQLite DB under the config directory. Choose a path matched by discovery settings.',
-      '任意です。指定すると作成したDBパスをDB group selectorへ追加します。': 'Optional. When provided, the created DB path is added to that DB Group selector list.',
       'DBを追加': 'Add DB',
       'マイグレーション一覧': 'Migrations',
       '読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.',
@@ -860,7 +858,6 @@
       'Applied Migration Groups': '適用マイグレーショングループ',
       'Migration files': 'マイグレーションファイル',
       'New DB path': '新規DBパス',
-      'Add to DB group': 'DBグループへ追加',
       'Version': 'バージョン',
       'Name': '名前',
       'File name': 'ファイル名',

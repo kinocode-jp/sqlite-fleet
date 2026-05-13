@@ -809,7 +809,6 @@
       try {
         await postAdmin('/api/admin/database-file', {
           path: $('newDatabasePath').value,
-          db_group: $('newDatabaseGroup').value,
         });
         closeDatabaseFileModal();
       } catch (error) {
@@ -818,7 +817,6 @@
     }
     function openDatabaseFileModal() {
       $('newDatabasePath').value = '';
-      $('newDatabaseGroup').value = '';
       $('databaseFileModal').hidden = false;
       $('newDatabasePath').focus();
     }

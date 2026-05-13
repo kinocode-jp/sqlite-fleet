@@ -297,6 +297,9 @@
         assert!(INDEX_HTML
             .contains("$('openDatabaseFileModal').addEventListener('click', openDatabaseFileModal)"));
         assert!(INDEX_HTML.contains("$('createDatabaseFile').addEventListener('click', createDatabaseFile)"));
+        assert!(INDEX_HTML.contains("path: $('newDatabasePath').value"));
+        assert!(!INDEX_HTML.contains("newDatabaseGroup"));
+        assert!(!INDEX_HTML.contains("Add to DB group"));
         assert!(INDEX_HTML.contains("closeDatabaseFileModal();"));
     }
 
