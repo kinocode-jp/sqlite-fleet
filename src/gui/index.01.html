@@ -288,12 +288,6 @@
       renderMigrationGroupEditor();
       renderMigrationFileGroupOptions();
 
-      $('dbGroupCards').innerHTML = state.db_groups.map((group) => `<article class="db-group-list-item">
-        <div><strong>${escapeHtml(group.name)}</strong><span class="muted">${escapeHtml(`${group.database_ids.length} DB`)}</span></div>
-        <div><span class="label">${escapeHtml(t('selectorsLabel'))}</span><div>${chips(group.selectors)}</div></div>
-        <div><span class="label">${escapeHtml(t('previewLabel'))}</span><div>${chips(group.database_ids)}</div></div>
-      </article>`).join('') || `<p class="muted">${escapeHtml(t('noDbGroups'))}</p>`;
-
       $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
         <strong>${escapeHtml(rule.selector)}</strong>
         <div><span class="label">${escapeHtml(t('assignedGroupsLabel'))}</span><div>${chips(rule.migration_groups)}</div></div>

@@ -237,8 +237,6 @@
         assert!(INDEX_HTML.contains("[t('pendingDb'), s.pending]"));
         assert!(INDEX_HTML.contains("${t('migrationsLabel')}"));
         assert!(INDEX_HTML.contains("t('migrationFilesLabel')"));
-        assert!(INDEX_HTML.contains("escapeHtml(t('selectorsLabel'))"));
-        assert!(INDEX_HTML.contains("escapeHtml(t('previewLabel'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
         assert!(INDEX_HTML.contains("[t('lockTimeout'), `${settings.lock_timeout_ms} ms`]"));
@@ -289,12 +287,10 @@
     fn html_uses_modals_for_database_and_db_group_creation() {
         assert!(INDEX_HTML.contains(r#"id="dbGroupModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
-        assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="db-group-list panel-list"></div>"#));
-        assert!(INDEX_HTML.contains(".db-group-list-item { display:grid; grid-template-columns:"));
-        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form, .db-group-list-item { grid-template-columns:1fr; }"));
-        assert!(INDEX_HTML.contains(r#"<article class="db-group-list-item">"#));
+        assert!(!INDEX_HTML.contains(r#"id="dbGroupCards""#));
+        assert!(!INDEX_HTML.contains(".db-group-list-item"));
+        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; }"));
         assert!(INDEX_HTML.contains(r#"<tbody id="databases"></tbody>"#));
-        assert!(INDEX_HTML.contains("border-bottom:1px solid var(--line); background:transparent;"));
         assert!(INDEX_HTML.contains("function openDbGroupModal()"));
         assert!(INDEX_HTML.contains("function closeDbGroupModal()"));
         assert!(!INDEX_HTML.contains("id=\"openDbGroupModal\""));
@@ -321,6 +317,7 @@
         assert!(INDEX_HTML.contains("closeDatabaseFileModal();"));
         assert!(INDEX_HTML.contains("function renderDatabaseRowsByGroup(plans)"));
         assert!(INDEX_HTML.contains(r#"<tr class="group-divider"><th colspan="7">${escapeHtml(group.name)}</th></tr>"#));
+        assert!(INDEX_HTML.contains(r#"<tr class="group-divider"><th colspan="7">${escapeHtml(t('ungroupedDb'))}</th></tr>"#));
         assert!(INDEX_HTML.contains("ungroupedDb: 'Ungrouped DBs'"));
     }
 
