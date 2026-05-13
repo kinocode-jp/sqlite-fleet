@@ -593,7 +593,9 @@
         const disabledTitle = t('migrationDbLinkAppliedDisabled');
         return `<span class="chip action-chip">
           <button class="chip-link" type="button" data-open-database="${escapeHtml(databaseId)}">${escapeHtml(databaseId)}</button>
-          <button class="chip-remove" type="button" ${canRemove ? `data-unassign-migration-db="${escapeHtml(databaseId)}" data-unassign-migration-group="${escapeHtml(migration.group)}" aria-label="${escapeHtml(t('removeDbMigrationLink', databaseId))}"` : `disabled data-always-disabled="true" title="${escapeHtml(disabledTitle)}" aria-label="${escapeHtml(disabledTitle)}"`}>×</button>
+          ${canRemove
+            ? `<button class="chip-remove" type="button" data-unassign-migration-db="${escapeHtml(databaseId)}" data-unassign-migration-group="${escapeHtml(migration.group)}" aria-label="${escapeHtml(t('removeDbMigrationLink', databaseId))}">×</button>`
+            : `<span class="disabled-tooltip" data-native-title="${escapeHtml(disabledTitle)}"><button class="chip-remove" type="button" disabled data-always-disabled="true" aria-label="${escapeHtml(disabledTitle)}">×</button></span>`}
         </span>`;
       }).join('')}</div>`;
     }
@@ -1360,6 +1362,59 @@
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, (c) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
     }
+    const appTooltip = document.createElement('div');
+    appTooltip.className = 'app-tooltip';
+    appTooltip.setAttribute('role', 'tooltip');
+    document.body.appendChild(appTooltip);
+    function tooltipTextFor(element) {
+      if (!element) return '';
+      const nativeTitle = element.getAttribute('title');
+      if (nativeTitle) {
+        element.dataset.nativeTitle = nativeTitle;
+        element.removeAttribute('title');
+        return nativeTitle;
+      }
+      return element.dataset.nativeTitle || '';
+    }
+    function moveAppTooltip(event) {
+      const margin = 12;
+      const rect = appTooltip.getBoundingClientRect();
+      let left = event.clientX + margin;
+      let top = event.clientY + margin;
+      if (left + rect.width > window.innerWidth - margin) left = window.innerWidth - rect.width - margin;
+      if (top + rect.height > window.innerHeight - margin) top = event.clientY - rect.height - margin;
+      appTooltip.style.left = `${Math.max(margin, left)}px`;
+      appTooltip.style.top = `${Math.max(margin, top)}px`;
+    }
+    function showAppTooltip(target, event) {
+      const text = tooltipTextFor(target);
+      if (!text) return;
+      appTooltip.textContent = text;
+      appTooltip.classList.add('visible');
+      if (event) moveAppTooltip(event);
+    }
+    function hideAppTooltip() {
+      appTooltip.classList.remove('visible');
+      appTooltip.textContent = '';
+    }
+    document.addEventListener('mouseover', (event) => {
+      const target = event.target.closest('[title], [data-native-title]');
+      if (target) showAppTooltip(target, event);
+    });
+    document.addEventListener('mousemove', (event) => {
+      if (appTooltip.classList.contains('visible')) moveAppTooltip(event);
+    });
+    document.addEventListener('mouseout', (event) => {
+      const target = event.target.closest('[data-native-title]');
+      if (target && !target.contains(event.relatedTarget)) hideAppTooltip();
+    });
+    document.addEventListener('focusin', (event) => {
+      const target = event.target.closest('[title], [data-native-title]');
+      if (!target) return;
+      const rect = target.getBoundingClientRect();
+      showAppTooltip(target, { clientX: rect.left, clientY: rect.bottom });
+    });
+    document.addEventListener('focusout', hideAppTooltip);
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
     $('dryRun').addEventListener('click', () => runMigrate('', true));

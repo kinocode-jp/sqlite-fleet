@@ -423,7 +423,8 @@
         assert!(INDEX_HTML.contains(r#"data-migration-detail-index="${escapeHtml(index)}""#));
         assert!(INDEX_HTML.contains(r#"data-open-database="${escapeHtml(databaseId)}""#));
         assert!(INDEX_HTML.contains(r#"data-unassign-migration-db="${escapeHtml(databaseId)}""#));
-        assert!(INDEX_HTML.contains(r#"disabled data-always-disabled="true" title="${escapeHtml(disabledTitle)}""#));
+        assert!(INDEX_HTML.contains(r#"class="disabled-tooltip" data-native-title="${escapeHtml(disabledTitle)}""#));
+        assert!(INDEX_HTML.contains(r#"disabled data-always-disabled="true" aria-label="${escapeHtml(disabledTitle)}""#));
         assert!(INDEX_HTML.contains("migrationDbLinkAppliedDisabled: 'すでにマイグレーション済のため削除できない'"));
         assert!(INDEX_HTML.contains("migrationDbLinkAppliedDisabled: 'Already migrated, so it cannot be removed'"));
         assert!(INDEX_HTML.contains(".chip-remove:disabled"));
