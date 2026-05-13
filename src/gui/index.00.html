@@ -566,7 +566,7 @@
             <h3>基本の考え方</h3>
             <ul>
               <li>マイグレーションファイルは <code>migrations.dir</code> の固定ディレクトリに置きます。</li>
-              <li><code>[migration_groups]</code> はversionリストでグループを管理します。未設定時は全マイグレーションが <code>main</code> に入ります。</li>
+              <li><code>[migration_groups]</code> はファイル名リストでグループを管理します。未設定時は全マイグレーションが <code>main</code> に入ります。</li>
               <li><code>[database_migration_groups]</code> はDBごとに対象マイグレーショングループを指定します。未指定DBは <code>main</code> を使います。</li>
               <li><code>[db_groups]</code> はカナリアなど、操作対象DBのまとまりを作るためのDBグループです。標準の <code>all</code> は全DBです。</li>
             </ul>
@@ -804,7 +804,7 @@
       '安全設定と監査ログ': 'Safety settings and audit log',
       'マイグレーションファイルは': 'Migration files are stored in',
       'の固定ディレクトリに置きます。': '.',
-      'はversionリストでグループを管理します。未設定時は全マイグレーションが': 'assigns migrations by version list. When unset, all migrations belong to',
+      'はファイル名リストでグループを管理します。未設定時は全マイグレーションが': 'assigns migrations by filename list. When unset, all migrations belong to',
       'に入ります。': '.',
       'はDBごとに対象マイグレーショングループを指定します。未指定DBは': 'assigns target Migration Groups per DB. Unassigned DBs use',
       'を使います。': '.',
@@ -946,6 +946,7 @@
         noLatestMigrationFilename: 'No migration files yet',
         targetDbLabel: 'Target DB',
         assignedGroupsLabel: 'Applied Migration Groups',
+        otherGroupsLabel: 'Other groups',
         selectorsLabel: 'Selectors',
         previewLabel: 'Preview',
         allowed: 'allowed',
