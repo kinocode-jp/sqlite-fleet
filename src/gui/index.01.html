@@ -704,12 +704,22 @@
       $('migrationSqlDiscardModal').hidden = true;
       closeMigrationFileModal(true);
     }
+    function openDbGroupModal() {
+      $('manageDbGroupName').value = '';
+      $('manageDbGroupSelectors').value = '';
+      $('dbGroupModal').hidden = false;
+      $('manageDbGroupName').focus();
+    }
+    function closeDbGroupModal() {
+      $('dbGroupModal').hidden = true;
+    }
     async function saveDbGroup() {
       try {
         await postAdmin('/api/admin/db-group', {
           name: $('manageDbGroupName').value,
           selectors: csvList($('manageDbGroupSelectors').value),
         });
+        closeDbGroupModal();
       } catch (error) {
         message(error.message, true);
       }
@@ -801,9 +811,19 @@
           path: $('newDatabasePath').value,
           db_group: $('newDatabaseGroup').value,
         });
+        closeDatabaseFileModal();
       } catch (error) {
         message(error.message, true);
       }
+    }
+    function openDatabaseFileModal() {
+      $('newDatabasePath').value = '';
+      $('newDatabaseGroup').value = '';
+      $('databaseFileModal').hidden = false;
+      $('newDatabasePath').focus();
+    }
+    function closeDatabaseFileModal() {
+      $('databaseFileModal').hidden = true;
     }
     function renderSqlTemplates() {
       $('sqlTemplate').innerHTML = Object.entries(sqlTemplates)
@@ -1366,11 +1386,26 @@
         return;
       }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();
+      if (!$('dbGroupModal').hidden) closeDbGroupModal();
+      if (!$('databaseFileModal').hidden) closeDatabaseFileModal();
       if (!$('migrationFileModal').hidden) closeMigrationFileModal();
     });
     $('clearMessage').addEventListener('click', clearMessage);
+    $('openDbGroupModal').addEventListener('click', openDbGroupModal);
+    $('closeDbGroupModal').addEventListener('click', closeDbGroupModal);
+    $('cancelDbGroup').addEventListener('click', closeDbGroupModal);
     $('saveDbGroup').addEventListener('click', saveDbGroup);
     $('saveDatabaseRule').addEventListener('click', saveDatabaseRule);
+    $('openDatabaseFileModal').addEventListener('click', openDatabaseFileModal);
+    $('closeDatabaseFileModal').addEventListener('click', closeDatabaseFileModal);
+    $('cancelDatabaseFile').addEventListener('click', closeDatabaseFileModal);
+    $('createDatabaseFile').addEventListener('click', createDatabaseFile);
+    $('dbGroupModal').addEventListener('click', (event) => {
+      if (event.target === $('dbGroupModal')) closeDbGroupModal();
+    });
+    $('databaseFileModal').addEventListener('click', (event) => {
+      if (event.target === $('databaseFileModal')) closeDatabaseFileModal();
+    });
     $('createMigrationFile').addEventListener('click', createMigrationFile);
     $('insertNewMigrationTemplate').addEventListener('click', insertNewMigrationTemplate);
     $('formatNewMigrationSql').addEventListener('click', formatNewMigrationSql);
@@ -1391,7 +1426,6 @@
       const button = event.target.closest('button[data-completion]');
       if (button) applySqlCompletion(button.dataset.completion);
     });
-    $('createDatabaseFile').addEventListener('click', createDatabaseFile);
     $('sqlFile').addEventListener('change', async (event) => {
       const file = event.target.files && event.target.files[0];
       if (!file) return;

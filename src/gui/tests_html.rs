@@ -277,6 +277,30 @@
     }
 
     #[test]
+    fn html_uses_modals_for_database_and_db_group_creation() {
+        assert!(INDEX_HTML
+            .contains(r#"<button id="openDbGroupModal" class="primary">新規作成</button>"#));
+        assert!(INDEX_HTML.contains(r#"id="dbGroupModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="card-list panel-list"></div>"#));
+        assert!(INDEX_HTML.contains("function openDbGroupModal()"));
+        assert!(INDEX_HTML.contains("function closeDbGroupModal()"));
+        assert!(INDEX_HTML.contains("$('openDbGroupModal').addEventListener('click', openDbGroupModal)"));
+        assert!(INDEX_HTML.contains("$('saveDbGroup').addEventListener('click', saveDbGroup)"));
+
+        assert!(INDEX_HTML
+            .contains(r#"<button id="openDatabaseFileModal" class="primary">新規作成</button>"#));
+        assert!(INDEX_HTML.contains(r#"id="databaseFileModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="databaseFileModalTitle">新規DB</h2>"#));
+        assert!(INDEX_HTML.contains("function openDatabaseFileModal()"));
+        assert!(INDEX_HTML.contains("function closeDatabaseFileModal()"));
+        assert!(INDEX_HTML
+            .contains("$('openDatabaseFileModal').addEventListener('click', openDatabaseFileModal)"));
+        assert!(INDEX_HTML.contains("$('createDatabaseFile').addEventListener('click', createDatabaseFile)"));
+        assert!(INDEX_HTML.contains("closeDatabaseFileModal();"));
+    }
+
+    #[test]
     fn html_uses_modal_for_migration_file_creation() {
         assert!(INDEX_HTML.contains(
             r#"<button id="openMigrationFileModal" class="primary">新規作成</button>"#
@@ -429,6 +453,10 @@
         assert!(INDEX_HTML
             .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
+        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DBグループ <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します"#));
+        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB一覧 <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション一覧 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます"#));
         assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));

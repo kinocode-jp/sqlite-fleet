@@ -48,6 +48,7 @@
     .panel-heading { display:grid; gap:3px; }
     .panel-title { display:flex; align-items:center; gap:7px; }
     .panel-actions { display:flex; justify-content:flex-end; gap:8px; margin-left:auto; }
+    .panel-list { padding:16px; }
     .panel h2 { margin:0; font-size:16px; line-height:1.3; }
     .panel-description { margin:0; color:var(--muted); font-size:13px; }
     .section-header { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
@@ -310,36 +311,40 @@
       <section class="panel page" data-page="db-groups" id="db-groups-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>DBグループ</h2>
-            <p class="panel-description">カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。</p>
+            <h2 class="panel-title">DBグループ <span class="tool-tip" tabindex="0" data-tip="カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。実行ページのDB groupで選択できます。">?</span></h2>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="DBグループはどのDBへ操作するかを決める対象セットです。実行ページのDB groupで選択できます。">?</span>
+          <div class="panel-actions">
+            <button id="openDbGroupModal" class="primary">新規作成</button>
+          </div>
         </div>
-        <div class="topology-grid">
-          <section>
-            <h3>DB Groups</h3>
-            <div class="info-card">
-              <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
-              <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
-              <button id="saveDbGroup" class="primary">DBグループを保存</button>
-            </div>
-            <div id="dbGroupCards" class="card-list"></div>
-          </section>
-        </div>
+        <div id="dbGroupCards" class="card-list panel-list"></div>
       </section>
+
+      <div id="dbGroupModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="dbGroupModalTitle">
+          <div class="modal-header">
+            <h2 id="dbGroupModalTitle">新規DBグループ</h2>
+            <button id="closeDbGroupModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <label class="field"><span class="field-label">Group name</span><input id="manageDbGroupName" placeholder="canary"></label>
+            <label class="field"><span class="field-label">DB selectors</span><input id="manageDbGroupSelectors" placeholder="tenant-a, data/tenant-b.db"></label>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelDbGroup" type="button">キャンセル</button>
+            <button id="saveDbGroup" class="primary">作成</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel page" data-page="databases" id="databases-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>DB一覧</h2>
-            <p class="panel-description">DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。</p>
+            <h2 class="panel-title">DB一覧 <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="pendingは未適用、corruptはchecksum不一致または不明な履歴、errorはDB読み取りや設定検証の失敗です。">?</span>
-        </div>
-        <div class="form-grid">
-          <label class="field"><span class="field-label">New DB path <span class="tool-tip" tabindex="0" data-tip="設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。">?</span></span><input id="newDatabasePath" placeholder="data/tenant-new.db"></label>
-          <label class="field"><span class="field-label">Add to DB group <span class="tool-tip" tabindex="0" data-tip="任意です。指定すると作成したDBパスをDB group selectorへ追加します。">?</span></span><input id="newDatabaseGroup" placeholder="canary"></label>
-          <div class="actions wide"><button id="createDatabaseFile" class="primary">DBを追加</button></div>
+          <div class="panel-actions">
+            <button id="openDatabaseFileModal" class="primary">新規作成</button>
+          </div>
         </div>
         <div class="table-wrap">
           <table>
@@ -348,6 +353,23 @@
           </table>
         </div>
       </section>
+
+      <div id="databaseFileModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="databaseFileModalTitle">
+          <div class="modal-header">
+            <h2 id="databaseFileModalTitle">新規DB</h2>
+            <button id="closeDatabaseFileModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <label class="field"><span class="field-label">New DB path <span class="tool-tip" tabindex="0" data-tip="設定ファイルのディレクトリ配下に空のSQLite DBを作成します。discovery設定に一致する場所を指定してください。">?</span></span><input id="newDatabasePath" placeholder="data/tenant-new.db"></label>
+            <label class="field"><span class="field-label">Add to DB group <span class="tool-tip" tabindex="0" data-tip="任意です。指定すると作成したDBパスをDB group selectorへ追加します。">?</span></span><input id="newDatabaseGroup" placeholder="canary"></label>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelDatabaseFile" type="button">キャンセル</button>
+            <button id="createDatabaseFile" class="primary">作成</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel page" data-page="migrations" id="migrations-panel">
         <div class="panel-header">
@@ -706,11 +728,14 @@
       'グループ作成': 'Create group',
       '新規作成': 'Create new',
       '新規マイグレーショングループ': 'New Migration Group',
+      '新規DBグループ': 'New DB Group',
+      '新規DB': 'New DB',
       '新規マイグレーション': 'New migration',
       '全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
+      'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。実行ページのDB groupで選択できます。': 'Manage target database sets such as canaries, customers, and environments. Select them from DB group in Run.',
       'DBグループはどのDBへ操作するかを決める対象セットです。実行ページのDB groupで選択できます。': 'A DB Group is a target set that decides where operations run. Select it from DB group in Run.',
       'マイグレーショングループを保存': 'Save Migration Group',
       'DBグループを保存': 'Save DB Group',
@@ -821,6 +846,8 @@
       'Create group': 'グループ作成',
       'Create new': '新規作成',
       'New Migration Group': '新規マイグレーショングループ',
+      'New DB Group': '新規DBグループ',
+      'New DB': '新規DB',
       'New migration': '新規マイグレーション',
       'Cancel': 'キャンセル',
       'Create': '作成',
