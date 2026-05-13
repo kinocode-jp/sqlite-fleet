@@ -75,8 +75,8 @@ sqlite-fleet --config sqlite-fleet.toml gui
 
 管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
 
-- マイグレーション: マイグレーショングループで絞り込み、SQL内容、適用済DB、未適用DBを確認します。
-- DB: DBグループで絞り込み、DBごとの対象マイグレーショングループ、適用済み件数、未適用migration、checksum不一致などを確認します。
+- マイグレーション: ファイル名単位でSQL内容、所属グループ、適用済DB、未適用DBを確認します。グループに分けたい場合だけ、画面上でマイグレーショングループを作成します。
+- DB: DB単位で対象マイグレーショングループ、適用済み件数、未適用migration、checksum不一致などを確認します。DBグループはDBをまとめて操作したい場合にだけ使います。
 - オーバービュー: 最新migration、未適用があるDB、失敗・不整合の有無をまとめて確認します。
 
 画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
@@ -157,7 +157,9 @@ path_template = "./data/tenants/{id:08:split2}.db"
 
 ## マイグレーションファイル
 
-マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` または `<name>_<version>.sql` 形式で置きます。マイグレーショングループはファイルの物理配置ではなく、`[migration_groups]` のファイル名リストで所属を管理します。同じmigrationを複数グループへ所属させても、同じファイル名はDBごとに1回だけ適用されます。
+マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` または `<name>_<version>.sql` 形式で置きます。通常は `[migration_groups]` を書かず、全ファイルを暗黙の `main` グループとして使えます。分岐したい場合だけ `[migration_groups]` にファイル名リストを書きます。
+
+sqlite-fleet では、マイグレーションの同一性は `version` ではなくファイル名全体です。同じ `001` や日付バージョンを持つファイルが複数あっても、ファイル名が違えば別マイグレーションとして扱います。同じファイル名が複数グループに含まれる場合は、DBごとに1回だけ適用されます。
 
 ```text
 migrations/
@@ -172,9 +174,13 @@ main = ["001_create_items.sql", "002_add_item_index.sql"]
 premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscription.sql"]
 ```
 
-`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + ファイル名リスト形式を推奨します。古い設定向けに `001` のようなversion指定も単一ファイルに一致する場合だけ読み込めますが、同じversionのファイルが複数ある場合は曖昧として拒否されます。
+`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + ファイル名リスト形式を推奨します。
+
+古い設定向けに `001` のようなversion指定も、単一ファイルに一致する場合だけ読み込めます。同じversionのファイルが複数ある場合は曖昧として拒否されるため、新しい設定では必ず `001_create_items.sql` のようなファイル名で指定してください。
 
 各DBには `_sqlite_fleet_migrations` が作成され、適用済みファイル名、version、name、checksum、適用時刻、実行時間が保存されます。
+
+旧バージョンで作成された `version` 主キーの履歴テーブルは、`status` / `check` / `migrate --dry-run` では読み取り互換として扱います。実際に `migrate` を実行すると、全ての旧履歴がローカルmigrationファイルへ解決でき、checksum検証も通った場合だけ、`filename` 主キーの新スキーマへ自動移行します。解決できない旧履歴がある場合はDBを書き換えずに失敗します。
 
 `status`、`plan`、`check`、`migrate --dry-run` は読み取り系コマンドとして扱い、対象DBに管理テーブルを作成しません。管理テーブルは実際に `migrate` で適用するときだけ作成します。
 
@@ -223,7 +229,7 @@ tenant-b -> main
 canary   -> tenant-a, tenant-b
 ```
 
-注意: 現在の履歴テーブルはマイグレーションファイル名を主キーにします。同じ `001` や日付バージョンを複数のファイル名で使えますが、同じファイル名を別内容で重複させる構成は拒否されます。
+注意: 履歴テーブルはマイグレーションファイル名を主キーにします。同じ `001` や日付バージョンを複数のファイル名で使えますが、同じファイル名を別内容で重複させる構成は拒否されます。適用順は `version_number`、`version`、`group`、`name`、`filename` の順で安定化されます。
 
 ## スキーマdrift
 
@@ -248,6 +254,7 @@ CI/CD では `migrate`、`check`、`doctor` の非0終了を失敗として扱�
 - `sqlite-fleet doctor` で設定、DB discovery、migration ファイルを検証する
 - `sqlite-fleet plan` で対象DBと適用予定を確認する
 - `sqlite-fleet migrate --dry-run` で読み取り専用の事前確認を行う
+- 旧 `version` 主キーの履歴テーブルを使っているDBでは、初回 `migrate` 前に `status` / `check` で全ての旧履歴がローカルmigrationへ解決できることを確認する
 - `report.path` を設定し、JSONレポートをCI/CD成果物として保存する
 - `audit.path` を設定し、GUI/CLIの変更操作を監査ログとして保存する
 - `--parallel` はDB数、ディスクI/O、ロック状況に合わせて控えめに設定する

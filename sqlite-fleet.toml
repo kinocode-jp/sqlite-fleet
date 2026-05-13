@@ -10,7 +10,12 @@ dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
 [migration_groups]
-main = ["001", "002", "003", "004"]
+main = [
+    "001_create_customers.sql",
+    "002_create_orders.sql",
+    "003_add_customer_status.sql",
+    "004_create_order_index.sql",
+]
 
 [execution]
 parallel = 4

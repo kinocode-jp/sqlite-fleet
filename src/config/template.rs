@@ -33,7 +33,9 @@ path_glob = "./data/**/*.db"
 dir = "./migrations"
 table = "_sqlite_fleet_migrations"
 
-# Uncomment after creating matching files in migrations/.
+# By default, every file in migrations.dir belongs to the implicit "main" group.
+# Uncomment only when you want to split migrations into explicit groups.
+# Use full migration file names, not bare versions.
 # [migration_groups]
 # main = ["001_create_items.sql", "002_add_item_index.sql"]
 
