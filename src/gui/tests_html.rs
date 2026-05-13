@@ -278,8 +278,12 @@
         assert!(INDEX_HTML.contains(r#"<section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="migrationFileModalTitle">新規マイグレーション</h2>"#));
         assert!(!INDEX_HTML.contains(r#"id="migrationDetailModal" class="modal-backdrop" hidden"#));
-        assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>DB</th><th>Group</th><th>Checksum</th></tr></thead>"#));
+        assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>DB</th><th>Checksum</th></tr></thead>"#));
         assert!(!INDEX_HTML.contains(r#"<thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
+        assert!(INDEX_HTML.contains(".link-button { min-height:0; padding:0; border:0; background:transparent; color:var(--accent-strong); font:inherit; text-align:left; text-decoration:none;"));
+        assert!(INDEX_HTML.contains(".chip-link { border:0; background:transparent; color:var(--accent-strong); padding:0; min-height:0; font:inherit; text-decoration:none;"));
+        assert!(INDEX_HTML.contains(".checksum-short { display:inline-flex; align-items:center; max-width:120px; padding:0; border:0; background:transparent; color:var(--accent-strong); font:inherit; text-decoration:none;"));
+        assert!(INDEX_HTML.contains(".group-divider th { padding:9px 12px;"));
         assert!(INDEX_HTML.contains(r#"id="checksumModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<code id="checksumModalValue"></code>"#));
         assert!(INDEX_HTML.contains(".migration-file-form .file-name-field { grid-column:1 / -1; max-width:640px; }"));
@@ -329,6 +333,11 @@
         assert!(INDEX_HTML.contains("function renderLatestMigrationFilename()"));
         assert!(INDEX_HTML.contains("function openMigrationDetailModal(index)"));
         assert!(INDEX_HTML.contains("function closeMigrationDetailModal()"));
+        assert!(INDEX_HTML.contains("function renderMigrationRowsByGroup()"));
+        assert!(INDEX_HTML.contains(
+            "knownGroups.concat(migrationGroups.filter((group) => !knownGroups.includes(group)))"
+        ));
+        assert!(INDEX_HTML.contains(r#"<tr class="group-divider"><th colspan="3">${escapeHtml(group)}</th></tr>"#));
         assert!(INDEX_HTML.contains("function shortChecksum(value)"));
         assert!(INDEX_HTML.contains("function migrationDatabaseChips(migration)"));
         assert!(INDEX_HTML.contains("function openDatabaseFromMigration(databaseId)"));

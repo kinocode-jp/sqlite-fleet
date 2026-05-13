@@ -289,12 +289,7 @@
         </tr>`;
       }).join('');
 
-      $('migrations').innerHTML = state.migrations.map((migration, index) => `<tr>
-        <td><button class="link-button" type="button" data-migration-detail-index="${escapeHtml(index)}"><code>${escapeHtml(migrationFileName(migration))}</code></button></td>
-        <td>${migrationDatabaseChips(migration)}</td>
-        <td>${chips([migration.group])}</td>
-        <td><button class="checksum-short" type="button" data-checksum="${escapeHtml(migration.checksum)}"><code>${escapeHtml(shortChecksum(migration.checksum))}</code></button></td>
-      </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+      $('migrations').innerHTML = renderMigrationRowsByGroup();
 
       renderMigrationGroupEditor();
       renderMigrationFileGroupOptions();
@@ -465,6 +460,33 @@
     function chips(values) {
       const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
       return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function renderMigrationRowsByGroup() {
+      const migrations = state.migrations || [];
+      if (!migrations.length) return `<tr><td colspan="3" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+      const migrationGroups = Array.from(new Set(migrations.map((migration) => migration.group))).sort();
+      const knownGroups = state.migration_groups && state.migration_groups.length
+        ? state.migration_groups.map((group) => group.name)
+        : [];
+      const groups = knownGroups.length
+        ? knownGroups.concat(migrationGroups.filter((group) => !knownGroups.includes(group)))
+        : migrationGroups;
+      const rows = [];
+      groups.forEach((group) => {
+        const groupMigrations = migrations
+          .map((migration, index) => ({ migration, index }))
+          .filter((item) => item.migration.group === group);
+        if (!groupMigrations.length) return;
+        rows.push(`<tr class="group-divider"><th colspan="3">${escapeHtml(group)}</th></tr>`);
+        groupMigrations.forEach(({ migration, index }) => {
+          rows.push(`<tr>
+            <td><button class="link-button" type="button" data-migration-detail-index="${escapeHtml(index)}"><code>${escapeHtml(migrationFileName(migration))}</code></button></td>
+            <td>${migrationDatabaseChips(migration)}</td>
+            <td><button class="checksum-short" type="button" data-checksum="${escapeHtml(migration.checksum)}"><code>${escapeHtml(shortChecksum(migration.checksum))}</code></button></td>
+          </tr>`);
+        });
+      });
+      return rows.join('');
     }
     function shortChecksum(value) {
       const checksum = String(value || '');
