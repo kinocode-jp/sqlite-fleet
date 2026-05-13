@@ -279,7 +279,10 @@
     fn html_uses_modals_for_database_and_db_group_creation() {
         assert!(INDEX_HTML.contains(r#"id="dbGroupModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
-        assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="card-list panel-list"></div>"#));
+        assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="db-group-list panel-list"></div>"#));
+        assert!(INDEX_HTML.contains(".db-group-list-item { display:grid; grid-template-columns:"));
+        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form, .db-group-list-item { grid-template-columns:1fr; }"));
+        assert!(INDEX_HTML.contains(r#"<article class="db-group-list-item">"#));
         assert!(INDEX_HTML.contains("function openDbGroupModal()"));
         assert!(INDEX_HTML.contains("function closeDbGroupModal()"));
         assert!(!INDEX_HTML.contains("id=\"openDbGroupModal\""));
