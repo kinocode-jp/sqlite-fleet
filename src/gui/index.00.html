@@ -60,6 +60,26 @@
     tr:last-child td { border-bottom:0; }
     .path-cell { max-width:360px; }
     .pending-cell { min-width:220px; }
+    .db-table { min-width:760px; table-layout:fixed; }
+    .db-table th, .db-table td { padding:8px 10px; vertical-align:middle; }
+    .db-table th { white-space:normal; overflow-wrap:anywhere; line-height:1.2; }
+    .db-table .col-id { width:14%; }
+    .db-table .col-status { width:52px; text-align:center; }
+    .db-table .col-groups { width:13%; }
+    .db-table .col-applied { width:66px; text-align:right; }
+    .db-table .col-pending { width:18%; }
+    .db-table .col-path { width:22%; }
+    .db-table .col-actions { width:212px; }
+    .truncate-text { display:block; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .truncate-text code { overflow-wrap:normal; }
+    .compact-cell { min-width:0; }
+    .compact-cell .muted { font-size:11px; }
+    .compact-chip-row { display:flex; flex-wrap:nowrap; gap:4px; max-width:100%; overflow:hidden; }
+    .compact-chip-row .chip { min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-height:20px; padding:1px 6px; }
+    .status-icon { display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; border:1px solid var(--line); font-size:13px; font-weight:800; line-height:1; }
+    .status-icon.ok { color:var(--ok); background:var(--ok-bg); border-color:#bfe8ce; }
+    .status-icon.warn { color:var(--warn); background:var(--warn-bg); border-color:#f4d49a; }
+    .status-icon.bad { color:var(--danger); background:var(--danger-bg); border-color:#f2b8b5; }
     code { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size:12px; overflow-wrap:anywhere; }
     .pill { display:inline-flex; align-items:center; min-height:24px; border-radius:999px; padding:3px 9px; font-size:12px; font-weight:760; border:1px solid var(--line); background:var(--surface-3); }
     .ok { color:var(--ok); background:var(--ok-bg); border-color:#bfe8ce; }
@@ -335,8 +355,8 @@
           </div>
         </div>
         <div class="table-wrap">
-          <table>
-            <thead><tr><th>ID</th><th>Status</th><th>Migration Groups</th><th>Applied</th><th>Pending</th><th>Path</th><th>Actions</th></tr></thead>
+          <table class="db-table">
+            <thead><tr><th class="col-id">ID</th><th class="col-status">Status</th><th class="col-groups">Migration Groups</th><th class="col-applied">Applied</th><th class="col-pending">Pending</th><th class="col-path">Path</th><th class="col-actions">Actions</th></tr></thead>
             <tbody id="databases"></tbody>
           </table>
         </div>
@@ -947,6 +967,10 @@
         targetDbLabel: 'Target DB',
         assignedGroupsLabel: 'Applied Migration Groups',
         otherGroupsLabel: 'Other groups',
+        statusOkLabel: 'Up to date',
+        statusPendingLabel: 'Pending migrations',
+        statusCorruptLabel: 'Checksum or unknown migration issue',
+        statusErrorLabel: 'Error',
         selectorsLabel: 'Selectors',
         previewLabel: 'Preview',
         allowed: 'allowed',

@@ -28,6 +28,10 @@
         targetDbLabel: '対象DB',
         assignedGroupsLabel: '適用マイグレーショングループ',
         otherGroupsLabel: '他のグループ',
+        statusOkLabel: '最新です',
+        statusPendingLabel: '未適用のマイグレーションがあります',
+        statusCorruptLabel: 'Checksumまたは不明な適用履歴があります',
+        statusErrorLabel: 'エラーがあります',
         selectorsLabel: 'セレクタ',
         previewLabel: 'プレビュー',
         allowed: '許可',
@@ -453,8 +457,16 @@
       const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
       return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
     }
+    function compactChips(values) {
+      const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
+      return list.length ? `<div class="compact-chip-row" title="${escapeHtml(list.join(', '))}">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function truncateCode(value) {
+      return `<span class="truncate-text" title="${escapeHtml(value)}"><code>${escapeHtml(value)}</code></span>`;
+    }
     function otherGroupsText(groups) {
-      return groups && groups.length ? `<div class="muted">${escapeHtml(t('otherGroupsLabel'))}: ${escapeHtml(groups.join(', '))}</div>` : '';
+      const text = groups && groups.length ? `${t('otherGroupsLabel')}: ${groups.join(', ')}` : '';
+      return text ? `<div class="muted truncate-text" title="${escapeHtml(text)}">${escapeHtml(text)}</div>` : '';
     }
     function databaseOtherGroups(databaseId, currentGroup) {
       return (state.db_groups || [])
@@ -464,18 +476,25 @@
     }
     function renderDatabaseRow(plan, currentGroup) {
       const pending = plan.pending.length;
-      const status = plan.error ? `<span class="pill bad">error</span>` :
-        plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
-        pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
+      const statusKind = plan.error ? 'error' :
+        plan.checksum_errors.length || plan.unknown_applied.length ? 'corrupt' :
+        pending ? 'pending' : 'ok';
+      const statusText = statusKind === 'error' ? t('statusErrorLabel') :
+        statusKind === 'corrupt' ? t('statusCorruptLabel') :
+        statusKind === 'pending' ? t('statusPendingLabel') : t('statusOkLabel');
+      const statusIcon = statusKind === 'ok' ? '✓' : statusKind === 'pending' ? '!' : '×';
+      const statusClass = statusKind === 'ok' ? 'ok' : statusKind === 'pending' ? 'warn' : 'bad';
+      const status = `<span class="status-icon ${statusClass}" title="${escapeHtml(statusText)}" aria-label="${escapeHtml(statusText)}">${escapeHtml(statusIcon)}</span>`;
       const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
       const otherGroups = databaseOtherGroups(plan.database.id, currentGroup);
+      const pendingNames = pending ? plan.pending.map(migrationFileName).join(', ') : '';
       return `<tr>
-        <td data-database-row="${escapeHtml(plan.database.id)}"><code>${escapeHtml(plan.database.id)}</code>${otherGroupsText(otherGroups)}</td>
-        <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
-        <td>${chips(plan.migration_groups)}</td>
+        <td class="compact-cell" data-database-row="${escapeHtml(plan.database.id)}">${truncateCode(plan.database.id)}${otherGroupsText(otherGroups)}</td>
+        <td class="col-status">${status}${details ? `<div class="muted truncate-text" title="${escapeHtml(details)}">${escapeHtml(details)}</div>` : ''}</td>
+        <td class="compact-cell">${compactChips(plan.migration_groups)}</td>
         <td>${escapeHtml(plan.applied_count)}</td>
-        <td>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
-        <td><code>${escapeHtml(plan.database.path)}</code></td>
+        <td class="compact-cell">${pending ? `<span class="truncate-text" title="${escapeHtml(pendingNames)}">${escapeHtml(pendingNames)}</span>` : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+        <td class="compact-cell">${truncateCode(plan.database.path)}</td>
         <td class="actions">
           <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
           <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
