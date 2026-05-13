@@ -15,10 +15,6 @@
         dbGroupsLabel: 'DBグループ',
         upToDate: '最新',
         pendingDb: '未適用DB',
-        statusLabel: '状態',
-        appliedLabel: '適用済み',
-        pendingLabel: '未適用',
-        actionsLabel: '操作',
         migrationsLabel: 'Migrations',
         migrationFilesLabel: 'マイグレーションファイル',
         fileNameLabel: 'ファイル名',
@@ -459,49 +455,38 @@
       const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
       return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
     }
-    function databaseListHeader() {
-      return `<div class="db-record-list-header" aria-hidden="true">
-        <span>ID</span>
-        <span>${escapeHtml(t('statusLabel'))}</span>
-        <span>${escapeHtml(t('migrationGroupsLabel'))}</span>
-        <span>${escapeHtml(t('appliedLabel'))}</span>
-        <span>${escapeHtml(t('pendingLabel'))}</span>
-        <span>${escapeHtml(t('pathLabel'))}</span>
-        <span>${escapeHtml(t('actionsLabel'))}</span>
-      </div>`;
-    }
     function renderDatabaseRow(plan) {
       const pending = plan.pending.length;
       const status = plan.error ? `<span class="pill bad">error</span>` :
         plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
         pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
       const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
-      return `<article class="db-record-list-item" data-database-row="${escapeHtml(plan.database.id)}">
-        <div class="db-record-cell"><span class="db-record-label">ID</span><code>${escapeHtml(plan.database.id)}</code></div>
-        <div class="db-record-cell"><span class="db-record-label">${escapeHtml(t('statusLabel'))}</span><div>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</div></div>
-        <div class="db-record-cell"><span class="db-record-label">${escapeHtml(t('migrationGroupsLabel'))}</span>${chips(plan.migration_groups)}</div>
-        <div class="db-record-cell"><span class="db-record-label">${escapeHtml(t('appliedLabel'))}</span><span>${escapeHtml(plan.applied_count)}</span></div>
-        <div class="db-record-cell"><span class="db-record-label">${escapeHtml(t('pendingLabel'))}</span><span>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</span></div>
-        <div class="db-record-cell"><span class="db-record-label">${escapeHtml(t('pathLabel'))}</span><code>${escapeHtml(plan.database.path)}</code></div>
-        <div class="actions" aria-label="${escapeHtml(t('actionsLabel'))}">
+      return `<tr>
+        <td data-database-row="${escapeHtml(plan.database.id)}"><code>${escapeHtml(plan.database.id)}</code></td>
+        <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
+        <td>${chips(plan.migration_groups)}</td>
+        <td>${escapeHtml(plan.applied_count)}</td>
+        <td>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+        <td><code>${escapeHtml(plan.database.path)}</code></td>
+        <td class="actions">
           <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
           <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
           <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">${escapeHtml(t('apply'))}</button>
-        </div>
-      </article>`;
+        </td>
+      </tr>`;
     }
     function renderDatabaseRowsByGroup(plans) {
       const databasePlans = plans || [];
-      if (!databasePlans.length) return `<p class="muted">${escapeHtml(t('noDb'))}</p>`;
+      if (!databasePlans.length) return `<tr><td colspan="7" class="muted">${escapeHtml(t('noDb'))}</td></tr>`;
       const customGroups = (state.db_groups || []).filter((group) => group.name !== 'all');
-      if (!customGroups.length) return databaseListHeader() + databasePlans.map(renderDatabaseRow).join('');
+      if (!customGroups.length) return databasePlans.map(renderDatabaseRow).join('');
       const planById = new Map(databasePlans.map((plan) => [plan.database.id, plan]));
       const rendered = new Set();
-      const rows = [databaseListHeader()];
+      const rows = [];
       customGroups.forEach((group) => {
         const groupPlans = (group.database_ids || []).map((id) => planById.get(id)).filter(Boolean);
         if (!groupPlans.length) return;
-        rows.push(`<div class="db-list-divider">${escapeHtml(group.name)}</div>`);
+        rows.push(`<tr class="group-divider"><th colspan="7">${escapeHtml(group.name)}</th></tr>`);
         groupPlans.forEach((plan) => {
           rendered.add(plan.database.id);
           rows.push(renderDatabaseRow(plan));
@@ -509,7 +494,7 @@
       });
       const otherPlans = databasePlans.filter((plan) => !rendered.has(plan.database.id));
       if (otherPlans.length) {
-        rows.push(`<div class="db-list-divider">${escapeHtml(t('ungroupedDb'))}</div>`);
+        rows.push(`<tr class="group-divider"><th colspan="7">${escapeHtml(t('ungroupedDb'))}</th></tr>`);
         otherPlans.forEach((plan) => rows.push(renderDatabaseRow(plan)));
       }
       return rows.join('');

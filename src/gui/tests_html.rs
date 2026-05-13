@@ -90,9 +90,8 @@
     #[test]
     fn html_escapes_dynamic_table_values_consistently() {
         assert!(INDEX_HTML.contains("return String(value).replace"));
-        assert!(INDEX_HTML.contains("<span>${escapeHtml(plan.applied_count)}</span>"));
+        assert!(INDEX_HTML.contains("<td>${escapeHtml(plan.applied_count)}</td>"));
         assert!(!INDEX_HTML.contains("<td>${plan.applied_count}</td>"));
-        assert!(!INDEX_HTML.contains("<span>${plan.applied_count}</span>"));
     }
 
     #[test]
@@ -187,6 +186,11 @@
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
         assert!(INDEX_HTML.contains("'Version': 'Version'"));
         assert!(INDEX_HTML.contains("'File name': 'File name'"));
+        assert!(INDEX_HTML.contains("'Status': 'Status'"));
+        assert!(INDEX_HTML.contains("'Applied': 'Applied'"));
+        assert!(INDEX_HTML.contains("'Pending': 'Pending'"));
+        assert!(INDEX_HTML.contains("'Path': 'Path'"));
+        assert!(INDEX_HTML.contains("'Actions': 'Actions'"));
         assert!(INDEX_HTML.contains("'テンプレート': 'Template'"));
         assert!(INDEX_HTML.contains("'スニペット': 'Snippet'"));
         assert!(INDEX_HTML.contains("'フォーマット': 'Format'"));
@@ -201,6 +205,11 @@
         assert!(INDEX_HTML.contains("'New migration': '新規マイグレーション'"));
         assert!(INDEX_HTML.contains("'Version': 'バージョン'"));
         assert!(INDEX_HTML.contains("'File name': 'ファイル名'"));
+        assert!(INDEX_HTML.contains("'Status': '状態'"));
+        assert!(INDEX_HTML.contains("'Applied': '適用済み'"));
+        assert!(INDEX_HTML.contains("'Pending': '未適用'"));
+        assert!(INDEX_HTML.contains("'Path': 'パス'"));
+        assert!(INDEX_HTML.contains("'Actions': '操作'"));
         assert!(!INDEX_HTML.contains("'バージョン': 'Version'"));
         assert!(INDEX_HTML.contains("'Template': 'テンプレート'"));
         assert!(INDEX_HTML.contains("'Format': 'フォーマット'"));
@@ -282,11 +291,10 @@
         assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
         assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="db-group-list panel-list"></div>"#));
         assert!(INDEX_HTML.contains(".db-group-list-item { display:grid; grid-template-columns:"));
-        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form, .db-group-list-item, .db-record-list-item { grid-template-columns:1fr; }"));
+        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form, .db-group-list-item { grid-template-columns:1fr; }"));
         assert!(INDEX_HTML.contains(r#"<article class="db-group-list-item">"#));
-        assert!(INDEX_HTML.contains(r#"<div id="databases" class="db-record-list"></div>"#));
-        assert!(INDEX_HTML.contains(r#"<article class="db-record-list-item" data-database-row="${escapeHtml(plan.database.id)}">"#));
-        assert!(INDEX_HTML.contains(".db-record-list-item { display:grid; grid-template-columns:"));
+        assert!(INDEX_HTML.contains(r#"<tbody id="databases"></tbody>"#));
+        assert!(INDEX_HTML.contains("border-bottom:1px solid var(--line); background:transparent;"));
         assert!(INDEX_HTML.contains("function openDbGroupModal()"));
         assert!(INDEX_HTML.contains("function closeDbGroupModal()"));
         assert!(!INDEX_HTML.contains("id=\"openDbGroupModal\""));
@@ -312,9 +320,7 @@
         assert!(!INDEX_HTML.contains("Add to DB group"));
         assert!(INDEX_HTML.contains("closeDatabaseFileModal();"));
         assert!(INDEX_HTML.contains("function renderDatabaseRowsByGroup(plans)"));
-        assert!(INDEX_HTML.contains(r#"<div class="db-list-divider">${escapeHtml(group.name)}</div>"#));
-        assert!(INDEX_HTML.contains(r#"<div class="db-list-divider">${escapeHtml(t('ungroupedDb'))}</div>"#));
-        assert!(!INDEX_HTML.contains(r#"<tbody id="databases"></tbody>"#));
+        assert!(INDEX_HTML.contains(r#"<tr class="group-divider"><th colspan="7">${escapeHtml(group.name)}</th></tr>"#));
         assert!(INDEX_HTML.contains("ungroupedDb: 'Ungrouped DBs'"));
     }
 
