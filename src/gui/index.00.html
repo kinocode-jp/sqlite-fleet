@@ -138,6 +138,7 @@
     .modal-body { display:grid; gap:14px; padding:16px; }
     .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:0 16px 16px; }
     .migration-file-form { grid-template-columns:160px minmax(0, 1fr) 220px; align-items:start; }
+    .migration-file-form .file-name-field { grid-column:1 / -1; max-width:640px; }
     .migration-file-form .wide { grid-column:1 / -1; }
     .sql-editor { display:grid; gap:8px; }
     .sql-control-row { display:grid; grid-template-columns:96px minmax(180px, 1fr) auto; gap:8px; align-items:center; }
@@ -374,7 +375,7 @@
             <button id="closeMigrationFileModal" type="button" aria-label="Close">×</button>
           </div>
           <div class="modal-body migration-file-form">
-            <label class="field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>
+            <label class="field file-name-field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>
             <label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>
             <div class="field wide sql-editor">
               <div class="sql-control-row">

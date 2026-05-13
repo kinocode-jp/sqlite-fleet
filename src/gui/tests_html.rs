@@ -282,7 +282,8 @@
         assert!(INDEX_HTML.contains(r#"<div id="migrationDetailBody" class="modal-body"></div>"#));
         assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(!INDEX_HTML.contains(r#"<thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
-        assert!(INDEX_HTML.contains(r#"<label class="field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
+        assert!(INDEX_HTML.contains(".migration-file-form .file-name-field { grid-column:1 / -1; max-width:640px; }"));
+        assert!(INDEX_HTML.contains(r#"<label class="field file-name-field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
         assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>"#));
         assert!(INDEX_HTML.contains(r#"<span class="field-label">テンプレート</span>"#));
         assert!(INDEX_HTML.contains(r#"<input id="newMigrationTemplateSearch" list="newMigrationTemplateOptions" placeholder="テンプレート検索" aria-label="SQL template">"#));
