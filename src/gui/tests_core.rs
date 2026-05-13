@@ -684,6 +684,82 @@
     }
 
     #[test]
+    fn api_update_migration_file_allows_unapplied_migration() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        let migration_path = migration_dir.join("001_initial.sql");
+        std::fs::write(&migration_path, "CREATE TABLE initial(id INTEGER);").unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+        let body = serde_json::json!({
+            "path": migration_path,
+            "version": "001",
+            "group": "main",
+            "sql": "CREATE TABLE initial(id INTEGER PRIMARY KEY);"
+        });
+
+        api_update_migration_file(&state, serde_json::to_vec(&body).unwrap()).unwrap();
+
+        assert_eq!(
+            std::fs::read_to_string(&migration_path).unwrap(),
+            "CREATE TABLE initial(id INTEGER PRIMARY KEY);"
+        );
+    }
+
+    #[test]
+    fn api_update_migration_file_rejects_applied_migration() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&migration_dir).unwrap();
+        std::fs::create_dir(&data_dir).unwrap();
+        let migration_path = migration_dir.join("001_initial.sql");
+        std::fs::write(&migration_path, "CREATE TABLE initial(id INTEGER);").unwrap();
+        let db_path = data_dir.join("tenant.db");
+        let conn = Connection::open(&db_path).unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            ..Config::default()
+        };
+        sqlite_fleet::ensure_migrations_table(&conn, config.migrations_table()).unwrap();
+        conn.execute(
+            &format!(
+                "INSERT INTO {} (version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5)",
+                config.migrations_table()
+            ),
+            ("001", "initial", "old", 1_i64, 1_i64),
+        )
+        .unwrap();
+        config.validate().unwrap();
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+        let body = serde_json::json!({
+            "path": migration_path,
+            "version": "001",
+            "group": "main",
+            "sql": "CREATE TABLE initial(id INTEGER PRIMARY KEY);"
+        });
+
+        let error = api_update_migration_file(&state, serde_json::to_vec(&body).unwrap())
+            .err()
+            .unwrap();
+
+        assert!(error.to_string().contains("適用済みのため編集できません"));
+        assert_eq!(
+            std::fs::read_to_string(&migration_path).unwrap(),
+            "CREATE TABLE initial(id INTEGER);"
+        );
+    }
+
+    #[test]
     fn api_create_migration_file_requires_group_when_groups_are_explicit() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");

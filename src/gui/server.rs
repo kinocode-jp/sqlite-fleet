@@ -332,6 +332,22 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 api_create_migration_file(state, request_body.unwrap_or_default()),
             )
         }
+        ("POST", "/api/admin/migration-file/update") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_update_migration_file(state, request_body.unwrap_or_default()),
+            )
+        }
         ("POST", "/api/admin/database-file") => {
             if !config.gui.allow_migration_edit {
                 return write_json_error(

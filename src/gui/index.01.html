@@ -1,4 +1,8 @@
         createdMigrationFile: 'マイグレーションファイルを追加しました',
+        savedMigrationFile: 'マイグレーションファイルを保存しました',
+        editMigrationTitle: 'マイグレーション詳細',
+        createMigrationTitle: '新規マイグレーション',
+        migrationAppliedReadonly: (databases) => `適用済みのため編集できません: ${databases}`,
         createdDatabaseFile: 'DBを追加しました',
         duplicateMigrationGroup: (name) => `マイグレーショングループは既に存在します: ${name}`,
         newMigrationGroup: 'グループ作成',
@@ -73,6 +77,8 @@
         yes: 'yes',
         no: 'no',
         table: 'table',
+        create: '作成',
+        save: '保存',
       },
     };
     const pageTitles = {
@@ -367,19 +373,39 @@
     function openMigrationDetailModal(index) {
       const migration = state && state.migrations ? state.migrations[Number(index)] : null;
       if (!migration) return;
-      const rows = [
-        [t('fileNameLabel'), migrationFileName(migration)],
-        [t('versionLabel'), migration.version],
-        [t('nameLabel'), migration.name],
-        [t('groupLabel'), migration.group],
-        [t('checksumLabel'), migration.checksum],
-        [t('pathLabel'), migration.path || ''],
-      ];
-      $('migrationDetailBody').innerHTML = `<div class="key-grid">${rows.map(([label, value]) => `<div class="key-item"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`).join('')}</div>`;
-      $('migrationDetailModal').hidden = false;
+      migrationFileMode = 'edit';
+      editingMigration = migration;
+      const appliedDatabases = migration.applied_databases || [];
+      const readOnly = appliedDatabases.length > 0 || !(state.gui_permissions && state.gui_permissions.allow_migration_edit);
+      $('migrationFileModalTitle').textContent = t('editMigrationTitle');
+      renderMigrationFileGroupOptions();
+      $('newMigrationFilename').value = migrationFileName(migration);
+      $('newMigrationFilename').disabled = true;
+      $('newMigrationGroupField').hidden = false;
+      if (!Array.from($('newMigrationGroup').options).some((option) => option.value === migration.group)) {
+        $('newMigrationGroup').innerHTML += `<option value="${escapeHtml(migration.group)}">${escapeHtml(migration.group)}</option>`;
+      }
+      $('newMigrationGroup').value = migration.group;
+      $('newMigrationGroup').disabled = true;
+      $('newMigrationLatestFilename').textContent = '';
+      $('newMigrationSql').value = migration.sql || '';
+      $('newMigrationSql').readOnly = readOnly;
+      $('migrationTemplateRow').hidden = true;
+      $('migrationSnippetRow').hidden = true;
+      $('formatNewMigrationSql').hidden = readOnly;
+      $('clearNewMigrationSql').hidden = readOnly;
+      $('createMigrationFile').hidden = readOnly;
+      $('createMigrationFile').textContent = t('save');
+      $('migrationFileStatus').hidden = !readOnly;
+      $('migrationFileStatus').textContent = readOnly && appliedDatabases.length
+        ? t('migrationAppliedReadonly', appliedDatabases.join(', '))
+        : '';
+      updateNewMigrationSqlMeta();
+      $('migrationFileModal').hidden = false;
+      $('newMigrationSql').focus();
     }
     function closeMigrationDetailModal() {
-      $('migrationDetailModal').hidden = true;
+      closeMigrationFileModal();
     }
     function renderDatabaseSelectors(plans) {
       const current = $('sqlDatabase').value;
@@ -473,6 +499,7 @@
         '/api/admin/db-group': 'savedDbGroup',
         '/api/admin/database-migration-group': 'savedDatabaseRule',
         '/api/admin/migration-file': 'createdMigrationFile',
+        '/api/admin/migration-file/update': 'savedMigrationFile',
         '/api/admin/database-file': 'createdDatabaseFile',
       };
       return messages[path] ? t(messages[path]) : (fallback || t('saved'));
@@ -527,11 +554,24 @@
       $('migrationGroupModal').hidden = true;
     }
     function openMigrationFileModal() {
+      migrationFileMode = 'create';
+      editingMigration = null;
+      $('migrationFileModalTitle').textContent = t('createMigrationTitle');
       renderMigrationFileGroupOptions();
       renderMigrationSnippets();
       renderLatestMigrationFilename();
       $('newMigrationFilename').value = nextMigrationFileName();
+      $('newMigrationFilename').disabled = false;
+      $('newMigrationGroup').disabled = false;
       $('newMigrationSql').value = '';
+      $('newMigrationSql').readOnly = false;
+      $('migrationFileStatus').hidden = true;
+      $('migrationTemplateRow').hidden = false;
+      $('migrationSnippetRow').hidden = false;
+      $('formatNewMigrationSql').hidden = false;
+      $('clearNewMigrationSql').hidden = false;
+      $('createMigrationFile').hidden = false;
+      $('createMigrationFile').textContent = t('create');
       updateNewMigrationSqlMeta();
       $('migrationFileModal').hidden = false;
       $('newMigrationFilename').focus();
@@ -539,6 +579,8 @@
     }
     function closeMigrationFileModal() {
       $('migrationFileModal').hidden = true;
+      migrationFileMode = 'create';
+      editingMigration = null;
     }
     async function saveDbGroup() {
       try {
@@ -562,6 +604,17 @@
     }
     async function createMigrationFile() {
       try {
+        if (migrationFileMode === 'edit') {
+          if (!editingMigration) throw new Error(t('unknownMigration'));
+          await postAdmin('/api/admin/migration-file/update', {
+            path: editingMigration.path,
+            version: editingMigration.version,
+            group: editingMigration.group,
+            sql: $('newMigrationSql').value,
+          });
+          closeMigrationFileModal();
+          return;
+        }
         const filenameParts = parseMigrationFilename($('newMigrationFilename').value);
         await postAdmin('/api/admin/migration-file', {
           version: filenameParts.version,
@@ -1143,11 +1196,6 @@
     $('migrationFileModal').addEventListener('click', (event) => {
       if (event.target === $('migrationFileModal')) closeMigrationFileModal();
     });
-    $('closeMigrationDetailModal').addEventListener('click', closeMigrationDetailModal);
-    $('closeMigrationDetail').addEventListener('click', closeMigrationDetailModal);
-    $('migrationDetailModal').addEventListener('click', (event) => {
-      if (event.target === $('migrationDetailModal')) closeMigrationDetailModal();
-    });
     $('closeSnippetDeleteModal').addEventListener('click', closeSnippetDeleteModal);
     $('cancelSnippetDelete').addEventListener('click', closeSnippetDeleteModal);
     $('confirmSnippetDelete').addEventListener('click', confirmDeleteMigrationSnippet);
@@ -1158,10 +1206,6 @@
       if (event.key !== 'Escape') return;
       if (!$('snippetDeleteModal').hidden) {
         closeSnippetDeleteModal();
-        return;
-      }
-      if (!$('migrationDetailModal').hidden) {
-        closeMigrationDetailModal();
         return;
       }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();

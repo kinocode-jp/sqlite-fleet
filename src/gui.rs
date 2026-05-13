@@ -2,9 +2,9 @@ use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, OpenFlags};
 use serde::{Deserialize, Serialize};
 use sqlite_fleet::{
-    backup, check, discover_databases, load_migrations, migrate_with_options, status_report,
-    write_audit_event, write_report_json, Config, DatabaseSelection, MigrateOptions,
-    MigrationGroupConfig, ALL_DB_GROUP, MAIN_MIGRATION_GROUP,
+    backup, check, discover_databases, load_migrations, migrate_with_options,
+    read_applied_migrations, status_report, write_audit_event, write_report_json, Config,
+    DatabaseSelection, MigrateOptions, MigrationGroupConfig, ALL_DB_GROUP, MAIN_MIGRATION_GROUP,
 };
 use std::collections::HashMap;
 use std::ffi::OsString;

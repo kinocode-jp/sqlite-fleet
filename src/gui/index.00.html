@@ -131,7 +131,7 @@
     .modal-backdrop { position:fixed; inset:0; z-index:50; display:grid; place-items:center; padding:18px; background:rgba(16,24,32,.48); }
     .modal-backdrop[hidden] { display:none; }
     .modal { width:min(460px, 100%); border:1px solid var(--line); border-radius:8px; background:var(--surface); box-shadow:0 20px 60px rgba(16,24,40,.22); overflow:hidden; }
-    .modal.wide { width:min(960px, calc(100vw - 36px)); }
+    .modal.wide { width:min(1120px, calc(100vw - 36px)); }
     .modal.wide .modal-body { max-height:calc(100vh - 170px); overflow:auto; }
     .modal-header { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; padding:15px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
     .modal-header h2 { margin:0; font-size:16px; }
@@ -140,6 +140,7 @@
     .migration-file-form { grid-template-columns:160px minmax(0, 1fr) 220px; align-items:start; }
     .migration-file-form .file-name-field { grid-column:1 / -1; max-width:640px; }
     .migration-file-form .wide { grid-column:1 / -1; }
+    .migration-file-status { grid-column:1 / -1; margin:0; color:var(--muted); font-size:13px; }
     .sql-editor { display:grid; gap:8px; }
     .sql-control-row { display:grid; grid-template-columns:96px minmax(180px, 1fr) auto; gap:8px; align-items:center; }
     .sql-snippet-toolbar { grid-template-columns:96px minmax(160px, 1fr) auto auto minmax(140px, .8fr) auto; }
@@ -355,19 +356,6 @@
         </div>
       </section>
 
-      <div id="migrationDetailModal" class="modal-backdrop" hidden>
-        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="migrationDetailModalTitle">
-          <div class="modal-header">
-            <h2 id="migrationDetailModalTitle">マイグレーション詳細</h2>
-            <button id="closeMigrationDetailModal" type="button" aria-label="Close">×</button>
-          </div>
-          <div id="migrationDetailBody" class="modal-body"></div>
-          <div class="modal-actions">
-            <button id="closeMigrationDetail" type="button">閉じる</button>
-          </div>
-        </section>
-      </div>
-
       <div id="migrationFileModal" class="modal-backdrop" hidden>
         <section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">
           <div class="modal-header">
@@ -377,15 +365,16 @@
           <div class="modal-body migration-file-form">
             <label class="field file-name-field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>
             <label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>
+            <p id="migrationFileStatus" class="migration-file-status" hidden></p>
             <div class="field wide sql-editor">
-              <div class="sql-control-row">
+              <div id="migrationTemplateRow" class="sql-control-row">
                 <span class="field-label">テンプレート</span>
                 <input id="newMigrationTemplateSearch" list="newMigrationTemplateOptions" placeholder="テンプレート検索" aria-label="SQL template">
                 <datalist id="newMigrationTemplateOptions"></datalist>
                 <input id="newMigrationSqlTemplate" type="hidden">
                 <button id="insertNewMigrationTemplate" type="button">テンプレート挿入</button>
               </div>
-              <div class="sql-control-row sql-snippet-toolbar">
+              <div id="migrationSnippetRow" class="sql-control-row sql-snippet-toolbar">
                 <span class="field-label">スニペット</span>
                 <select id="newMigrationSnippetSelect" aria-label="Snippet"></select>
                 <button id="insertNewMigrationSnippet" type="button">挿入</button>
@@ -631,6 +620,8 @@
     let schemaState = null;
     let selectedMigrationGroupName = null;
     let pendingSnippetDeleteName = null;
+    let migrationFileMode = 'create';
+    let editingMigration = null;
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
@@ -718,6 +709,7 @@
       'スニペット削除': 'Delete snippet',
       'マイグレーション詳細': 'Migration details',
       '閉じる': 'Close',
+      '保存': 'Save',
       '選択したスニペットを削除します。': 'Delete the selected snippet.',
       'スニペットを削除': 'Delete snippet',
       'SQLファイル保存': 'Save SQL file',
@@ -849,10 +841,16 @@
         selectDbForSchema: 'Select a DB and load schema',
         unset: 'Unset',
         saved: 'Saved',
+        create: 'Create',
+        save: 'Save',
         savedMigrationGroup: 'Migration Group saved',
         savedDbGroup: 'DB Group saved',
         savedDatabaseRule: 'DB assignment saved',
         createdMigrationFile: 'Migration file registered',
+        savedMigrationFile: 'Migration file saved',
+        editMigrationTitle: 'Migration details',
+        createMigrationTitle: 'New migration',
+        migrationAppliedReadonly: (databases) => `Applied to DBs and read-only: ${databases}`,
         createdDatabaseFile: 'DB registered',
         duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
         newMigrationGroup: 'New group',

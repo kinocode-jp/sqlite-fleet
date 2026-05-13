@@ -11,21 +11,33 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
         discover_databases(config),
         load_migrations(config),
     ) {
-        (Ok(status), Ok(databases), Ok(migrations)) => ApiEnvelope {
-            ok: true,
-            data: Some(StateData {
-                migration_groups: api_migration_groups(config, &databases, &migrations),
-                db_groups: api_db_groups(config, &databases),
-                database_migration_rules: api_database_migration_rules(config),
-                gui_permissions: GuiPermissionData::from_config(config),
-                settings: SettingsData::from_config(config),
-                project: config.project.name.clone(),
-                status,
-                databases,
-                migrations,
-            }),
-            error: None,
-        },
+        (Ok(status), Ok(databases), Ok(migrations)) => {
+            let migration_data = match api_migrations(config, &databases, &migrations) {
+                Ok(migration_data) => migration_data,
+                Err(error) => {
+                    return ApiEnvelope {
+                        ok: false,
+                        data: None,
+                        error: Some(error.to_string()),
+                    };
+                }
+            };
+            ApiEnvelope {
+                ok: true,
+                data: Some(StateData {
+                    migration_groups: api_migration_groups(config, &databases, &migrations),
+                    db_groups: api_db_groups(config, &databases),
+                    database_migration_rules: api_database_migration_rules(config),
+                    gui_permissions: GuiPermissionData::from_config(config),
+                    settings: SettingsData::from_config(config),
+                    project: config.project.name.clone(),
+                    status,
+                    databases,
+                    migrations: migration_data,
+                }),
+                error: None,
+            }
+        }
         (status, databases, migrations) => ApiEnvelope {
             ok: false,
             data: None,
@@ -39,6 +51,57 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
             ),
         },
     }
+}
+
+fn api_migrations(
+    config: &Config,
+    databases: &[sqlite_fleet::Database],
+    migrations: &[sqlite_fleet::Migration],
+) -> Result<Vec<MigrationData>> {
+    migrations
+        .iter()
+        .map(|migration| {
+            Ok(MigrationData {
+                group: migration.group.clone(),
+                version: migration.version.clone(),
+                name: migration.name.clone(),
+                checksum: migration.checksum.clone(),
+                path: migration.path.clone(),
+                sql: migration.sql.clone(),
+                applied_databases: applied_databases_for_version(
+                    config,
+                    databases,
+                    &migration.version,
+                    false,
+                )?,
+            })
+        })
+        .collect()
+}
+
+fn applied_databases_for_version(
+    config: &Config,
+    databases: &[sqlite_fleet::Database],
+    version: &str,
+    strict: bool,
+) -> Result<Vec<String>> {
+    let mut applied_databases = Vec::new();
+    for database in databases {
+        if !database.exists {
+            continue;
+        }
+        let applied = match open_gui_database(config, database, true)
+            .and_then(|conn| read_applied_migrations(&conn, config.migrations_table()))
+        {
+            Ok(applied) => applied,
+            Err(error) if strict => return Err(error),
+            Err(_) => continue,
+        };
+        if applied.iter().any(|migration| migration.version == version) {
+            applied_databases.push(database.id.clone());
+        }
+    }
+    Ok(applied_databases)
 }
 
 fn api_migration_groups(
@@ -437,6 +500,69 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
         "migration file を作成しました: {}",
         path.display()
     )))
+}
+
+fn api_update_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: MigrationFileUpdateRequest =
+        serde_json::from_slice(&body).context("migration file update request body のJSONが不正です")?;
+    let version = clean_version(&request.version)?;
+    let group = clean_name(&request.group, "Migration group name")?;
+    let sql = request.sql.trim();
+    if sql.is_empty() {
+        bail!("migration SQL は空にできません");
+    }
+    if utf8_byte_len(sql) > MAX_SQL_BYTES {
+        bail!("migration SQL が大きすぎます");
+    }
+    let config = locked_config(state)?;
+    let databases = discover_databases(&config)?;
+    let applied_databases = applied_databases_for_version(&config, &databases, &version, true)?;
+    if !applied_databases.is_empty() {
+        bail!(
+            "このmigrationは既にDBへ適用済みのため編集できません: {}",
+            applied_databases.join(", ")
+        );
+    }
+    let requested_path = PathBuf::from(request.path.trim());
+    if requested_path.as_os_str().is_empty() {
+        bail!("migration file path は空にできません");
+    }
+    validate_path_stays_in_base(&config, &requested_path, "migration file")?;
+    let migrations = load_migrations(&config)?;
+    let migration = migrations
+        .iter()
+        .find(|migration| {
+            migration.group == group
+                && migration.version == version
+                && paths_equal(&migration.path, &requested_path)
+        })
+        .ok_or_else(|| anyhow::anyhow!("指定されたmigration fileが見つかりません"))?;
+    let previous_sql = std::fs::read_to_string(&migration.path).with_context(|| {
+        format!(
+            "migration file の現在内容を読めません: {}",
+            migration.path.display()
+        )
+    })?;
+    std::fs::write(&migration.path, sql)
+        .with_context(|| format!("migration file を更新できません: {}", migration.path.display()))?;
+    if let Err(error) = load_migrations(&config) {
+        let _ = std::fs::write(&migration.path, previous_sql);
+        return Err(error);
+    }
+    Ok(AdminResult::new(format!(
+        "migration file を更新しました: {}",
+        migration.path.display()
+    )))
+}
+
+fn paths_equal(left: &Path, right: &Path) -> bool {
+    if left == right {
+        return true;
+    }
+    match (std::fs::canonicalize(left), std::fs::canonicalize(right)) {
+        (Ok(left), Ok(right)) => left == right,
+        _ => false,
+    }
 }
 
 fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {

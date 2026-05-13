@@ -3,12 +3,23 @@ struct StateData {
     project: Option<String>,
     status: sqlite_fleet::StatusReport,
     databases: Vec<sqlite_fleet::Database>,
-    migrations: Vec<sqlite_fleet::Migration>,
+    migrations: Vec<MigrationData>,
     migration_groups: Vec<MigrationGroupData>,
     db_groups: Vec<DbGroupData>,
     database_migration_rules: Vec<DatabaseMigrationRuleData>,
     gui_permissions: GuiPermissionData,
     settings: SettingsData,
+}
+
+#[derive(Serialize)]
+struct MigrationData {
+    group: String,
+    version: String,
+    name: String,
+    checksum: String,
+    path: PathBuf,
+    sql: String,
+    applied_databases: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -172,6 +183,15 @@ struct MigrationFileRequest {
     name: String,
     filename: Option<String>,
     group: Option<String>,
+    sql: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MigrationFileUpdateRequest {
+    path: String,
+    version: String,
+    group: String,
     sql: String,
 }
 
