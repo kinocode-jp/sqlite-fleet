@@ -7,6 +7,7 @@ struct StateData {
     migration_groups: Vec<MigrationGroupData>,
     db_groups: Vec<DbGroupData>,
     database_migration_rules: Vec<DatabaseMigrationRuleData>,
+    database_migration_assignments: Vec<DatabaseMigrationAssignmentData>,
     gui_permissions: GuiPermissionData,
     settings: SettingsData,
 }
@@ -38,6 +39,13 @@ struct DbGroupData {
 
 #[derive(Serialize)]
 struct DatabaseMigrationRuleData {
+    selector: String,
+    migration_groups: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DatabaseMigrationAssignmentData {
+    database_id: String,
     selector: String,
     migration_groups: Vec<String>,
 }
@@ -255,6 +263,10 @@ fn clean_list(values: Vec<String>, label: &str) -> Result<Vec<String>> {
     if values.is_empty() {
         bail!("{label} は1件以上必要です");
     }
+    clean_list_allow_empty(values, label)
+}
+
+fn clean_list_allow_empty(values: Vec<String>, label: &str) -> Result<Vec<String>> {
     let mut cleaned = Vec::new();
     for value in values {
         let value = clean_name(&value, label)?;

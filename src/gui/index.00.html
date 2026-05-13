@@ -120,6 +120,10 @@
     .info-card strong { font-size:14px; overflow-wrap:anywhere; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
+    .chip.action-chip { gap:4px; padding-right:4px; }
+    .chip-link { border:0; background:transparent; color:var(--accent-strong); padding:0; min-height:0; font:inherit; text-decoration:underline; text-underline-offset:2px; box-shadow:none; }
+    .chip-remove { min-height:18px; width:18px; padding:0; border-radius:50%; border:1px solid var(--line-strong); background:#fff; color:var(--danger); font-size:12px; line-height:1; }
+    .checksum-short { display:inline-flex; align-items:center; max-width:120px; padding:0; border:0; background:transparent; color:var(--accent-strong); font:inherit; text-decoration:underline; text-underline-offset:2px; }
     .key-grid { display:grid; gap:8px; }
     .key-item { display:grid; grid-template-columns:140px minmax(0, 1fr); gap:8px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:#fff; }
     .key-item span:first-child { color:var(--muted); font-size:12px; font-weight:700; }
@@ -352,11 +356,26 @@
         </div>
         <div class="table-wrap">
           <table>
-            <thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>
+            <thead><tr><th>File name</th><th>DB</th><th>Group</th><th>Checksum</th></tr></thead>
             <tbody id="migrations"></tbody>
           </table>
         </div>
       </section>
+
+      <div id="checksumModal" class="modal-backdrop" hidden>
+        <section class="modal" role="dialog" aria-modal="true" aria-labelledby="checksumModalTitle">
+          <div class="modal-header">
+            <h2 id="checksumModalTitle">Checksum</h2>
+            <button id="closeChecksumModal" type="button" aria-label="Close">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="key-item"><span>Checksum</span><code id="checksumModalValue"></code></div>
+          </div>
+          <div class="modal-actions">
+            <button id="closeChecksum" type="button">閉じる</button>
+          </div>
+        </section>
+      </div>
 
       <div id="migrationFileModal" class="modal-backdrop" hidden>
         <section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="migrationFileModalTitle">
@@ -875,6 +894,7 @@
         createMigrationTitle: 'New migration',
         migrationAppliedReadonly: (databases) => `Applied to DBs and read-only: ${databases}`,
         confirmCloseMigrationSql: 'Discard unsaved SQL changes?',
+        removeDbMigrationLink: (database) => `Remove migration link for ${database}`,
         createdDatabaseFile: 'DB registered',
         duplicateMigrationGroup: (name) => `Migration Group already exists: ${name}`,
         newMigrationGroup: 'New group',

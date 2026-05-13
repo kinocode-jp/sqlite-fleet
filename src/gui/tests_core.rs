@@ -797,6 +797,64 @@
     }
 
     #[test]
+    fn api_save_database_migration_group_allows_empty_assignment() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        api_save_database_migration_group(
+            &state,
+            br#"{"selector":"tenant","groups":[]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(
+            config.database_migration_groups.get("tenant"),
+            Some(&Vec::<String>::new())
+        );
+        let database = sqlite_fleet::Database {
+            id: "tenant".to_string(),
+            path: dir.path().join("tenant.db"),
+            exists: true,
+            readable: true,
+        };
+        assert!(config.migration_groups_for_database(&database).is_empty());
+    }
+
+    #[test]
+    fn api_database_migration_assignments_preserve_matching_selector() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        let database_path = data_dir.join("tenant.db");
+        Connection::open(&database_path).unwrap();
+        let mut config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            ..Config::default()
+        };
+        config
+            .database_migration_groups
+            .insert("data/tenant.db".to_string(), vec!["main".to_string()]);
+        let databases = discover_databases(&config).unwrap();
+
+        let assignments = api_database_migration_assignments(&config, &databases);
+
+        assert_eq!(assignments.len(), 1);
+        assert_eq!(assignments[0].database_id, "tenant");
+        assert_eq!(assignments[0].selector, "data/tenant.db");
+        assert_eq!(assignments[0].migration_groups, vec!["main"]);
+    }
+
+    #[test]
     fn api_create_migration_file_removes_file_when_migration_validation_fails() {
         let dir = tempfile::tempdir().unwrap();
         let migration_dir = dir.path().join("migrations");

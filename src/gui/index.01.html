@@ -4,6 +4,7 @@
         createMigrationTitle: '新規マイグレーション',
         migrationAppliedReadonly: (databases) => `適用済みのため編集できません: ${databases}`,
         confirmCloseMigrationSql: '保存していないSQLの変更を破棄しますか？',
+        removeDbMigrationLink: (database) => `${database} との紐づけを外す`,
         createdDatabaseFile: 'DBを追加しました',
         duplicateMigrationGroup: (name) => `マイグレーショングループは既に存在します: ${name}`,
         newMigrationGroup: 'グループ作成',
@@ -274,7 +275,7 @@
           pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
         const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
         return `<tr>
-          <td><code>${escapeHtml(plan.database.id)}</code></td>
+          <td data-database-row="${escapeHtml(plan.database.id)}"><code>${escapeHtml(plan.database.id)}</code></td>
           <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
           <td>${chips(plan.migration_groups)}</td>
           <td>${escapeHtml(plan.applied_count)}</td>
@@ -290,9 +291,10 @@
 
       $('migrations').innerHTML = state.migrations.map((migration, index) => `<tr>
         <td><button class="link-button" type="button" data-migration-detail-index="${escapeHtml(index)}"><code>${escapeHtml(migrationFileName(migration))}</code></button></td>
+        <td>${migrationDatabaseChips(migration)}</td>
         <td>${chips([migration.group])}</td>
-        <td><code>${escapeHtml(migration.checksum)}</code></td>
-      </tr>`).join('') || `<tr><td colspan="3" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
+        <td><button class="checksum-short" type="button" data-checksum="${escapeHtml(migration.checksum)}"><code>${escapeHtml(shortChecksum(migration.checksum))}</code></button></td>
+      </tr>`).join('') || `<tr><td colspan="4" class="muted">${escapeHtml(t('noMigrations'))}</td></tr>`;
 
       renderMigrationGroupEditor();
       renderMigrationFileGroupOptions();
@@ -463,6 +465,66 @@
     function chips(values) {
       const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
       return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function shortChecksum(value) {
+      const checksum = String(value || '');
+      return checksum.length > 16 ? `${checksum.slice(0, 8)}...${checksum.slice(-6)}` : checksum;
+    }
+    function migrationTargetDatabases(migration) {
+      const group = (state.migration_groups || []).find((item) => item.name === migration.group);
+      return group ? group.databases.slice().sort() : [];
+    }
+    function planForDatabase(databaseId) {
+      return state && state.status ? state.status.plans.find((plan) => plan.database.id === databaseId) : null;
+    }
+    function migrationDatabaseChips(migration) {
+      const applied = new Set(migration.applied_databases || []);
+      const databases = migrationTargetDatabases(migration);
+      if (!databases.length) return `<span class="muted">${escapeHtml(t('none'))}</span>`;
+      return `<div class="chip-row">${databases.map((databaseId) => {
+        const canRemove = !applied.has(databaseId);
+        return `<span class="chip action-chip">
+          <button class="chip-link" type="button" data-open-database="${escapeHtml(databaseId)}">${escapeHtml(databaseId)}</button>
+          ${canRemove ? `<button class="chip-remove" type="button" data-unassign-migration-db="${escapeHtml(databaseId)}" data-unassign-migration-group="${escapeHtml(migration.group)}" aria-label="${escapeHtml(t('removeDbMigrationLink', databaseId))}">×</button>` : ''}
+        </span>`;
+      }).join('')}</div>`;
+    }
+    function openDatabaseFromMigration(databaseId) {
+      openPage('databases');
+      const rowCell = document.querySelector(`[data-database-row="${CSS.escape(databaseId)}"]`);
+      if (rowCell) rowCell.scrollIntoView({ block: 'center' });
+    }
+    function openChecksumModal(checksum) {
+      $('checksumModalValue').textContent = checksum;
+      $('checksumModal').hidden = false;
+    }
+    function closeChecksumModal() {
+      $('checksumModal').hidden = true;
+    }
+    async function unassignMigrationDatabase(databaseId, migrationGroup) {
+      try {
+        const plan = planForDatabase(databaseId);
+        if (!plan) throw new Error(t('noDb'));
+        const explicitAssignments = (state.database_migration_assignments || [])
+          .filter((assignment) => assignment.database_id === databaseId && (assignment.migration_groups || []).includes(migrationGroup));
+        const targets = explicitAssignments.length
+          ? explicitAssignments.map((assignment) => ({
+              selector: assignment.selector,
+              groups: (assignment.migration_groups || []).filter((group) => group !== migrationGroup),
+            }))
+          : [{ selector: databaseId, groups: (plan.migration_groups || []).filter((group) => group !== migrationGroup) }];
+        for (const target of targets) {
+          await api('/api/admin/database-migration-group', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(target),
+          });
+        }
+        message(t('savedDatabaseRule'));
+        await load({ showLoadedMessage: false });
+      } catch (error) {
+        message(error.message, true);
+      }
     }
     function selectedTargetQuery() {
       const params = new URLSearchParams();
@@ -1202,6 +1264,21 @@
       renderMigrationGroupEditor();
     });
     $('migrations').addEventListener('click', (event) => {
+      const databaseButton = event.target.closest('button[data-open-database]');
+      if (databaseButton) {
+        openDatabaseFromMigration(databaseButton.dataset.openDatabase);
+        return;
+      }
+      const unassignButton = event.target.closest('button[data-unassign-migration-db]');
+      if (unassignButton) {
+        unassignMigrationDatabase(unassignButton.dataset.unassignMigrationDb, unassignButton.dataset.unassignMigrationGroup);
+        return;
+      }
+      const checksumButton = event.target.closest('button[data-checksum]');
+      if (checksumButton) {
+        openChecksumModal(checksumButton.dataset.checksum);
+        return;
+      }
       const button = event.target.closest('button[data-migration-detail-index]');
       if (button) openMigrationDetailModal(button.dataset.migrationDetailIndex);
     });
@@ -1218,6 +1295,11 @@
     $('cancelMigrationFile').addEventListener('click', closeMigrationFileModal);
     $('migrationFileModal').addEventListener('click', (event) => {
       if (event.target === $('migrationFileModal')) closeMigrationFileModal();
+    });
+    $('closeChecksumModal').addEventListener('click', closeChecksumModal);
+    $('closeChecksum').addEventListener('click', closeChecksumModal);
+    $('checksumModal').addEventListener('click', (event) => {
+      if (event.target === $('checksumModal')) closeChecksumModal();
     });
     $('closeMigrationSqlDiscardModal').addEventListener('click', closeMigrationSqlDiscardModal);
     $('cancelMigrationSqlDiscard').addEventListener('click', closeMigrationSqlDiscardModal);
@@ -1239,6 +1321,10 @@
       }
       if (!$('migrationSqlDiscardModal').hidden) {
         closeMigrationSqlDiscardModal();
+        return;
+      }
+      if (!$('checksumModal').hidden) {
+        closeChecksumModal();
         return;
       }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();

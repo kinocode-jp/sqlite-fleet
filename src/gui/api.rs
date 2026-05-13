@@ -28,6 +28,9 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
                     migration_groups: api_migration_groups(config, &databases, &migrations),
                     db_groups: api_db_groups(config, &databases),
                     database_migration_rules: api_database_migration_rules(config),
+                    database_migration_assignments: api_database_migration_assignments(
+                        config, &databases,
+                    ),
                     gui_permissions: GuiPermissionData::from_config(config),
                     settings: SettingsData::from_config(config),
                     project: config.project.name.clone(),
@@ -191,6 +194,33 @@ fn api_database_migration_rules(config: &Config) -> Vec<DatabaseMigrationRuleDat
         .collect::<Vec<_>>();
     rules.sort_by(|left, right| left.selector.cmp(&right.selector));
     rules
+}
+
+fn api_database_migration_assignments(
+    config: &Config,
+    databases: &[sqlite_fleet::Database],
+) -> Vec<DatabaseMigrationAssignmentData> {
+    let mut assignments = Vec::new();
+    for database in databases {
+        for (selector, groups) in &config.database_migration_groups {
+            if config.database_matches_selector(database, selector) {
+                let mut migration_groups = groups.clone();
+                migration_groups.sort();
+                migration_groups.dedup();
+                assignments.push(DatabaseMigrationAssignmentData {
+                    database_id: database.id.clone(),
+                    selector: selector.clone(),
+                    migration_groups,
+                });
+            }
+        }
+    }
+    assignments.sort_by(|left, right| {
+        left.database_id
+            .cmp(&right.database_id)
+            .then_with(|| left.selector.cmp(&right.selector))
+    });
+    assignments
 }
 
 fn api_plan(config: &Config) -> ApiEnvelope<Vec<sqlite_fleet::DatabasePlan>> {
@@ -408,7 +438,7 @@ fn api_save_database_migration_group(state: &ServerState, body: Vec<u8>) -> Resu
     let request: DatabaseMigrationGroupRequest = serde_json::from_slice(&body)
         .context("database migration group request body のJSONが不正です")?;
     let selector = clean_name(&request.selector, "DB selector")?;
-    let groups = clean_list(request.groups, "migration groups")?;
+    let groups = clean_list_allow_empty(request.groups, "migration groups")?;
     let mut config = locked_config(state)?;
     config
         .database_migration_groups

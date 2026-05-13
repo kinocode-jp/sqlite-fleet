@@ -676,9 +676,6 @@ impl Config {
             if selector.trim().is_empty() || selector.trim() != selector {
                 bail!("database_migration_groups のDB selectorは空白なしの非空文字列である必要があります");
             }
-            if groups.is_empty() {
-                bail!("database_migration_groups.{selector} は1件以上のマイグレーショングループが必要です");
-            }
             for group in groups {
                 validate_group_name(&format!("database_migration_groups.{selector}"), group)?;
                 if !migration_groups.contains_key(group) {
@@ -737,15 +734,15 @@ impl Config {
 
     pub fn migration_groups_for_database(&self, database: &Database) -> Vec<String> {
         let configured = self.effective_migration_groups();
-        let mut groups = self
-            .database_migration_groups
-            .iter()
-            .filter(|(selector, _groups)| {
-                database_matches_config_selector(self, database, selector)
-            })
-            .flat_map(|(_selector, groups)| groups.iter().cloned())
-            .collect::<Vec<_>>();
-        if groups.is_empty() {
+        let mut matched_rule = false;
+        let mut groups = Vec::new();
+        for (selector, rule_groups) in &self.database_migration_groups {
+            if database_matches_config_selector(self, database, selector) {
+                matched_rule = true;
+                groups.extend(rule_groups.iter().cloned());
+            }
+        }
+        if !matched_rule {
             groups = {
                 if configured.contains_key(MAIN_MIGRATION_GROUP) {
                     vec![MAIN_MIGRATION_GROUP.to_string()]
