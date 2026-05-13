@@ -132,7 +132,6 @@
         assert!(INDEX_HTML.contains(
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
-        assert!(INDEX_HTML.contains(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#));
         assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB一覧</a>"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
         let migration_group_nav = INDEX_HTML
@@ -141,23 +140,19 @@
         let migration_nav = INDEX_HTML
             .find(r#"<a href='#migrations-panel' data-page-link="migrations">"#)
             .expect("migration nav link exists");
-        let db_group_nav = INDEX_HTML
-            .find(r#"<a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups">"#)
-            .expect("db group nav link exists");
         let database_nav = INDEX_HTML
             .find(r#"<a href='#databases-panel' data-page-link="databases">"#)
             .expect("database nav link exists");
         assert!(migration_group_nav < migration_nav);
-        assert!(migration_nav < db_group_nav);
-        assert!(db_group_nav < database_nav);
+        assert!(migration_nav < database_nav);
         assert!(INDEX_HTML.contains("function updateConditionalNav()"));
+        assert!(INDEX_HTML.contains("if (hash === '#db-groups-panel') return 'databases'"));
         assert!(INDEX_HTML.contains("const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main')"));
         assert!(INDEX_HTML.contains(
             r#"<section class="panel page" data-page="migration-groups" id="migration-groups-panel">"#
         ));
-        assert!(INDEX_HTML.contains(
-            r#"<section class="panel page" data-page="db-groups" id="db-groups-panel">"#
-        ));
+        assert!(!INDEX_HTML.contains(r#"data-page-link="db-groups""#));
+        assert!(!INDEX_HTML.contains(r#"data-page="db-groups""#));
     }
 
     #[test]
@@ -282,24 +277,21 @@
 
     #[test]
     fn html_uses_modals_for_database_and_db_group_creation() {
-        assert!(INDEX_HTML
-            .contains(r#"<button id="openDbGroupModal" class="primary">新規作成</button>"#));
         assert!(INDEX_HTML.contains(r#"id="dbGroupModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
         assert!(INDEX_HTML.contains(r#"<div id="dbGroupCards" class="card-list panel-list"></div>"#));
         assert!(INDEX_HTML.contains("function openDbGroupModal()"));
         assert!(INDEX_HTML.contains("function closeDbGroupModal()"));
-        assert!(INDEX_HTML.contains("$('openDbGroupModal').addEventListener('click', openDbGroupModal)"));
+        assert!(!INDEX_HTML.contains("id=\"openDbGroupModal\""));
         assert!(INDEX_HTML.contains(
             "$('openDbGroupModalFromDatabases').addEventListener('click', openDbGroupModal)"
         ));
-        assert!(INDEX_HTML.contains("$('openDbGroupModalFromDatabases').hidden = hasDbGroups"));
         assert!(INDEX_HTML.contains("$('saveDbGroup').addEventListener('click', saveDbGroup)"));
 
         assert!(INDEX_HTML
             .contains(r#"<button id="openDatabaseFileModal" class="primary">新規作成</button>"#));
         assert!(INDEX_HTML.contains(
-            r#"<button id="openDbGroupModalFromDatabases" hidden>グループ作成</button>"#
+            r#"<button id="openDbGroupModalFromDatabases">グループ作成</button>"#
         ));
         assert!(INDEX_HTML.contains(r#"id="databaseFileModal" class="modal-backdrop" hidden"#));
         assert!(INDEX_HTML.contains(r#"<h2 id="databaseFileModalTitle">新規DB</h2>"#));
@@ -312,6 +304,9 @@
         assert!(!INDEX_HTML.contains("newDatabaseGroup"));
         assert!(!INDEX_HTML.contains("Add to DB group"));
         assert!(INDEX_HTML.contains("closeDatabaseFileModal();"));
+        assert!(INDEX_HTML.contains("function renderDatabaseRowsByGroup(plans)"));
+        assert!(INDEX_HTML.contains(r#"<tr class="group-divider"><th colspan="7">${escapeHtml(group.name)}</th></tr>"#));
+        assert!(INDEX_HTML.contains("ungroupedDb: 'Ungrouped DBs'"));
     }
 
     #[test]
@@ -467,8 +462,6 @@
         assert!(INDEX_HTML
             .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
-        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DBグループ <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB一覧 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション一覧 <span class="tool-tip""#));

@@ -195,7 +195,6 @@
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>実行</a>
         <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>マイグレーショングループ</a>
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション</a>
-        <a href='#db-groups-panel' data-page-link="db-groups" data-conditional-nav="db-groups"><span class="nav-icon">MAP</span>DBグループ</a>
         <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB一覧</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQL実行</a>
         <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>スキーマ作成</a>
@@ -308,18 +307,6 @@
         </section>
       </div>
 
-      <section class="panel page" data-page="db-groups" id="db-groups-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2 class="panel-title">DBグループ <span class="tool-tip" tabindex="0" data-tip="カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。実行ページのDB groupで選択できます。">?</span></h2>
-          </div>
-          <div class="panel-actions">
-            <button id="openDbGroupModal" class="primary">新規作成</button>
-          </div>
-        </div>
-        <div id="dbGroupCards" class="card-list panel-list"></div>
-      </section>
-
       <div id="dbGroupModal" class="modal-backdrop" hidden>
         <section class="modal" role="dialog" aria-modal="true" aria-labelledby="dbGroupModalTitle">
           <div class="modal-header">
@@ -344,9 +331,10 @@
           </div>
           <div class="panel-actions">
             <button id="openDatabaseFileModal" class="primary">新規作成</button>
-            <button id="openDbGroupModalFromDatabases" hidden>グループ作成</button>
+            <button id="openDbGroupModalFromDatabases">グループ作成</button>
           </div>
         </div>
+        <div id="dbGroupCards" class="card-list panel-list"></div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>ID</th><th>Status</th><th>Migration Groups</th><th>Applied</th><th>Pending</th><th>Path</th><th>Actions</th></tr></thead>
@@ -904,6 +892,7 @@
         none: 'None',
         noDb: 'No DBs',
         allDb: 'All DBs',
+        ungroupedDb: 'Ungrouped DBs',
         noSelection: 'No override',
         noTargetDb: 'No target DBs',
         noMigrations: 'No migrations',
@@ -1009,6 +998,7 @@
         none: 'なし',
         noDb: 'DBなし',
         allDb: '全DB',
+        ungroupedDb: '未分類DB',
         noSelection: '指定なし',
         noTargetDb: '対象DBなし',
         noMigrations: 'migration はありません',

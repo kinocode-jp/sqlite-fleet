@@ -191,6 +191,7 @@
     }
     function pageFromHash() {
       const hash = window.location.hash;
+      if (hash === '#db-groups-panel') return 'databases';
       const link = hash ? document.querySelector(`[data-page-link][href="${CSS.escape(hash)}"]`) : null;
       return link ? link.dataset.pageLink : 'execute';
     }
@@ -217,16 +218,13 @@
     function updateConditionalNav() {
       if (!state) return;
       const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main');
-      const hasDbGroups = (state.db_groups || []).some((group) => group.name !== 'all');
-      const visibility = { 'migration-groups': hasMigrationGroups, 'db-groups': hasDbGroups };
+      const visibility = { 'migration-groups': hasMigrationGroups };
       document.querySelectorAll('[data-conditional-nav]').forEach((link) => {
         link.hidden = !visibility[link.dataset.conditionalNav];
       });
       $('openMigrationGroupModalFromMigrations').hidden = hasMigrationGroups;
-      $('openDbGroupModalFromDatabases').hidden = hasDbGroups;
       const page = activePage();
       if (page === 'migration-groups' && !hasMigrationGroups) openPage('migrations');
-      if (page === 'db-groups' && !hasDbGroups) openPage('databases');
     }
     async function api(path, options = {}) {
       setBusy(true);
@@ -283,26 +281,7 @@
         [t('corruptMissing'), s.corrupt + s.missing],
       ].map(([label, value]) => `<div class="metric"><span class="label">${escapeHtml(label)}</span><strong>${escapeHtml(String(value))}</strong></div>`).join('');
 
-      $('databases').innerHTML = s.plans.map((plan) => {
-        const pending = plan.pending.length;
-        const status = plan.error ? `<span class="pill bad">error</span>` :
-          plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
-          pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
-        const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
-        return `<tr>
-          <td data-database-row="${escapeHtml(plan.database.id)}"><code>${escapeHtml(plan.database.id)}</code></td>
-          <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
-          <td>${chips(plan.migration_groups)}</td>
-          <td>${escapeHtml(plan.applied_count)}</td>
-          <td>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
-          <td><code>${escapeHtml(plan.database.path)}</code></td>
-          <td class="actions">
-            <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
-            <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
-            <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">${escapeHtml(t('apply'))}</button>
-          </td>
-        </tr>`;
-      }).join('');
+      $('databases').innerHTML = renderDatabaseRowsByGroup(s.plans);
 
       $('migrations').innerHTML = renderMigrationRowsByGroup();
 
@@ -475,6 +454,50 @@
     function chips(values) {
       const list = (values || []).filter((value) => value !== null && value !== undefined && String(value) !== '');
       return list.length ? `<div class="chip-row">${list.map((value) => `<span class="chip">${escapeHtml(value)}</span>`).join('')}</div>` : `<span class="muted">${escapeHtml(t('none'))}</span>`;
+    }
+    function renderDatabaseRow(plan) {
+      const pending = plan.pending.length;
+      const status = plan.error ? `<span class="pill bad">error</span>` :
+        plan.checksum_errors.length || plan.unknown_applied.length ? `<span class="pill bad">corrupt</span>` :
+        pending ? `<span class="pill warn">pending</span>` : `<span class="pill ok">ok</span>`;
+      const details = plan.error || [plan.checksum_errors.length && 'checksum', plan.unknown_applied.length && t('unknownMigration')].filter(Boolean).join(', ');
+      return `<tr>
+        <td data-database-row="${escapeHtml(plan.database.id)}"><code>${escapeHtml(plan.database.id)}</code></td>
+        <td>${status}${details ? `<div class="muted">${escapeHtml(details)}</div>` : ''}</td>
+        <td>${chips(plan.migration_groups)}</td>
+        <td>${escapeHtml(plan.applied_count)}</td>
+        <td>${pending ? escapeHtml(plan.pending.map(migrationFileName).join(', ')) : `<span class="muted">${escapeHtml(t('none'))}</span>`}</td>
+        <td><code>${escapeHtml(plan.database.path)}</code></td>
+        <td class="actions">
+          <button data-action="migrate" data-dry-run="true" data-database="${escapeHtml(plan.database.id)}">Dry run</button>
+          <button data-action="backup" data-database="${escapeHtml(plan.database.id)}">Backup</button>
+          <button class="danger" data-action="migrate" data-dry-run="false" data-database="${escapeHtml(plan.database.id)}">${escapeHtml(t('apply'))}</button>
+        </td>
+      </tr>`;
+    }
+    function renderDatabaseRowsByGroup(plans) {
+      const databasePlans = plans || [];
+      if (!databasePlans.length) return `<tr><td colspan="7" class="muted">${escapeHtml(t('noDb'))}</td></tr>`;
+      const customGroups = (state.db_groups || []).filter((group) => group.name !== 'all');
+      if (!customGroups.length) return databasePlans.map(renderDatabaseRow).join('');
+      const planById = new Map(databasePlans.map((plan) => [plan.database.id, plan]));
+      const rendered = new Set();
+      const rows = [];
+      customGroups.forEach((group) => {
+        const groupPlans = (group.database_ids || []).map((id) => planById.get(id)).filter(Boolean);
+        if (!groupPlans.length) return;
+        rows.push(`<tr class="group-divider"><th colspan="7">${escapeHtml(group.name)}</th></tr>`);
+        groupPlans.forEach((plan) => {
+          rendered.add(plan.database.id);
+          rows.push(renderDatabaseRow(plan));
+        });
+      });
+      const otherPlans = databasePlans.filter((plan) => !rendered.has(plan.database.id));
+      if (otherPlans.length) {
+        rows.push(`<tr class="group-divider"><th colspan="7">${escapeHtml(t('ungroupedDb'))}</th></tr>`);
+        otherPlans.forEach((plan) => rows.push(renderDatabaseRow(plan)));
+      }
+      return rows.join('');
     }
     function renderMigrationRowsByGroup() {
       const migrations = state.migrations || [];
@@ -1390,7 +1413,6 @@
       if (!$('migrationFileModal').hidden) closeMigrationFileModal();
     });
     $('clearMessage').addEventListener('click', clearMessage);
-    $('openDbGroupModal').addEventListener('click', openDbGroupModal);
     $('openDbGroupModalFromDatabases').addEventListener('click', openDbGroupModal);
     $('closeDbGroupModal').addEventListener('click', closeDbGroupModal);
     $('cancelDbGroup').addEventListener('click', closeDbGroupModal);
