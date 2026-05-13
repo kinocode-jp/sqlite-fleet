@@ -281,6 +281,8 @@
         assert!(INDEX_HTML.contains(r#"<thead><tr><th>File name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(!INDEX_HTML.contains(r#"<thead><tr><th>Version</th><th>Name</th><th>Group</th><th>Checksum</th></tr></thead>"#));
         assert!(INDEX_HTML.contains(".migration-file-form .file-name-field { grid-column:1 / -1; max-width:640px; }"));
+        assert!(INDEX_HTML.contains(".migration-file-form #newMigrationGroupField { grid-column:1 / -1; max-width:240px; }"));
+        assert!(INDEX_HTML.contains(".migration-file-form #newMigrationGroupField .field-label { white-space:nowrap; }"));
         assert!(INDEX_HTML.contains(".modal.wide { width:min(1120px, calc(100vw - 36px)); }"));
         assert!(INDEX_HTML.contains(r#"<p id="migrationFileStatus" class="migration-file-status" hidden></p>"#));
         assert!(INDEX_HTML.contains(r#"<label class="field file-name-field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
@@ -309,7 +311,16 @@
         assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlCursor">Ln 1, Col 1</span>"#));
         assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlStats">0 bytes / 0 lines</span>"#));
         assert!(INDEX_HTML.contains("function openMigrationFileModal()"));
-        assert!(INDEX_HTML.contains("function closeMigrationFileModal()"));
+        assert!(INDEX_HTML.contains("function closeMigrationFileModal(force = false)"));
+        assert!(INDEX_HTML.contains("function isMigrationSqlDirty()"));
+        assert!(INDEX_HTML.contains("const forceClose = force === true"));
+        assert!(INDEX_HTML.contains(r#"id="migrationSqlDiscardModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="migrationSqlDiscardModalTitle">SQL編集内容の破棄</h2>"#));
+        assert!(INDEX_HTML.contains("function closeMigrationSqlDiscardModal()"));
+        assert!(INDEX_HTML.contains("function confirmMigrationSqlDiscard()"));
+        assert!(INDEX_HTML.contains("$('migrationSqlDiscardModal').hidden = false"));
+        assert!(INDEX_HTML.contains("let migrationFileInitialSql = ''"));
+        assert!(INDEX_HTML.contains("let pendingMigrationFileClose = false"));
         assert!(INDEX_HTML.contains("function renderMigrationFileGroupOptions()"));
         assert!(INDEX_HTML.contains("function nextMigrationFileName()"));
         assert!(INDEX_HTML.contains("function latestMigrationFileName()"));
@@ -353,6 +364,7 @@
         assert!(INDEX_HTML.contains("$('openMigrationFileModal').addEventListener('click', openMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('cancelMigrationFile').addEventListener('click', closeMigrationFileModal)"));
+        assert!(INDEX_HTML.contains("$('confirmMigrationSqlDiscard').addEventListener('click', confirmMigrationSqlDiscard)"));
         assert!(INDEX_HTML.contains("$('insertNewMigrationTemplate').addEventListener('click', insertNewMigrationTemplate)"));
         assert!(INDEX_HTML.contains("$('formatNewMigrationSql').addEventListener('click', formatNewMigrationSql)"));
         assert!(INDEX_HTML.contains("$('saveNewMigrationSnippet').addEventListener('click', saveNewMigrationSnippet)"));
@@ -360,7 +372,7 @@
         assert!(INDEX_HTML.contains("$('newMigrationSql').addEventListener('scroll', syncSqlEditorScroll)"));
         assert!(INDEX_HTML.contains("$('newMigrationSql').addEventListener('keydown', handleSqlEditorKeydown)"));
         assert!(INDEX_HTML.contains("if (event.target === $('migrationFileModal')) closeMigrationFileModal()"));
-        assert!(INDEX_HTML.contains("closeMigrationFileModal();"));
+        assert!(INDEX_HTML.contains("closeMigrationFileModal(true);"));
         assert!(!INDEX_HTML.contains(r#"<button id="createMigrationFile" class="primary">マイグレーションファイル追加</button>"#));
     }
 

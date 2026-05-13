@@ -3,6 +3,7 @@
         editMigrationTitle: 'マイグレーション詳細',
         createMigrationTitle: '新規マイグレーション',
         migrationAppliedReadonly: (databases) => `適用済みのため編集できません: ${databases}`,
+        confirmCloseMigrationSql: '保存していないSQLの変更を破棄しますか？',
         createdDatabaseFile: 'DBを追加しました',
         duplicateMigrationGroup: (name) => `マイグレーショングループは既に存在します: ${name}`,
         newMigrationGroup: 'グループ作成',
@@ -389,6 +390,7 @@
       $('newMigrationGroup').disabled = true;
       $('newMigrationLatestFilename').textContent = '';
       $('newMigrationSql').value = migration.sql || '';
+      migrationFileInitialSql = $('newMigrationSql').value;
       $('newMigrationSql').readOnly = readOnly;
       $('migrationTemplateRow').hidden = true;
       $('migrationSnippetRow').hidden = true;
@@ -564,6 +566,7 @@
       $('newMigrationFilename').disabled = false;
       $('newMigrationGroup').disabled = false;
       $('newMigrationSql').value = '';
+      migrationFileInitialSql = '';
       $('newMigrationSql').readOnly = false;
       $('migrationFileStatus').hidden = true;
       $('migrationTemplateRow').hidden = false;
@@ -577,10 +580,30 @@
       $('newMigrationFilename').focus();
       $('newMigrationFilename').select();
     }
-    function closeMigrationFileModal() {
+    function isMigrationSqlDirty() {
+      return $('newMigrationSql').value !== migrationFileInitialSql;
+    }
+    function closeMigrationFileModal(force = false) {
+      const forceClose = force === true;
+      if (!forceClose && !$('migrationFileModal').hidden && !$('newMigrationSql').readOnly && isMigrationSqlDirty()) {
+        pendingMigrationFileClose = true;
+        $('migrationSqlDiscardModal').hidden = false;
+        return;
+      }
       $('migrationFileModal').hidden = true;
       migrationFileMode = 'create';
       editingMigration = null;
+      migrationFileInitialSql = '';
+      pendingMigrationFileClose = false;
+    }
+    function closeMigrationSqlDiscardModal() {
+      pendingMigrationFileClose = false;
+      $('migrationSqlDiscardModal').hidden = true;
+    }
+    function confirmMigrationSqlDiscard() {
+      if (!pendingMigrationFileClose) return;
+      $('migrationSqlDiscardModal').hidden = true;
+      closeMigrationFileModal(true);
     }
     async function saveDbGroup() {
       try {
@@ -612,7 +635,7 @@
             group: editingMigration.group,
             sql: $('newMigrationSql').value,
           });
-          closeMigrationFileModal();
+          closeMigrationFileModal(true);
           return;
         }
         const filenameParts = parseMigrationFilename($('newMigrationFilename').value);
@@ -623,7 +646,7 @@
           group: $('newMigrationGroup').value,
           sql: $('newMigrationSql').value,
         });
-        closeMigrationFileModal();
+        closeMigrationFileModal(true);
       } catch (error) {
         message(error.message, true);
       }
@@ -1196,6 +1219,12 @@
     $('migrationFileModal').addEventListener('click', (event) => {
       if (event.target === $('migrationFileModal')) closeMigrationFileModal();
     });
+    $('closeMigrationSqlDiscardModal').addEventListener('click', closeMigrationSqlDiscardModal);
+    $('cancelMigrationSqlDiscard').addEventListener('click', closeMigrationSqlDiscardModal);
+    $('confirmMigrationSqlDiscard').addEventListener('click', confirmMigrationSqlDiscard);
+    $('migrationSqlDiscardModal').addEventListener('click', (event) => {
+      if (event.target === $('migrationSqlDiscardModal')) closeMigrationSqlDiscardModal();
+    });
     $('closeSnippetDeleteModal').addEventListener('click', closeSnippetDeleteModal);
     $('cancelSnippetDelete').addEventListener('click', closeSnippetDeleteModal);
     $('confirmSnippetDelete').addEventListener('click', confirmDeleteMigrationSnippet);
@@ -1206,6 +1235,10 @@
       if (event.key !== 'Escape') return;
       if (!$('snippetDeleteModal').hidden) {
         closeSnippetDeleteModal();
+        return;
+      }
+      if (!$('migrationSqlDiscardModal').hidden) {
+        closeMigrationSqlDiscardModal();
         return;
       }
       if (!$('migrationGroupModal').hidden) closeMigrationGroupModal();
