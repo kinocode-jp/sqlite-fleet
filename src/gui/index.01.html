@@ -579,6 +579,21 @@
       pathBrowseMode = 'path';
       pathBrowseCurrent = '';
     }
+    function setPathBrowserView(view, rerender = false) {
+      pathBrowseView = view === 'icons' ? 'icons' : 'list';
+      localStorage.setItem('sqlite-fleet-path-browser-view', pathBrowseView);
+      document.querySelectorAll('[data-path-view]').forEach((button) => {
+        const active = button.dataset.pathView === pathBrowseView;
+        button.classList.toggle('active', active);
+        button.setAttribute('aria-pressed', active ? 'true' : 'false');
+      });
+      $('pathBrowserList').className = `path-browser-list ${pathBrowseView}`;
+      if (rerender) {
+        $('pathBrowserList').innerHTML = pathBrowseEntries.length
+          ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')
+          : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+      }
+    }
     async function loadPathBrowser(dir) {
       try {
         pathBrowseCurrent = dir || '';
@@ -594,14 +609,31 @@
       $('pathBrowserCurrent').textContent = pathBrowseCurrent || '.';
       $('pathBrowserParent').hidden = data.parent === null || data.parent === undefined;
       $('pathBrowserParent').dataset.pathParent = data.parent || '';
-      const entries = data.entries || [];
-      $('pathBrowserList').innerHTML = entries.length ? entries.map((entry) => `
-        <div class="path-browser-row">
-          <button class="path-browser-name" type="button" data-path-${entry.kind === 'dir' ? 'open' : 'select'}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</button>
-          <span class="muted">${escapeHtml(entry.kind === 'dir' ? t('folder') : t('file'))}</span>
+      pathBrowseEntries = data.entries || [];
+      setPathBrowserView(pathBrowseView);
+      $('pathBrowserList').innerHTML = pathBrowseEntries.length
+        ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')
+        : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+    }
+    function pathBrowserEntryHtml(entry) {
+      const kindLabel = entry.kind === 'dir' ? t('folder') : t('file');
+      const iconLabel = entry.kind === 'dir' ? 'DIR' : 'FILE';
+      const actionAttr = entry.kind === 'dir' ? 'data-path-open' : 'data-path-select';
+      if (pathBrowseView === 'icons') {
+        return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
+          <span class="path-browser-icon" aria-hidden="true">${escapeHtml(iconLabel)}</span>
+          <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+          <span class="muted">${escapeHtml(kindLabel)}</span>
           <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
-        </div>
-      `).join('') : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+        </div>`;
+      }
+      return `<div class="path-browser-row" title="${escapeHtml(entry.path)}">
+        <span class="path-browser-icon" aria-hidden="true">${escapeHtml(iconLabel)}</span>
+        <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+        <span class="muted path-browser-kind">${escapeHtml(kindLabel)}</span>
+        <code class="path-browser-path">${escapeHtml(entry.path)}</code>
+        <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
+      </div>`;
     }
     function selectPathBrowser(path, kind) {
       if (!pathBrowseTargetId) return;
@@ -1768,6 +1800,11 @@
       if (selectButton) {
         event.preventDefault();
         selectPathBrowser(selectButton.dataset.pathSelect, selectButton.dataset.pathKind || 'path');
+      }
+      const pathViewButton = event.target.closest('[data-path-view]');
+      if (pathViewButton) {
+        event.preventDefault();
+        setPathBrowserView(pathViewButton.dataset.pathView, true);
       }
     });
     $('refresh').addEventListener('click', load);

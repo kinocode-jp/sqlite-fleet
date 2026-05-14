@@ -157,10 +157,25 @@
     .settings-actions { margin-top:10px; }
     .input-action-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:6px; align-items:center; }
     .input-action-row button { white-space:nowrap; }
-    .path-browser-current { display:flex; gap:8px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:var(--surface-2); }
-    .path-browser-list { display:grid; gap:6px; max-height:50vh; overflow:auto; }
-    .path-browser-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-toolbar { display:flex; gap:10px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:var(--surface-2); }
+    .path-browser-current { display:flex; gap:8px; align-items:center; min-width:0; }
+    .path-browser-current code { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .path-browser-actions { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-end; }
+    .path-browser-view-toggle { display:inline-flex; gap:4px; padding:3px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+    .path-browser-view-toggle button { min-height:28px; padding:4px 8px; border-color:transparent; box-shadow:none; background:transparent; }
+    .path-browser-view-toggle button.active { border-color:var(--accent); background:var(--accent-soft); color:var(--accent-strong); }
+    .path-browser-list { display:grid; gap:6px; max-height:56vh; overflow:auto; }
+    .path-browser-list.list { display:grid; gap:4px; }
+    .path-browser-list.icons { grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); align-items:stretch; }
+    .path-browser-row { display:grid; grid-template-columns:34px minmax(0, 1.1fr) 72px minmax(0, 1fr) auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-tile { display:grid; gap:6px; align-content:start; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--surface); min-height:124px; }
+    .path-browser-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:1px solid var(--line); border-radius:6px; background:var(--surface-3); color:var(--muted); font-size:11px; font-weight:800; }
+    .path-browser-tile .path-browser-icon { width:42px; height:38px; justify-self:center; }
     .path-browser-name { justify-content:flex-start; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .path-browser-path { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .path-browser-tile .path-browser-name { justify-content:center; text-align:center; white-space:normal; overflow-wrap:anywhere; min-height:36px; }
+    .path-browser-tile .muted { text-align:center; }
+    .path-browser-tile button[data-path-select] { width:100%; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
     .chip.action-chip { gap:4px; padding-right:4px; }
@@ -222,7 +237,7 @@
     .editor-meta { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
-    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
+    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row { grid-template-columns:30px minmax(0, 1fr) auto; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
 <body>
@@ -675,7 +690,16 @@
             <button id="closePathBrowser" type="button">×</button>
           </div>
           <div class="modal-body">
-            <div class="path-browser-current"><code id="pathBrowserCurrent">.</code><button id="pathBrowserParent" type="button">上へ</button></div>
+            <div class="path-browser-toolbar">
+              <div class="path-browser-current"><span class="label">現在位置</span><code id="pathBrowserCurrent">.</code></div>
+              <div class="path-browser-actions">
+                <button id="pathBrowserParent" type="button">上へ</button>
+                <div class="path-browser-view-toggle" role="group" aria-label="表示切替">
+                  <button id="pathBrowserListView" type="button" data-path-view="list">リスト</button>
+                  <button id="pathBrowserIconView" type="button" data-path-view="icons">アイコン</button>
+                </div>
+              </div>
+            </div>
             <div id="pathBrowserList" class="path-browser-list"></div>
           </div>
           <div class="modal-actions">
@@ -807,6 +831,8 @@
     let pathBrowseTargetId = null;
     let pathBrowseMode = 'path';
     let pathBrowseCurrent = '';
+    let pathBrowseView = localStorage.getItem('sqlite-fleet-path-browser-view') === 'icons' ? 'icons' : 'list';
+    let pathBrowseEntries = [];
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
@@ -857,7 +883,11 @@
       'Migration dir': 'Migration dir',
       '参照': 'Browse',
       'パスを参照': 'Browse path',
+      '現在位置': 'Current',
       '上へ': 'Up',
+      '表示切替': 'View mode',
+      'リスト': 'List',
+      'アイコン': 'Icons',
       '選択': 'Select',
       'フォルダ': 'Folder',
       'ファイル': 'File',
@@ -1048,7 +1078,11 @@
       'Migration dir': 'マイグレーションディレクトリ',
       'Browse': '参照',
       'Browse path': 'パスを参照',
+      'Current': '現在位置',
       'Up': '上へ',
+      'View mode': '表示切替',
+      'List': 'リスト',
+      'Icons': 'アイコン',
       'Select': '選択',
       'Folder': 'フォルダ',
       'File': 'ファイル',
