@@ -245,6 +245,11 @@
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
         assert!(INDEX_HTML.contains(r#"<button id="savePermissions" class="primary">権限を保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveSettings" class="primary">設定を保存</button>"#));
+        assert!(INDEX_HTML.contains(r#"<div class="settings-accordion">"#));
+        assert!(INDEX_HTML.contains(r#"<details class="settings-section" open>"#));
+        assert!(INDEX_HTML.contains(r#"<summary>DB検出</summary>"#));
+        assert!(INDEX_HTML.contains(r#"<summary>GUI permissions</summary>"#));
+        assert!(INDEX_HTML.contains(".settings-section[open] summary"));
         assert!(INDEX_HTML.contains(r#"<button id="baselineAll">対象を読み取り済みにする</button>"#));
         assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupDir""#));
         assert!(INDEX_HTML.contains(r#"id="pathBrowserModal" class="modal-backdrop" hidden"#));
@@ -352,7 +357,7 @@
         assert!(INDEX_HTML.contains(r#"<h2 id="dbGroupModalTitle">新規DBグループ</h2>"#));
         assert!(!INDEX_HTML.contains(r#"id="dbGroupCards""#));
         assert!(!INDEX_HTML.contains(".db-group-list-item"));
-        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; }"));
+        assert!(INDEX_HTML.contains(".summary, .form-grid, .help, .migration-file-form, .settings-form { grid-template-columns:1fr; }"));
         assert!(INDEX_HTML.contains(r#"<tbody id="databases"></tbody>"#));
         assert!(INDEX_HTML.contains("function openDbGroupModal()"));
         assert!(INDEX_HTML.contains("function closeDbGroupModal()"));

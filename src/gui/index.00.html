@@ -155,6 +155,15 @@
     .settings-form { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
     .settings-form .wide { grid-column:1 / -1; }
     .settings-actions { margin-top:10px; }
+    .settings-accordion { display:grid; gap:10px; }
+    .settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden; }
+    .settings-section summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; cursor:pointer; font-weight:800; }
+    .settings-section summary::-webkit-details-marker { display:none; }
+    .settings-section summary::after { content:"+"; color:var(--muted); font-weight:900; }
+    .settings-section[open] summary { border-bottom:1px solid var(--line); background:var(--surface-2); }
+    .settings-section[open] summary::after { content:"-"; }
+    .settings-section-body { display:grid; gap:12px; padding:12px 14px 14px; }
+    .settings-section .key-grid { margin-top:2px; }
     .input-action-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:6px; align-items:center; }
     .input-action-row button { white-space:nowrap; }
     .path-browser-toolbar { display:flex; gap:10px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:var(--surface-2); }
@@ -246,7 +255,7 @@
     .editor-meta { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
-    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row, .path-browser-header { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind, .path-browser-header .path-browser-path, .path-browser-header .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
+    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form, .settings-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide, .settings-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row, .path-browser-header { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind, .path-browser-header .path-browser-path, .path-browser-header .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
 <body>
@@ -638,57 +647,74 @@
           </div>
           <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
         </div>
-        <div class="topology-grid">
-          <section class="wide">
-            <h3>設定変更</h3>
-            <div class="settings-form">
-              <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
-              <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
-              <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-              <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-              <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
-              <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
-              <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
-              <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
-              <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
-              <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
-              <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
-              <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath" data-path-accept="json">参照</button></span></label>
-              <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir" data-path-kind-filter="dir">参照</button></span></label>
-              <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath" data-path-accept="jsonl,log">参照</button></span></label>
-              <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
-              <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
-              <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
-              <label class="field"><span class="field-label">Continue on error</span><input id="settingsContinueOnError" type="checkbox"></label>
-              <label class="field"><span class="field-label">Backup before migrate</span><input id="settingsBackupBeforeMigrate" type="checkbox"></label>
+        <div class="settings-accordion">
+          <details class="settings-section" open>
+            <summary>基本</summary>
+            <div class="settings-section-body">
+              <div class="settings-form">
+                <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
+              </div>
+              <div id="basicSettings" class="key-grid"></div>
             </div>
-            <div class="actions settings-actions"><button id="saveSettings" class="primary">設定を保存</button></div>
-          </section>
-          <section>
-            <h3>基本</h3>
-            <div id="basicSettings" class="key-grid"></div>
-          </section>
-          <section>
-            <h3>DB検出</h3>
-            <div id="discoverySettings" class="key-grid"></div>
-          </section>
-          <section>
-            <h3>マイグレーション</h3>
-            <div id="migrationSettings" class="key-grid"></div>
-          </section>
-          <section>
-            <h3>GUI permissions</h3>
-            <div id="permissions" class="permission-form"></div>
-            <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
-          </section>
-          <section>
-            <h3>Runtime</h3>
-            <div id="runtimeSettings" class="key-grid"></div>
-          </section>
-          <section>
-            <h3>出力/保全</h3>
-            <div id="outputSettings" class="key-grid"></div>
-          </section>
+          </details>
+          <details class="settings-section" open>
+            <summary>DB検出</summary>
+            <div class="settings-section-body">
+              <div class="settings-form">
+                <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
+                <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
+                <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
+                <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
+                <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
+              </div>
+              <div id="discoverySettings" class="key-grid"></div>
+            </div>
+          </details>
+          <details class="settings-section">
+            <summary>マイグレーション</summary>
+            <div class="settings-section-body">
+              <div class="settings-form">
+                <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
+                <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
+              </div>
+              <div id="migrationSettings" class="key-grid"></div>
+            </div>
+          </details>
+          <details class="settings-section">
+            <summary>出力/保全</summary>
+            <div class="settings-section-body">
+              <div class="settings-form">
+                <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
+                <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath" data-path-accept="json">参照</button></span></label>
+                <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir" data-path-kind-filter="dir">参照</button></span></label>
+                <label class="field"><span class="field-label">Backup before migrate</span><input id="settingsBackupBeforeMigrate" type="checkbox"></label>
+                <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath" data-path-accept="jsonl,log">参照</button></span></label>
+              </div>
+              <div id="outputSettings" class="key-grid"></div>
+            </div>
+          </details>
+          <details class="settings-section">
+            <summary>Runtime</summary>
+            <div class="settings-section-body">
+              <div class="settings-form">
+                <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Continue on error</span><input id="settingsContinueOnError" type="checkbox"></label>
+              </div>
+              <div id="runtimeSettings" class="key-grid"></div>
+            </div>
+          </details>
+          <div class="actions settings-actions"><button id="saveSettings" class="primary">設定を保存</button></div>
+          <details class="settings-section">
+            <summary>GUI permissions</summary>
+            <div class="settings-section-body">
+              <div id="permissions" class="permission-form"></div>
+              <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
+            </div>
+          </details>
         </div>
       </section>
 
