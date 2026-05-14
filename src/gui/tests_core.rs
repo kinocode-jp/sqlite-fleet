@@ -462,7 +462,9 @@
         assert!(data
             .entries
             .iter()
-            .any(|entry| entry.path == "data/tenant.db" && entry.kind == "file"));
+            .any(|entry| entry.path == "data/tenant.db"
+                && entry.kind == "file"
+                && entry.modified_at_ms.is_some()));
     }
 
     #[test]

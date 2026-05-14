@@ -167,7 +167,7 @@
     .path-browser-list { display:grid; gap:6px; max-height:56vh; overflow:auto; }
     .path-browser-list.list { display:grid; gap:4px; }
     .path-browser-list.icons { grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); align-items:stretch; }
-    .path-browser-row { display:grid; grid-template-columns:24px minmax(0, 1.1fr) 72px minmax(0, 1fr) auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-row { display:grid; grid-template-columns:24px minmax(0, 1.1fr) 72px minmax(0, 1fr) 128px; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
     .path-browser-row.disabled, .path-browser-tile.disabled { opacity:.45; background:var(--surface-2); }
     .path-browser-tile { display:grid; gap:8px; align-content:start; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--surface); min-height:92px; }
     .path-browser-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:16px; }
@@ -179,11 +179,11 @@
     .path-browser-link { border:0; background:transparent; box-shadow:none; color:var(--text); padding:0; min-height:0; font:inherit; }
     .path-browser-link:disabled { color:var(--muted); cursor:not-allowed; }
     .path-browser-path { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .path-browser-date { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--muted); }
     .path-browser-tile .path-browser-name { justify-content:flex-start; text-align:left; white-space:normal; overflow-wrap:anywhere; min-height:36px; }
     .path-browser-tile .path-browser-link { display:flex; justify-content:flex-start; text-align:left; font-weight:700; }
     .path-browser-tile .path-browser-folder-link { display:grid; grid-template-columns:20px minmax(0, 1fr); gap:6px; align-items:start; }
-    .path-browser-tile .muted { text-align:center; }
-    .path-browser-tile button[data-path-select] { width:100%; }
+    .path-browser-tile .path-browser-date { white-space:normal; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
     .chip.action-chip { gap:4px; padding-right:4px; }
@@ -245,7 +245,7 @@
     .editor-meta { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
-    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row { grid-template-columns:30px minmax(0, 1fr) auto; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
+    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
 <body>
@@ -702,6 +702,7 @@
               <div class="path-browser-current"><span class="label">現在位置</span><code id="pathBrowserCurrent">.</code></div>
               <div class="path-browser-actions">
                 <button id="pathBrowserParent" type="button">上へ</button>
+                <button id="pathBrowserUseCurrent" type="button">この場所を使う</button>
                 <div class="path-browser-view-toggle" role="group" aria-label="表示切替">
                   <button id="pathBrowserListView" type="button" data-path-view="list">リスト</button>
                   <button id="pathBrowserIconView" type="button" data-path-view="icons">アイコン</button>
@@ -895,6 +896,7 @@
       'パスを参照': 'Browse path',
       '現在位置': 'Current',
       '上へ': 'Up',
+      'この場所を使う': 'Use this location',
       '表示切替': 'View mode',
       'リスト': 'List',
       'アイコン': 'Icons',
@@ -1090,6 +1092,7 @@
       'Browse path': 'パスを参照',
       'Current': '現在位置',
       'Up': '上へ',
+      'Use this location': 'この場所を使う',
       'View mode': '表示切替',
       'List': 'リスト',
       'Icons': 'アイコン',

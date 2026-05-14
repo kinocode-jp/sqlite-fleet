@@ -102,6 +102,7 @@ struct PathEntryData {
     name: String,
     path: String,
     kind: String,
+    modified_at_ms: Option<u64>,
 }
 
 #[derive(Serialize)]

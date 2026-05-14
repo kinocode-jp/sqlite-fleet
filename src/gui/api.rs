@@ -313,10 +313,16 @@ fn api_path_entries(config: &Config, dir: Option<&str>) -> Result<PathEntriesDat
             continue;
         }
         let kind = if metadata.is_dir() { "dir" } else { "file" };
+        let modified_at_ms = metadata.modified().ok().and_then(|time| {
+            time.duration_since(std::time::UNIX_EPOCH)
+                .ok()
+                .map(|duration| duration.as_millis().min(u128::from(u64::MAX)) as u64)
+        });
         entries.push(PathEntryData {
             name: name.to_string(),
             path: relative_path_string(&base_dir, &path)?,
             kind: kind.to_string(),
+            modified_at_ms,
         });
     }
     entries.sort_by(|a, b| {

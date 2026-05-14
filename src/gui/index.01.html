@@ -613,6 +613,7 @@
       $('pathBrowserCurrent').textContent = pathBrowseCurrent || '.';
       $('pathBrowserParent').hidden = data.parent === null || data.parent === undefined;
       $('pathBrowserParent').dataset.pathParent = data.parent || '';
+      $('pathBrowserUseCurrent').hidden = !canSelectCurrentPathBrowserDirectory();
       pathBrowseEntries = data.entries || [];
       setPathBrowserView(pathBrowseView);
       $('pathBrowserList').innerHTML = pathBrowseEntries.length
@@ -625,24 +626,40 @@
       const selectable = isPathBrowserSelectable(entry);
       const disabled = selectable ? '' : ' disabled';
       const disabledClass = selectable ? '' : ' disabled';
+      const modified = formatPathModified(entry.modified_at_ms);
       if (pathBrowseView === 'icons') {
         if (entry.kind === 'file') {
           return `<div class="path-browser-tile${disabledClass}" title="${escapeHtml(entry.path)}">
             <button class="path-browser-name path-browser-link" type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(entry.name)}</button>
+            <span class="path-browser-date">${escapeHtml(modified)}</span>
           </div>`;
         }
         return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
           <button class="path-browser-name path-browser-link path-browser-folder-link" type="button" data-path-open="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"><span class="path-browser-icon folder" aria-hidden="true"></span><span>${escapeHtml(entry.name)}</span></button>
-          <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(t('select'))}</button>
+          <span class="path-browser-date">${escapeHtml(modified)}</span>
         </div>`;
       }
       return `<div class="path-browser-row${disabledClass}" title="${escapeHtml(entry.path)}">
         <span class="path-browser-icon ${entry.kind === 'dir' ? 'folder' : 'file'}" aria-hidden="true"></span>
-        <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${entry.kind === 'file' ? disabled : ''}>${escapeHtml(entry.name)}</button>
+        <button class="path-browser-name path-browser-link" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${entry.kind === 'file' ? disabled : ''}>${escapeHtml(entry.name)}</button>
         <span class="muted path-browser-kind">${escapeHtml(kindLabel)}</span>
         <code class="path-browser-path">${escapeHtml(entry.path)}</code>
-        <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(t('select'))}</button>
+        <span class="path-browser-date">${escapeHtml(modified)}</span>
       </div>`;
+    }
+    function formatPathModified(value) {
+      const number = Number(value);
+      if (!Number.isFinite(number) || number <= 0) return '';
+      const date = new Date(number);
+      if (Number.isNaN(date.getTime())) return '';
+      const locale = currentLocale === 'ja' ? 'ja-JP' : 'en-US';
+      return new Intl.DateTimeFormat(locale, {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }).format(date);
     }
     function pathBrowserExtension(path) {
       const name = String(path || '').split('/').pop() || '';
@@ -654,6 +671,9 @@
       if (entry.kind === 'dir') return true;
       if (!pathBrowseAcceptExtensions.length) return true;
       return pathBrowseAcceptExtensions.includes(pathBrowserExtension(entry.path));
+    }
+    function canSelectCurrentPathBrowserDirectory() {
+      return pathBrowseKindFilter === 'dir' || pathBrowseMode === 'glob';
     }
     function selectPathBrowser(path, kind) {
       if (!pathBrowseTargetId) return;
@@ -1841,6 +1861,10 @@
     $('closePathBrowser').addEventListener('click', closePathBrowser);
     $('cancelPathBrowser').addEventListener('click', closePathBrowser);
     $('pathBrowserParent').addEventListener('click', () => loadPathBrowser($('pathBrowserParent').dataset.pathParent || ''));
+    $('pathBrowserUseCurrent').addEventListener('click', () => {
+      if (!canSelectCurrentPathBrowserDirectory()) return;
+      selectPathBrowser(pathBrowseCurrent, 'dir');
+    });
     $('dryRun').addEventListener('click', () => runMigrate('', true));
     $('backupAll').addEventListener('click', () => runBackup(''));
     $('baselineAll').addEventListener('click', baselineTargets);

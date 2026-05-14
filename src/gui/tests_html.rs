@@ -267,7 +267,13 @@
         assert!(INDEX_HTML.contains("pathBrowseAcceptExtensions"));
         assert!(INDEX_HTML.contains("function isPathBrowserSelectable(entry)"));
         assert!(INDEX_HTML.contains("function pathBrowserExtension(path)"));
+        assert!(INDEX_HTML.contains("function formatPathModified(value)"));
+        assert!(INDEX_HTML.contains("function canSelectCurrentPathBrowserDirectory()"));
+        assert!(INDEX_HTML.contains(r#"id="pathBrowserUseCurrent" type="button">この場所を使う</button>"#));
+        assert!(INDEX_HTML.contains("entry.modified_at_ms"));
+        assert!(INDEX_HTML.contains("path-browser-date"));
         assert!(INDEX_HTML.contains(r#"<span class="path-browser-icon folder" aria-hidden="true"></span>"#));
+        assert!(!INDEX_HTML.contains("data-path-select=\"${escapeHtml(entry.path)}\" data-path-kind=\"${escapeHtml(entry.kind)}\"${disabled}>${escapeHtml(t('select'))}</button>"));
         assert!(INDEX_HTML.contains("pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')"));
         assert!(!INDEX_HTML.contains(r#"<span class="muted">${escapeHtml(kindLabel)}</span>"#));
         assert!(!INDEX_HTML.contains(">DIR<"));
