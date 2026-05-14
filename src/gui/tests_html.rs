@@ -262,6 +262,7 @@
         assert!(INDEX_HTML.contains("function setPathBrowserView(view, rerender = false)"));
         assert!(INDEX_HTML.contains("function pathBrowserEntryHtml(entry)"));
         assert!(INDEX_HTML.contains("pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')"));
+        assert!(!INDEX_HTML.contains(r#"<span class="muted">${escapeHtml(kindLabel)}</span>"#));
         assert!(INDEX_HTML.contains("function selectPathBrowser(path, kind)"));
         assert!(INDEX_HTML.contains("document.querySelectorAll('[data-path-browse]').forEach"));
         assert!(INDEX_HTML.contains("button.disabled = !permissions.allow_migration_edit;"));

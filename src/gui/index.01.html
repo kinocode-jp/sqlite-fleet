@@ -623,7 +623,6 @@
         return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
           <span class="path-browser-icon" aria-hidden="true">${escapeHtml(iconLabel)}</span>
           <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
-          <span class="muted">${escapeHtml(kindLabel)}</span>
           <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
         </div>`;
       }
