@@ -220,8 +220,8 @@
       <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>マイグレーション適用</a>
         <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>マイグレーショングループ</a>
-        <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション</a>
-        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB</a>
+        <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション管理</a>
+        <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQLコンソール</a>
         <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>スキーマ作成</a>
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
@@ -356,7 +356,7 @@
       <section class="panel page" data-page="databases" id="databases-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2 class="panel-title">DB <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
+            <h2 class="panel-title">DB管理 <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
           </div>
           <div class="panel-actions">
             <button id="openDatabaseFileModal" class="primary">新規作成</button>
@@ -390,7 +390,7 @@
       <section class="panel page" data-page="migrations" id="migrations-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2 class="panel-title">マイグレーション一覧 <span class="tool-tip" tabindex="0" data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。">?</span></h2>
+            <h2 class="panel-title">マイグレーション管理 <span class="tool-tip" tabindex="0" data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。">?</span></h2>
           </div>
           <div class="panel-actions">
             <button id="openMigrationFileModal" class="primary">新規作成</button>
@@ -762,8 +762,8 @@
       'マイグレーション適用': 'Migration Apply',
       'マイグレーショングループ': 'Migration Groups',
       'DBグループ': 'DB Groups',
-      'DB': 'DB',
-      'マイグレーション': 'Migrations',
+      'DB管理': 'DB Management',
+      'マイグレーション管理': 'Migration Management',
       'SQLコンソール': 'SQL Console',
       'スキーマ作成': 'Schema builder',
       '設定': 'Settings',
@@ -960,8 +960,10 @@
       'Migration Apply': 'マイグレーション適用',
       'SQL Console': 'SQLコンソール',
       'Databases': 'DB',
-      'Database management': 'DB',
-      'Migration management': 'マイグレーション',
+      'DB Management': 'DB管理',
+      'Migration Management': 'マイグレーション管理',
+      'Database management': 'DB管理',
+      'Migration management': 'マイグレーション管理',
       'Migrations': 'マイグレーション',
       'Schema builder': 'スキーマ作成',
       'Settings': '設定',

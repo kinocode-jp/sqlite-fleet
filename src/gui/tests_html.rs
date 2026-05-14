@@ -132,7 +132,7 @@
         assert!(INDEX_HTML.contains(
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
-        assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB</a>"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
         let migration_group_nav = INDEX_HTML
             .find(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#)
@@ -480,9 +480,9 @@
         assert!(INDEX_HTML
             .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
-        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB管理 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
-        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション一覧 <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション管理 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます"#));
         assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));
     }
