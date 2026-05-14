@@ -562,13 +562,15 @@
       if (lastSegment.includes('.')) return lastSlash >= 0 ? trimmed.slice(0, lastSlash) : '';
       return trimmed;
     }
-    async function openPathBrowser(targetId, mode = 'path') {
+    async function openPathBrowser(targetId, mode = 'path', accept = '', kindFilter = '') {
       if (state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
         message(t('permissionEditDisabled'), true);
         return;
       }
       pathBrowseTargetId = targetId;
       pathBrowseMode = mode;
+      pathBrowseAcceptExtensions = String(accept || '').split(',').map((item) => item.trim().toLowerCase().replace(/^\./, '')).filter(Boolean);
+      pathBrowseKindFilter = kindFilter || '';
       pathBrowseCurrent = pathBrowseStartDir($(targetId).value);
       $('pathBrowserModal').hidden = false;
       await loadPathBrowser(pathBrowseCurrent);
@@ -578,6 +580,8 @@
       pathBrowseTargetId = null;
       pathBrowseMode = 'path';
       pathBrowseCurrent = '';
+      pathBrowseAcceptExtensions = [];
+      pathBrowseKindFilter = '';
     }
     function setPathBrowserView(view, rerender = false) {
       pathBrowseView = view === 'icons' ? 'icons' : 'list';
@@ -618,28 +622,43 @@
     function pathBrowserEntryHtml(entry) {
       const kindLabel = entry.kind === 'dir' ? t('folder') : t('file');
       const actionAttr = entry.kind === 'dir' ? 'data-path-open' : 'data-path-select';
+      const selectable = isPathBrowserSelectable(entry);
+      const disabled = selectable ? '' : ' disabled';
+      const disabledClass = selectable ? '' : ' disabled';
       if (pathBrowseView === 'icons') {
         if (entry.kind === 'file') {
-          return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
-            <button class="path-browser-name path-browser-link" type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+          return `<div class="path-browser-tile${disabledClass}" title="${escapeHtml(entry.path)}">
+            <button class="path-browser-name path-browser-link" type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(entry.name)}</button>
           </div>`;
         }
         return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
-          <span class="path-browser-icon" aria-hidden="true">DIR</span>
-          <button class="path-browser-name path-browser-link" type="button" data-path-open="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
-          <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
+          <button class="path-browser-name path-browser-link path-browser-folder-link" type="button" data-path-open="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"><span class="path-browser-icon folder" aria-hidden="true"></span><span>${escapeHtml(entry.name)}</span></button>
+          <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(t('select'))}</button>
         </div>`;
       }
-      return `<div class="path-browser-row" title="${escapeHtml(entry.path)}">
-        <span class="path-browser-icon" aria-hidden="true">${entry.kind === 'dir' ? 'DIR' : 'FILE'}</span>
-        <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+      return `<div class="path-browser-row${disabledClass}" title="${escapeHtml(entry.path)}">
+        <span class="path-browser-icon ${entry.kind === 'dir' ? 'folder' : 'file'}" aria-hidden="true"></span>
+        <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${entry.kind === 'file' ? disabled : ''}>${escapeHtml(entry.name)}</button>
         <span class="muted path-browser-kind">${escapeHtml(kindLabel)}</span>
         <code class="path-browser-path">${escapeHtml(entry.path)}</code>
-        <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
+        <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}"${disabled}>${escapeHtml(t('select'))}</button>
       </div>`;
+    }
+    function pathBrowserExtension(path) {
+      const name = String(path || '').split('/').pop() || '';
+      const index = name.lastIndexOf('.');
+      return index >= 0 ? name.slice(index + 1).toLowerCase() : '';
+    }
+    function isPathBrowserSelectable(entry) {
+      if (pathBrowseKindFilter === 'dir') return entry.kind === 'dir';
+      if (entry.kind === 'dir') return true;
+      if (!pathBrowseAcceptExtensions.length) return true;
+      return pathBrowseAcceptExtensions.includes(pathBrowserExtension(entry.path));
     }
     function selectPathBrowser(path, kind) {
       if (!pathBrowseTargetId) return;
+      const entry = pathBrowseEntries.find((item) => item.path === path && item.kind === kind);
+      if (entry && !isPathBrowserSelectable(entry)) return;
       const value = pathBrowseMode === 'glob' && kind === 'dir'
         ? `${path ? `${path}/` : ''}**/*.db`
         : path;
@@ -1790,7 +1809,12 @@
       const browseButton = event.target.closest('[data-path-browse]');
       if (browseButton) {
         event.preventDefault();
-        openPathBrowser(browseButton.dataset.pathBrowse, browseButton.dataset.pathMode || 'path');
+        openPathBrowser(
+          browseButton.dataset.pathBrowse,
+          browseButton.dataset.pathMode || 'path',
+          browseButton.dataset.pathAccept || '',
+          browseButton.dataset.pathKindFilter || '',
+        );
         return;
       }
       const openButton = event.target.closest('[data-path-open]');

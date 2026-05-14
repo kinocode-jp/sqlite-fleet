@@ -167,15 +167,21 @@
     .path-browser-list { display:grid; gap:6px; max-height:56vh; overflow:auto; }
     .path-browser-list.list { display:grid; gap:4px; }
     .path-browser-list.icons { grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); align-items:stretch; }
-    .path-browser-row { display:grid; grid-template-columns:34px minmax(0, 1.1fr) 72px minmax(0, 1fr) auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-row { display:grid; grid-template-columns:24px minmax(0, 1.1fr) 72px minmax(0, 1fr) auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-row.disabled, .path-browser-tile.disabled { opacity:.45; background:var(--surface-2); }
     .path-browser-tile { display:grid; gap:8px; align-content:start; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--surface); min-height:92px; }
-    .path-browser-icon { display:inline-flex; align-items:center; justify-content:center; width:30px; height:30px; border:1px solid var(--line); border-radius:6px; background:var(--surface-3); color:var(--muted); font-size:11px; font-weight:800; }
-    .path-browser-tile .path-browser-icon { width:42px; height:38px; justify-self:center; }
+    .path-browser-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:16px; }
+    .path-browser-icon.folder::before { content:""; position:absolute; left:1px; top:5px; width:16px; height:10px; border:1px solid var(--accent); border-radius:2px; background:var(--accent-soft); }
+    .path-browser-icon.folder::after { content:""; position:absolute; left:2px; top:2px; width:8px; height:5px; border:1px solid var(--accent); border-bottom:0; border-radius:2px 2px 0 0; background:var(--accent-soft); }
+    .path-browser-icon.file::before { content:""; position:absolute; left:3px; top:1px; width:11px; height:14px; border:1px solid var(--line-strong); border-radius:2px; background:#fff; }
+    .path-browser-icon.file::after { content:""; position:absolute; left:6px; top:5px; width:5px; height:1px; background:var(--line-strong); box-shadow:0 4px 0 var(--line-strong); }
     .path-browser-name { justify-content:flex-start; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .path-browser-link { border:0; background:transparent; box-shadow:none; color:var(--text); padding:0; min-height:0; font:inherit; }
+    .path-browser-link:disabled { color:var(--muted); cursor:not-allowed; }
     .path-browser-path { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-    .path-browser-tile .path-browser-name { justify-content:center; text-align:center; white-space:normal; overflow-wrap:anywhere; min-height:36px; }
-    .path-browser-tile .path-browser-link { justify-content:center; text-align:center; font-weight:700; }
+    .path-browser-tile .path-browser-name { justify-content:flex-start; text-align:left; white-space:normal; overflow-wrap:anywhere; min-height:36px; }
+    .path-browser-tile .path-browser-link { display:flex; justify-content:flex-start; text-align:left; font-weight:700; }
+    .path-browser-tile .path-browser-folder-link { display:grid; grid-template-columns:20px minmax(0, 1fr); gap:6px; align-items:start; }
     .path-browser-tile .muted { text-align:center; }
     .path-browser-tile button[data-path-select] { width:100%; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
@@ -358,7 +364,7 @@
           </div>
           <div class="modal-body">
             <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
-            <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="manageMigrationGroupDir" placeholder="existing/migrations"><button type="button" data-path-browse="manageMigrationGroupDir">参照</button></span></label>
+            <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="manageMigrationGroupDir" placeholder="existing/migrations"><button type="button" data-path-browse="manageMigrationGroupDir" data-path-kind-filter="dir">参照</button></span></label>
           </div>
           <div class="modal-actions">
             <button id="cancelMigrationGroup" type="button">キャンセル</button>
@@ -637,18 +643,18 @@
             <div class="settings-form">
               <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
               <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
-              <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob">参照</button></span></label>
-              <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource">参照</button></span></label>
+              <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+              <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
               <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
               <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
               <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
               <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
-              <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir">参照</button></span></label>
+              <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
               <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
               <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
-              <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath">参照</button></span></label>
-              <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir">参照</button></span></label>
-              <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath">参照</button></span></label>
+              <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath" data-path-accept="json">参照</button></span></label>
+              <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir" data-path-kind-filter="dir">参照</button></span></label>
+              <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath" data-path-accept="jsonl,log">参照</button></span></label>
               <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
               <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
               <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
@@ -835,6 +841,8 @@
     let pathBrowseCurrent = '';
     let pathBrowseView = localStorage.getItem('sqlite-fleet-path-browser-view') === 'icons' ? 'icons' : 'list';
     let pathBrowseEntries = [];
+    let pathBrowseAcceptExtensions = [];
+    let pathBrowseKindFilter = '';
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
