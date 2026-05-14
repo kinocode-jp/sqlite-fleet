@@ -116,7 +116,7 @@
         assert!(INDEX_HTML.contains("$('clearMessage').addEventListener('click', clearMessage)"));
         assert!(!INDEX_HTML.contains(r#"<p id="message" class="message muted">読み込み中...</p>"#));
         assert!(INDEX_HTML.contains(".sidebar-nav a[hidden] { display:none; }"));
-        assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">実行</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">マイグレーション適用</h2>"#));
         assert!(!INDEX_HTML.contains("実行計画から管理するSQLite fleet"));
         assert!(!INDEX_HTML.contains(
             "「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。"
@@ -180,7 +180,7 @@
         assert!(INDEX_HTML.contains("let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en'"));
         assert!(INDEX_HTML.contains("function translateStaticDom()"));
         assert!(INDEX_HTML.contains("function setLocale(locale)"));
-        assert!(INDEX_HTML.contains("'実行': 'Run'"));
+        assert!(INDEX_HTML.contains("'マイグレーション適用': 'Migration Apply'"));
         assert!(INDEX_HTML.contains("'グループ作成': 'Create group'"));
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
@@ -199,8 +199,8 @@
         assert!(INDEX_HTML.contains("'スニペット削除': 'Delete snippet'"));
         assert!(INDEX_HTML.contains("'テンプレート検索': 'Search templates'"));
         assert!(INDEX_HTML.contains("'現在のSQLをスニペット保存': 'Save current SQL as snippet'"));
-        assert!(INDEX_HTML.contains("'Run': '実行'"));
-        assert!(INDEX_HTML.contains("'SQL runner': 'SQL実行'"));
+        assert!(INDEX_HTML.contains("'Migration Apply': 'マイグレーション適用'"));
+        assert!(INDEX_HTML.contains("'SQL Console': 'SQLコンソール'"));
         assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
         assert!(INDEX_HTML.contains("'New migration': '新規マイグレーション'"));
         assert!(INDEX_HTML.contains("'Version': 'バージョン'"));

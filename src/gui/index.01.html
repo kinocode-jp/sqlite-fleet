@@ -91,23 +91,23 @@
     };
     const pageTitles = {
       en: {
-        execute: 'Run',
+        execute: 'Migration Apply',
         'migration-groups': 'Migration Groups',
         'db-groups': 'DB Groups',
         databases: 'DB',
         migrations: 'Migration management',
-        sql: 'SQL runner',
+        sql: 'SQL Console',
         schema: 'Schema builder',
         settings: 'Settings / permissions',
         help: 'Help',
       },
       ja: {
-        execute: '実行',
+        execute: 'マイグレーション適用',
         'migration-groups': 'マイグレーショングループ',
         'db-groups': 'DBグループ',
         databases: 'DB',
         migrations: 'マイグレーション',
-        sql: 'SQL実行',
+        sql: 'SQLコンソール',
         schema: 'スキーマ作成',
         settings: '設定',
         help: 'ヘルプ',
@@ -270,8 +270,7 @@
       }
     }
     function render() {
-      const project = state.project || 'sqlite-fleet';
-      $('title').textContent = project;
+      $('title').textContent = 'Sqlite Fleet';
       const s = state.status;
       updateConditionalNav();
       renderDatabaseSelectors(s.plans);
