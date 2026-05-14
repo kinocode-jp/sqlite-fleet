@@ -284,6 +284,47 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 api_save_gui_permissions(state, request_body.unwrap_or_default()),
             )
         }
+        ("POST", "/api/admin/settings") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI settings edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_save_settings(state, request_body.unwrap_or_default()),
+            )
+        }
+        ("POST", "/api/admin/baseline") => {
+            if !config.gui.allow_migrate {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migrate は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            let result =
+                api_baseline_migrations(state, request_body.unwrap_or_default()).and_then(
+                    |report| {
+                        let report_write_error = write_report_json(&config, &report).err();
+                        if let Some(error) = report_write_error {
+                            Err(error)
+                        } else {
+                            write_audit_event(&config, "gui.baseline", &report)?;
+                            Ok(report)
+                        }
+                    },
+                );
+            write_json_result(&mut stream, result)
+        }
         ("POST", "/api/admin/migration-group") => {
             if !config.gui.allow_migration_edit {
                 return write_json_error(

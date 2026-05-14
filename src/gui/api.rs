@@ -117,11 +117,8 @@ fn api_migration_groups(
     databases: &[sqlite_fleet::Database],
     migrations: &[sqlite_fleet::Migration],
 ) -> Vec<MigrationGroupData> {
-    let mut names = config
-        .effective_migration_groups()
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>();
+    let group_configs = config.effective_migration_groups();
+    let mut names = group_configs.keys().cloned().collect::<Vec<_>>();
     names.sort();
     names
         .into_iter()
@@ -142,6 +139,7 @@ fn api_migration_groups(
                 .map(|database| database.id.clone())
                 .collect::<Vec<_>>();
             MigrationGroupData {
+                dir: group_configs.get(&name).and_then(|group| group.dir.clone()),
                 name,
                 migrations: group_migrations,
                 databases: group_databases,
@@ -389,11 +387,39 @@ fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     Ok(AdminResult::new("GUI permissions を保存しました".to_string()))
 }
 
+fn api_save_settings(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: SettingsRequest =
+        serde_json::from_slice(&body).context("settings request body のJSONが不正です")?;
+    let mut config = locked_config(state)?;
+    config.project.name = clean_optional_string(request.project_name);
+    config.databases.discovery = request.discovery.trim().to_string();
+    config.databases.path_glob = clean_optional_string(request.databases_path_glob);
+    config.databases.source = clean_optional_string(request.databases_source);
+    config.databases.query = clean_optional_string(request.databases_query);
+    config.databases.id_column = clean_optional_string(request.databases_id_column);
+    config.databases.path_column = clean_optional_string(request.databases_path_column);
+    config.databases.path_template = clean_optional_string(request.databases_path_template);
+    config.migrations.dir = request.migrations_dir.trim().to_string();
+    config.migrations.table = request.migrations_table.trim().to_string();
+    config.report.format = request.report_format.trim().to_string();
+    config.report.path = clean_optional_string(request.report_path);
+    config.backup.dir = request.backup_dir.trim().to_string();
+    config.backup.before_migrate = request.backup_before_migrate;
+    config.backup.keep_last = request.backup_keep_last;
+    config.audit.path = clean_optional_string(request.audit_path);
+    config.execution.parallel = request.parallel;
+    config.execution.lock_timeout_ms = request.lock_timeout_ms;
+    config.execution.continue_on_error = request.continue_on_error;
+    persist_config(state, config)?;
+    Ok(AdminResult::new("settings を保存しました".to_string()))
+}
+
 fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationGroupRequest =
         serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
     let name = clean_name(&request.name, "Migration group name")?;
     let mut migrations = clean_migration_id_list(request.versions)?;
+    let dir = clean_optional_string(request.dir);
     let mut config = locked_config(state)?;
     let existed = config.migration_groups.contains_key(&name);
     if config.migration_groups.is_empty() && name != MAIN_MIGRATION_GROUP {
@@ -410,7 +436,7 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
             MigrationGroupConfig::versions(main_versions),
         );
     }
-    if !existed && name != MAIN_MIGRATION_GROUP && migrations.is_empty() {
+    if dir.is_none() && !existed && name != MAIN_MIGRATION_GROUP && migrations.is_empty() {
         migrations = config
             .migration_groups
             .get(MAIN_MIGRATION_GROUP)
@@ -418,17 +444,214 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
             .unwrap_or_default();
     }
     match config.migration_groups.get_mut(&name) {
-        Some(group) => group.migrations = migrations,
+        Some(group) => {
+            if let Some(dir) = dir {
+                group.dir = Some(dir);
+            }
+            group.migrations = migrations;
+        }
         None => {
-            config
-                .migration_groups
-                .insert(name.clone(), MigrationGroupConfig::versions(migrations));
+            config.migration_groups.insert(
+                name.clone(),
+                MigrationGroupConfig { dir, migrations },
+            );
         }
     }
     persist_config(state, config)?;
     Ok(AdminResult::new(format!(
         "migration group を保存しました: {name}"
     )))
+}
+
+fn api_baseline_migrations(state: &ServerState, body: Vec<u8>) -> Result<MigrateReport> {
+    let request: BaselineRequest =
+        serde_json::from_slice(&body).context("baseline request body のJSONが不正です")?;
+    if request.databases.is_empty() {
+        bail!("baseline対象DBが選択されていません");
+    }
+    let config = locked_config(state)?;
+    let databases = discover_databases(&config)?;
+    let migrations = load_migrations(&config)?;
+    let selected = request
+        .databases
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    let plans = sqlite_fleet::build_plan(&config, &databases, &migrations)
+        .into_iter()
+        .filter(|plan| selected.contains(&plan.database.id))
+        .collect::<Vec<_>>();
+    if plans.is_empty() {
+        bail!("baseline対象DBが見つかりません");
+    }
+    let database_count = plans.len();
+    let mut results = Vec::new();
+    for plan in plans {
+        let result = baseline_database(&config, plan, &migrations);
+        let success = result.success;
+        results.push(result);
+        if !config.execution.continue_on_error && !success {
+            break;
+        }
+    }
+    let applied_databases = results
+        .iter()
+        .filter(|result| result.success && !result.applied.is_empty())
+        .count();
+    let pending_databases = results
+        .iter()
+        .filter(|result| !result.pending.is_empty())
+        .count();
+    let failed_databases = results.iter().filter(|result| !result.success).count();
+    Ok(MigrateReport {
+        dry_run: false,
+        database_count,
+        processed_databases: results.len(),
+        pending_databases,
+        applied_databases,
+        failed_databases,
+        databases: results,
+    })
+}
+
+fn baseline_database(
+    config: &Config,
+    plan: sqlite_fleet::DatabasePlan,
+    migrations: &[sqlite_fleet::Migration],
+) -> DatabaseMigrationResult {
+    let _operation_lock =
+        match acquire_database_operation_lock(config, &plan.database.path, "baseline") {
+            Ok(lock) => lock,
+            Err(error) => {
+                return baseline_failed_result(plan.database, plan.pending, error.to_string());
+            }
+        };
+    let plan = sqlite_fleet::build_database_plan(config, &plan.database, migrations);
+    let pending = plan.pending.clone();
+    if let Some(error) = plan.error {
+        return baseline_failed_result(plan.database, pending, error);
+    }
+    if !plan.unknown_applied.is_empty() {
+        return baseline_failed_result(
+            plan.database,
+            pending,
+            "不明な適用履歴があるためbaseline登録できません".to_string(),
+        );
+    }
+    if !plan.checksum_errors.is_empty() {
+        return baseline_failed_result(
+            plan.database,
+            pending,
+            "checksum不一致があるためbaseline登録できません".to_string(),
+        );
+    }
+    if pending.is_empty() {
+        return DatabaseMigrationResult {
+            database: plan.database,
+            applied: Vec::new(),
+            pending: Vec::new(),
+            pre_backup: None,
+            success: true,
+            error: None,
+        };
+    }
+    let database_migrations = sqlite_fleet::migrations_for_database(config, &plan.database, migrations);
+    let mut conn = match open_gui_database(config, &plan.database, false) {
+        Ok(conn) => conn,
+        Err(error) => return baseline_failed_result(plan.database, pending, error.to_string()),
+    };
+    if let Err(error) =
+        migrate_legacy_migrations_table(&mut conn, config.migrations_table(), &database_migrations)
+    {
+        return baseline_failed_result(plan.database, pending, error.to_string());
+    }
+    drop(conn);
+    let plan = sqlite_fleet::build_database_plan(config, &plan.database, migrations);
+    let pending = plan.pending.clone();
+    if let Some(error) = plan.error {
+        return baseline_failed_result(plan.database, pending, error);
+    }
+    if !plan.unknown_applied.is_empty() {
+        return baseline_failed_result(
+            plan.database,
+            pending,
+            "不明な適用履歴があるためbaseline登録できません".to_string(),
+        );
+    }
+    if !plan.checksum_errors.is_empty() {
+        return baseline_failed_result(
+            plan.database,
+            pending,
+            "checksum不一致があるためbaseline登録できません".to_string(),
+        );
+    }
+    if pending.is_empty() {
+        return DatabaseMigrationResult {
+            database: plan.database,
+            applied: Vec::new(),
+            pending: Vec::new(),
+            pre_backup: None,
+            success: true,
+            error: None,
+        };
+    }
+    let mut conn = match open_gui_database(config, &plan.database, false) {
+        Ok(conn) => conn,
+        Err(error) => return baseline_failed_result(plan.database, pending, error.to_string()),
+    };
+    if let Err(error) = ensure_migrations_table(&conn, config.migrations_table()) {
+        return baseline_failed_result(plan.database, pending, error.to_string());
+    }
+    let tx = match conn.transaction() {
+        Ok(tx) => tx,
+        Err(error) => return baseline_failed_result(plan.database, pending, error.to_string()),
+    };
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_secs().min(i64::MAX as u64) as i64)
+        .unwrap_or(0);
+    for migration in &pending {
+        if let Err(error) = tx.execute(
+            &format!(
+                "INSERT INTO main.{} (filename, version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, ?5, 0)",
+                config.migrations_table()
+            ),
+            rusqlite::params![
+                migration.filename,
+                migration.version,
+                migration.name,
+                migration.checksum,
+                now
+            ],
+        ) {
+            return baseline_failed_result(plan.database, pending, error.to_string());
+        }
+    }
+    if let Err(error) = tx.commit() {
+        return baseline_failed_result(plan.database, pending, error.to_string());
+    }
+    DatabaseMigrationResult {
+        database: plan.database,
+        applied: pending,
+        pending: Vec::new(),
+        pre_backup: None,
+        success: true,
+        error: None,
+    }
+}
+
+fn baseline_failed_result(
+    database: sqlite_fleet::Database,
+    pending: Vec<sqlite_fleet::MigrationSummary>,
+    error: String,
+) -> DatabaseMigrationResult {
+    DatabaseMigrationResult {
+        database,
+        applied: Vec::new(),
+        pending,
+        pre_backup: None,
+        success: false,
+        error: Some(error),
+    }
 }
 
 fn clean_migration_id_list(values: Vec<String>) -> Result<Vec<String>> {

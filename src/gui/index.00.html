@@ -122,6 +122,7 @@
     .builder-block .actions { justify-content:flex-end; }
     .target-preview { min-height:38px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
     .topology-grid { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:14px; padding:16px; }
+    .topology-grid > .wide { grid-column:1 / -1; }
     .topology-grid h3 { margin:0 0 10px; font-size:14px; }
     .migration-group-editor { display:grid; grid-template-columns:280px minmax(0, 1fr); gap:14px; padding:16px; }
     .migration-group-editor.simple { grid-template-columns:minmax(0, 1fr); }
@@ -151,6 +152,9 @@
     .permission-card strong { font-size:14px; overflow-wrap:anywhere; }
     .permission-card .pill { min-width:48px; justify-content:center; }
     .permission-card input { width:18px; height:18px; }
+    .settings-form { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
+    .settings-form .wide { grid-column:1 / -1; }
+    .settings-actions { margin-top:10px; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
     .chip.action-chip { gap:4px; padding-right:4px; }
@@ -275,6 +279,7 @@
           <div class="actions wide">
             <button id="dryRun" class="primary">対象をDry run</button>
             <button id="backupAll">対象をBackup</button>
+            <button id="baselineAll">対象を読み取り済みにする</button>
             <button id="migrateAll" class="danger">対象へ適用</button>
           </div>
         </div>
@@ -330,6 +335,7 @@
           </div>
           <div class="modal-body">
             <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
+            <label class="field"><span class="field-label">Migration dir</span><input id="manageMigrationGroupDir" placeholder="existing/migrations"></label>
           </div>
           <div class="modal-actions">
             <button id="cancelMigrationGroup" type="button">キャンセル</button>
@@ -598,17 +604,42 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>設定</h2>
-            <p class="panel-description">現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認・変更できます。</p>
+            <p class="panel-description">現在のプロジェクト設定、DB検出、出力先、バックアップ、GUI操作権限を確認・変更できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
         </div>
         <div class="topology-grid">
+          <section class="wide">
+            <h3>設定変更</h3>
+            <div class="settings-form">
+              <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
+              <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
+              <label class="field"><span class="field-label">DB path glob</span><input id="settingsPathGlob" placeholder="./data/**/*.db"></label>
+              <label class="field"><span class="field-label">Discovery source</span><input id="settingsSource"></label>
+              <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
+              <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
+              <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
+              <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
+              <label class="field"><span class="field-label">Migration dir</span><input id="settingsMigrationsDir"></label>
+              <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
+              <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
+              <label class="field"><span class="field-label">Report path</span><input id="settingsReportPath"></label>
+              <label class="field"><span class="field-label">Backup dir</span><input id="settingsBackupDir"></label>
+              <label class="field"><span class="field-label">Audit path</span><input id="settingsAuditPath"></label>
+              <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
+              <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
+              <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
+              <label class="field"><span class="field-label">Continue on error</span><input id="settingsContinueOnError" type="checkbox"></label>
+              <label class="field"><span class="field-label">Backup before migrate</span><input id="settingsBackupBeforeMigrate" type="checkbox"></label>
+            </div>
+            <div class="actions settings-actions"><button id="saveSettings" class="primary">設定を保存</button></div>
+          </section>
           <section>
             <h3>基本</h3>
             <div id="basicSettings" class="key-grid"></div>
           </section>
           <section>
-            <h3>DB探索</h3>
+            <h3>DB検出</h3>
             <div id="discoverySettings" class="key-grid"></div>
           </section>
           <section>
@@ -618,7 +649,7 @@
           <section>
             <h3>GUI permissions</h3>
             <div id="permissions" class="permission-form"></div>
-            <div class="actions" style="margin-top:10px;"><button id="savePermissions" class="primary">権限を保存</button></div>
+            <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
           </section>
           <section>
             <h3>Runtime</h3>
@@ -786,6 +817,7 @@
       '制限なし': 'No limit',
       '対象をDry run': 'Dry run targets',
       '対象をBackup': 'Back up targets',
+      '対象を読み取り済みにする': 'Mark targets as already applied',
       '対象へ適用': 'Apply to targets',
       '通常はグループを意識せず、全DBに同じマイグレーションを適用します。分けたい時だけグループを追加します。': 'Normally, all DBs receive the same migrations without thinking about groups. Add a group only when you need to split them.',
       'マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。': 'A Migration Group is the set of migrations applied to each DB. It is managed separately from DB Groups.',
@@ -797,6 +829,7 @@
       '新規マイグレーション': 'New migration',
       '全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
+      'Migration dir': 'Migration dir',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。実行ページのDB groupで選択できます。': 'Manage target database sets such as canaries, customers, and environments. Select them from DB group in Run.',
@@ -872,11 +905,26 @@
       '変更前のカラム名です。': 'Current column name.',
       '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
       'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
-      '現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project settings, DB discovery, output, backup, and GUI operation permissions.',
+      '現在のプロジェクト設定、DB検出、出力先、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project settings, DB discovery, output paths, backup, and GUI operation permissions.',
       '権限を保存': 'Save permissions',
+      '設定変更': 'Edit settings',
+      '設定を保存': 'Save settings',
+      'Project name': 'Project name',
+      'DB discovery': 'DB discovery',
+      'DB path glob': 'DB path glob',
+      'Discovery source': 'Discovery source',
+      'ID column': 'ID column',
+      'Path column': 'Path column',
+      'Discovery query': 'Discovery query',
+      'Path template': 'Path template',
+      'History table': 'History table',
+      'Lock timeout ms': 'Lock timeout ms',
+      'Backup keep last': 'Backup keep last',
+      'Continue on error': 'Continue on error',
+      'Backup before migrate': 'Backup before migrate',
       'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
       '基本': 'Basic',
-      'DB探索': 'DB Discovery',
+      'DB検出': 'DB Discovery',
       '出力/保全': 'Output / Safeguards',
       '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。': 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
       '基本の考え方': 'Core model',
@@ -956,6 +1004,22 @@
       'Delete': '削除',
       'Output file name': '出力ファイル名',
       'GUI permissions': 'GUI権限',
+      'Edit settings': '設定変更',
+      'Save settings': '設定を保存',
+      'Project name': 'プロジェクト名',
+      'DB discovery': 'DB検出方法',
+      'DB path glob': 'DBパスglob',
+      'Discovery source': '探索元DB',
+      'ID column': 'IDカラム',
+      'Path column': 'パスカラム',
+      'Discovery query': '探索クエリ',
+      'Path template': 'パステンプレート',
+      'Migration dir': 'マイグレーションディレクトリ',
+      'History table': '履歴テーブル',
+      'Lock timeout ms': 'ロックタイムアウトms',
+      'Backup keep last': 'backup保持数',
+      'Continue on error': 'エラー時に続行',
+      'Backup before migrate': 'migrate前backup',
       'Runtime': '実行設定',
       'Paths': 'パス',
       'Object Definitions': 'オブジェクト定義',
@@ -1002,6 +1066,8 @@
         savedDbGroup: 'DB Group saved',
         savedDatabaseRule: 'DB assignment saved',
         savedGuiPermissions: 'GUI permissions saved',
+        savedSettings: 'Settings saved',
+        baselineDone: (processed, failed) => `baseline complete: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'Permission changes are disabled by allow_migration_edit',
         createdMigrationFile: 'Migration file registered',
         savedMigrationFile: 'Migration file saved',
@@ -1078,6 +1144,7 @@
         required: (label) => `Enter ${label}`,
         allDbTarget: 'All DBs',
         confirmMigrate: (target) => `Apply migrations to ${target}. Continue?`,
+        confirmBaseline: 'Mark pending migrations as already applied without running SQL. Continue?',
         migrateDone: (mode, processed, failed) => `${mode} complete: processed=${processed}, failed=${failed}`,
         checkDone: (ok, failed) => `check complete: ok=${ok}, failed=${failed}`,
         confirmBackup: (target) => `Create backup for ${target}. Continue?`,
@@ -1113,4 +1180,6 @@
         savedDbGroup: 'DBグループを保存しました',
         savedDatabaseRule: 'DBの割当を保存しました',
         savedGuiPermissions: 'GUI権限を保存しました',
+        savedSettings: '設定を保存しました',
+        baselineDone: (processed, failed) => `baseline 完了: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'allow_migration_edit が無効のため権限変更できません',

@@ -24,7 +24,7 @@ pub fn build_plan(
         .collect()
 }
 
-fn migrations_for_database(
+pub fn migrations_for_database(
     config: &Config,
     database: &Database,
     migrations: &[Migration],

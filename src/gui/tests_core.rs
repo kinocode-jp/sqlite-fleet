@@ -393,6 +393,325 @@
     }
 
     #[test]
+    fn api_save_settings_persists_discovery_and_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("db/migrate");
+        let backups_dir = dir.path().join("safe/backups");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        std::fs::create_dir_all(&backups_dir).unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+                ..Config::default()
+            },
+            config_path.clone(),
+        );
+
+        api_save_settings(
+            &state,
+            br#"{"project_name":"Existing App","discovery":"glob","databases_path_glob":"data/*.db","databases_source":null,"databases_query":null,"databases_id_column":null,"databases_path_column":null,"databases_path_template":null,"migrations_dir":"db/migrate","migrations_table":"schema_migrations","report_format":"json","report_path":"reports/status.json","backup_dir":"safe/backups","backup_before_migrate":true,"backup_keep_last":0,"audit_path":"audit.jsonl","parallel":2,"lock_timeout_ms":0,"continue_on_error":true}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(config.project.name.as_deref(), Some("Existing App"));
+        assert_eq!(config.databases.path_glob.as_deref(), Some("data/*.db"));
+        assert_eq!(config.migrations.dir, "db/migrate");
+        assert_eq!(config.migrations.table, "schema_migrations");
+        assert_eq!(config.backup.dir, "safe/backups");
+        assert!(config.backup.before_migrate);
+        assert_eq!(config.backup.keep_last, 0);
+        assert_eq!(config.execution.parallel, 2);
+        assert_eq!(config.execution.lock_timeout_ms, 0);
+        let saved = std::fs::read_to_string(config_path).unwrap();
+        assert!(saved.contains("name = \"Existing App\""), "{saved}");
+        assert!(saved.contains("dir = \"db/migrate\""), "{saved}");
+    }
+
+    #[test]
+    fn api_baseline_migrations_marks_pending_without_running_sql() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        Connection::open(data_dir.join("tenant.db")).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_items.sql"),
+            "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let state = test_server_state(
+            Config {
+                base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+                databases: sqlite_fleet::DatabasesConfig {
+                    discovery: "glob".to_string(),
+                    path_glob: Some("data/*.db".to_string()),
+                    ..Default::default()
+                },
+                ..Config::default()
+            },
+            dir.path().join("sqlite-fleet.toml"),
+        );
+
+        let report = api_baseline_migrations(&state, br#"{"databases":["tenant"]}"#.to_vec()).unwrap();
+        assert_eq!(report.failed_databases, 0);
+        assert_eq!(report.applied_databases, 1);
+
+        let conn = Connection::open(data_dir.join("tenant.db")).unwrap();
+        let table_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='items'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(table_exists, 0);
+        let history_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM _sqlite_fleet_migrations", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(history_count, 1);
+    }
+
+    #[test]
+    fn baseline_rechecks_pending_after_acquiring_operation_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        let db_path = data_dir.join("tenant.db");
+        Connection::open(&db_path).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_items.sql"),
+            "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..Default::default()
+            },
+            ..Config::default()
+        };
+        let databases = discover_databases(&config).unwrap();
+        let migrations = load_migrations(&config).unwrap();
+        let stale_plan = sqlite_fleet::build_plan(&config, &databases, &migrations)
+            .into_iter()
+            .next()
+            .unwrap();
+        assert_eq!(stale_plan.pending.len(), 1);
+        let conn = Connection::open(&db_path).unwrap();
+        ensure_migrations_table(&conn, "_sqlite_fleet_migrations").unwrap();
+        conn.execute(
+            "INSERT INTO _sqlite_fleet_migrations (filename, version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, 1, 0)",
+            rusqlite::params![
+                migrations[0].filename,
+                migrations[0].version,
+                migrations[0].name,
+                migrations[0].checksum,
+            ],
+        )
+        .unwrap();
+
+        let result = baseline_database(&config, stale_plan, &migrations);
+
+        assert!(result.success, "{:?}", result.error);
+        assert!(result.applied.is_empty());
+        assert!(result.pending.is_empty());
+        let history_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM _sqlite_fleet_migrations", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(history_count, 1);
+    }
+
+    #[test]
+    fn api_baseline_migrations_respects_existing_database_operation_lock() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        let db_path = data_dir.join("tenant.db");
+        Connection::open(&db_path).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_items.sql"),
+            "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..Default::default()
+            },
+            execution: sqlite_fleet::ExecutionConfig {
+                lock_timeout_ms: 1,
+                ..Default::default()
+            },
+            ..Config::default()
+        };
+        let _lock = sqlite_fleet::acquire_database_operation_lock(&config, &db_path, "test")
+            .expect("test lock should be acquired");
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let report =
+            api_baseline_migrations(&state, br#"{"databases":["tenant"]}"#.to_vec()).unwrap();
+
+        assert_eq!(report.database_count, 1);
+        assert_eq!(report.processed_databases, 1);
+        assert_eq!(report.failed_databases, 1);
+        assert!(report.databases[0]
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("別のsqlite-fleet操作中")));
+        let conn = Connection::open(&db_path).unwrap();
+        let history_exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_sqlite_fleet_migrations'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(history_exists, 0);
+    }
+
+    #[test]
+    fn api_baseline_migrations_upgrades_legacy_history_before_inserting_pending() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_items.sql"),
+            "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        std::fs::write(
+            migrations_dir.join("002_add_items_name.sql"),
+            "ALTER TABLE items ADD COLUMN name TEXT;",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..Default::default()
+            },
+            ..Config::default()
+        };
+        let migrations = load_migrations(&config).unwrap();
+        let first = migrations
+            .iter()
+            .find(|migration| migration.filename == "001_create_items.sql")
+            .unwrap();
+        let db_path = data_dir.join("tenant.db");
+        let conn = Connection::open(&db_path).unwrap();
+        conn.execute_batch("CREATE TABLE items(id INTEGER PRIMARY KEY);")
+            .unwrap();
+        conn.execute(
+            "CREATE TABLE _sqlite_fleet_migrations (
+                version TEXT PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                checksum TEXT NOT NULL,
+                applied_at INTEGER NOT NULL,
+                execution_ms INTEGER NOT NULL
+            )",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO _sqlite_fleet_migrations (version, name, checksum, applied_at, execution_ms)
+             VALUES (?1, ?2, ?3, 1, 1)",
+            rusqlite::params![first.version, first.name, first.checksum],
+        )
+        .unwrap();
+        drop(conn);
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let report =
+            api_baseline_migrations(&state, br#"{"databases":["tenant"]}"#.to_vec()).unwrap();
+
+        assert_eq!(report.failed_databases, 0);
+        assert_eq!(report.applied_databases, 1);
+        let conn = Connection::open(&db_path).unwrap();
+        let applied =
+            sqlite_fleet::read_applied_migrations(&conn, "_sqlite_fleet_migrations").unwrap();
+        let filenames = applied
+            .iter()
+            .map(|migration| migration.filename.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(filenames, ["001_create_items.sql", "002_add_items_name.sql"]);
+    }
+
+    #[test]
+    fn api_baseline_migrations_stops_on_first_failure_when_continue_on_error_is_false() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir_all(&data_dir).unwrap();
+        std::fs::create_dir_all(&migrations_dir).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_items.sql"),
+            "CREATE TABLE items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let first = Connection::open(data_dir.join("a.db")).unwrap();
+        ensure_migrations_table(&first, "_sqlite_fleet_migrations").unwrap();
+        first
+            .execute(
+                "INSERT INTO _sqlite_fleet_migrations (filename, version, name, checksum, applied_at, execution_ms) VALUES (?1, ?2, ?3, ?4, 1, 0)",
+                rusqlite::params!["001_create_items.sql", "001", "create_items", "wrong-checksum"],
+            )
+            .unwrap();
+        Connection::open(data_dir.join("b.db")).unwrap();
+        let state = test_server_state(
+            Config {
+                base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+                databases: sqlite_fleet::DatabasesConfig {
+                    discovery: "glob".to_string(),
+                    path_glob: Some("data/*.db".to_string()),
+                    ..Default::default()
+                },
+                execution: sqlite_fleet::ExecutionConfig {
+                    continue_on_error: false,
+                    ..Default::default()
+                },
+                ..Config::default()
+            },
+            dir.path().join("sqlite-fleet.toml"),
+        );
+
+        let report =
+            api_baseline_migrations(&state, br#"{"databases":["a","b"]}"#.to_vec()).unwrap();
+
+        assert_eq!(report.database_count, 2);
+        assert_eq!(report.processed_databases, 1);
+        assert_eq!(report.failed_databases, 1);
+        assert_eq!(report.applied_databases, 0);
+        assert_eq!(report.databases[0].database.id, "a");
+        let second = Connection::open(data_dir.join("b.db")).unwrap();
+        let history_exists: i64 = second
+            .query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_sqlite_fleet_migrations'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(history_exists, 0);
+    }
+
+    #[test]
     fn api_db_groups_resolve_relative_path_selectors_for_preview() {
         let dir = tempfile::tempdir().unwrap();
         let data_dir = dir.path().join("data");
@@ -1106,6 +1425,57 @@
         assert!(response.contains(r#""ok":true"#), "{response}");
         let audit = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
         assert!(audit.contains(r#""operation":"gui.migrate""#), "{audit}");
+    }
+
+    #[test]
+    fn gui_baseline_writes_report_and_audit_event() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        let migrations_dir = dir.path().join("migrations");
+        std::fs::create_dir(&data_dir).unwrap();
+        std::fs::create_dir(&migrations_dir).unwrap();
+        Connection::open(data_dir.join("tenant.db")).unwrap();
+        std::fs::write(
+            migrations_dir.join("001_create_baseline_items.sql"),
+            "CREATE TABLE baseline_items(id INTEGER PRIMARY KEY);",
+        )
+        .unwrap();
+        let config = Config {
+            base_dir: dir.path().to_path_buf(),
+            databases: sqlite_fleet::DatabasesConfig {
+                discovery: "glob".to_string(),
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
+            migrations: sqlite_fleet::MigrationsConfig {
+                dir: "migrations".to_string(),
+                ..sqlite_fleet::MigrationsConfig::default()
+            },
+            report: sqlite_fleet::ReportConfig {
+                format: "json".to_string(),
+                path: Some("baseline-report.json".to_string()),
+            },
+            audit: sqlite_fleet::AuditConfig {
+                path: Some("audit.jsonl".to_string()),
+            },
+            ..Config::default()
+        };
+        let body = r#"{"databases":["tenant"]}"#;
+
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/baseline HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            config,
+        );
+
+        assert!(response.contains(r#""ok":true"#), "{response}");
+        let audit = std::fs::read_to_string(dir.path().join("audit.jsonl")).unwrap();
+        assert!(audit.contains(r#""operation":"gui.baseline""#), "{audit}");
+        let report = std::fs::read_to_string(dir.path().join("baseline-report.json")).unwrap();
+        assert!(report.contains(r#""applied_databases": 1"#), "{report}");
     }
 
     #[test]

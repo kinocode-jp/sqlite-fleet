@@ -142,6 +142,27 @@ canary = ["tenant-a", "tenant-b"]
 
 設定由来のパスは設定ファイルのディレクトリ配下に限定されます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる `base_dir` 外への脱出は安全側で拒否します。
 
+## 既存プロジェクトへの導入
+
+sqlite-fleet は、新規プロジェクト専用ではなく、既存のSQLite DBと既存のmigrationファイルを取り込んで管理する前提です。
+
+DBは設定ファイルからの相対パスで検出します。DBファイルがディレクトリに並んでいる場合は `databases.discovery = "glob"` と `databases.path_glob` を使います。親DBや管理DBにtenant一覧がある場合は `databases.discovery = "query"` を使い、`source`、`query`、`id_column`、`path_column` または `path_template` で対象DBを列挙します。GUIの設定画面では、この仕組みを「DB検出」と表示しています。
+
+既存のmigrationディレクトリは `migrations.dir` に指定します。複数ディレクトリに分かれている場合は、基本のディレクトリを `migrations.dir` に置き、追加ディレクトリをマイグレーショングループの `dir` として登録できます。
+
+```toml
+[migrations]
+dir = "./db/migrate"
+
+[migration_groups.legacy_admin]
+dir = "./engines/admin/db/migrate"
+
+[database_migration_groups]
+admin = ["main", "legacy_admin"]
+```
+
+すでに本番DBへ適用済みのmigrationを初回導入時に再実行したくない場合は、GUIの実行画面で対象DBを選び、`対象を読み取り済みにする` を実行します。この操作はSQLを実行せず、未適用として見えているmigrationを履歴テーブルへ登録します。DBの実スキーマがmigration内容と一致していることを確認してから使ってください。
+
 ## 親DBから対象DBを列挙する例
 
 ```toml
@@ -157,7 +178,7 @@ path_template = "./data/tenants/{id:08:split2}.db"
 
 ## マイグレーションファイル
 
-マイグレーションファイルは `migrations.dir` の固定ディレクトリに `<version>_<name>.sql` または `<name>_<version>.sql` 形式で置きます。通常は `[migration_groups]` を書かず、全ファイルを暗黙の `main` グループとして使えます。分岐したい場合だけ `[migration_groups]` にファイル名リストを書きます。
+マイグレーションファイルは `migrations.dir` に `<version>_<name>.sql` または `<name>_<version>.sql` 形式で置きます。通常は `[migration_groups]` を書かず、全ファイルを暗黙の `main` グループとして使えます。分岐したい場合だけ `[migration_groups]` にファイル名リストを書きます。既存プロジェクトで複数ディレクトリに分かれている場合は、`[migration_groups.<name>] dir = "..."` で追加ディレクトリを読み込めます。
 
 sqlite-fleet では、マイグレーションの同一性は `version` ではなくファイル名全体です。同じ `001` や日付バージョンを持つファイルが複数あっても、ファイル名が違えば別マイグレーションとして扱います。同じファイル名が複数グループに含まれる場合は、DBごとに1回だけ適用されます。
 
@@ -174,7 +195,7 @@ main = ["001_create_items.sql", "002_add_item_index.sql"]
 premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscription.sql"]
 ```
 
-`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。互換用に `[migration_groups.<name>] dir = "..."` 形式も読み込めますが、新規設定では固定ディレクトリ + ファイル名リスト形式を推奨します。
+`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。既存ディレクトリをそのまま取り込む場合は、マイグレーショングループ作成時に `Migration dir` を指定できます。新しく整理する設定では、基本ディレクトリ + ファイル名リスト形式を推奨します。
 
 古い設定向けに `001` のようなversion指定も、単一ファイルに一致する場合だけ読み込めます。同じversionのファイルが複数ある場合は曖昧として拒否されるため、新しい設定では必ず `001_create_items.sql` のようなファイル名で指定してください。
 
@@ -243,7 +264,7 @@ sqlite-fleet drift --group canary
 ## 終了コード
 
 - `0`: コマンドが成功した
-- 非0: 設定不備、DB探索失敗、migration失敗、checksum不一致、DB検査失敗、またはレポート書き込み失敗
+- 非0: 設定不備、DB検出失敗、migration失敗、checksum不一致、DB検査失敗、またはレポート書き込み失敗
 
 CI/CD では `migrate`、`check`、`doctor` の非0終了を失敗として扱ってください。
 
@@ -251,7 +272,7 @@ CI/CD では `migrate`、`check`、`doctor` の非0終了を失敗として扱�
 
 - 本番DBのバックアップを取得してから `migrate` を実行する
 - `migrate --backup` または `backup.before_migrate = true` で本適用前backupを自動化する
-- `sqlite-fleet doctor` で設定、DB discovery、migration ファイルを検証する
+- `sqlite-fleet doctor` で設定、DB検出、migration ファイルを検証する
 - `sqlite-fleet plan` で対象DBと適用予定を確認する
 - `sqlite-fleet migrate --dry-run` で読み取り専用の事前確認を行う
 - 旧 `version` 主キーの履歴テーブルを使っているDBでは、初回 `migrate` 前に `status` / `check` で全ての旧履歴がローカルmigrationへ解決できることを確認する
@@ -280,7 +301,7 @@ fn main() -> Result<()> {
 }
 ```
 
-`Config::load()` は `report.format` / `report.path` まで含めて全体検証します。CLI と同じように、レポート出力設定の検証を実際の書き込み時まで遅らせたい場合は `Config::load_for_operation()` を使います。DB探索だけを行う場合は `Config::load_for_discovery()` を使います。
+`Config::load()` は `report.format` / `report.path` まで含めて全体検証します。CLI と同じように、レポート出力設定の検証を実際の書き込み時まで遅らせたい場合は `Config::load_for_operation()` を使います。DB検出だけを行う場合は `Config::load_for_discovery()` を使います。
 
 `doctor` と `doctor_with_overrides` は `report.path` へ書き込まない診断APIです。レポート書き出しも必要な場合は `doctor_and_write_report` を使います。
 

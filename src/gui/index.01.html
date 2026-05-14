@@ -73,6 +73,7 @@
         required: (label) => `${label} を入力してください`,
         allDbTarget: '全DB',
         confirmMigrate: (target) => `${target} へマイグレーションを適用します。続行しますか？`,
+        confirmBaseline: '対象DBの未適用マイグレーションを実行せず、読み取り済みとして履歴登録します。続行しますか？',
         migrateDone: (mode, processed, failed) => `${mode} 完了: processed=${processed}, failed=${failed}`,
         checkDone: (ok, failed) => `check 完了: ok=${ok}, failed=${failed}`,
         confirmBackup: (target) => `${target} のbackupを作成します。続行しますか？`,
@@ -181,6 +182,7 @@
       }
       if (!disabled && state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
         $('savePermissions').disabled = true;
+        $('saveSettings').disabled = true;
       }
     }
     function message(text, isError = false) {
@@ -444,6 +446,26 @@
       $('savePermissions').disabled = !permissions.allow_migration_edit;
       $('savePermissions').title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
       const settings = state.settings;
+      $('settingsProjectName').value = settings.project_name || '';
+      $('settingsDiscovery').value = settings.discovery || 'glob';
+      $('settingsPathGlob').value = settings.databases_path_glob || '';
+      $('settingsSource').value = settings.databases_source || '';
+      $('settingsQuery').value = settings.databases_query || '';
+      $('settingsIdColumn').value = settings.databases_id_column || '';
+      $('settingsPathColumn').value = settings.databases_path_column || '';
+      $('settingsPathTemplate').value = settings.databases_path_template || '';
+      $('settingsMigrationsDir').value = settings.migrations_dir || '';
+      $('settingsMigrationsTable').value = settings.migrations_table || '';
+      $('settingsReportFormat').value = settings.report_format || 'json';
+      $('settingsReportPath').value = settings.report_path || '';
+      $('settingsBackupDir').value = settings.backup_dir || '';
+      $('settingsAuditPath').value = settings.audit_path || '';
+      $('settingsParallel').value = settings.parallel;
+      $('settingsLockTimeoutMs').value = settings.lock_timeout_ms;
+      $('settingsBackupKeepLast').value = settings.backup_keep_last;
+      $('settingsContinueOnError').checked = Boolean(settings.continue_on_error);
+      $('settingsBackupBeforeMigrate').checked = Boolean(settings.backup_before_migrate);
+      $('saveSettings').disabled = !permissions.allow_migration_edit;
       $('basicSettings').innerHTML = keyItems([
         ['name', settings.project_name || t('unset')],
       ]);
@@ -484,6 +506,33 @@
           payload[input.dataset.permissionKey] = input.checked;
         });
         await postAdmin('/api/admin/gui-permissions', payload);
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function saveSettings() {
+      try {
+        await postAdmin('/api/admin/settings', {
+          project_name: optionalInput('settingsProjectName'),
+          discovery: requireValue('settingsDiscovery', 'DB discovery'),
+          databases_path_glob: optionalInput('settingsPathGlob'),
+          databases_source: optionalInput('settingsSource'),
+          databases_query: optionalInput('settingsQuery'),
+          databases_id_column: optionalInput('settingsIdColumn'),
+          databases_path_column: optionalInput('settingsPathColumn'),
+          databases_path_template: optionalInput('settingsPathTemplate'),
+          migrations_dir: requireValue('settingsMigrationsDir', 'Migration dir'),
+          migrations_table: requireValue('settingsMigrationsTable', 'History table'),
+          report_format: requireValue('settingsReportFormat', 'Report format'),
+          report_path: optionalInput('settingsReportPath'),
+          backup_dir: requireValue('settingsBackupDir', 'Backup dir'),
+          backup_before_migrate: $('settingsBackupBeforeMigrate').checked,
+          backup_keep_last: nonNegativeIntegerValue('settingsBackupKeepLast', 'Backup keep last'),
+          audit_path: optionalInput('settingsAuditPath'),
+          parallel: positiveIntegerValue('settingsParallel', 'Parallel'),
+          lock_timeout_ms: nonNegativeIntegerValue('settingsLockTimeoutMs', 'Lock timeout ms'),
+          continue_on_error: $('settingsContinueOnError').checked,
+        });
       } catch (error) {
         message(error.message, true);
       }
@@ -711,6 +760,7 @@
         '/api/admin/db-group': 'savedDbGroup',
         '/api/admin/database-migration-group': 'savedDatabaseRule',
         '/api/admin/gui-permissions': 'savedGuiPermissions',
+        '/api/admin/settings': 'savedSettings',
         '/api/admin/migration-file': 'createdMigrationFile',
         '/api/admin/migration-file/update': 'savedMigrationFile',
         '/api/admin/database-file': 'createdDatabaseFile',
@@ -735,7 +785,7 @@
         const result = await api('/api/admin/migration-group', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, versions: [] }),
+          body: JSON.stringify({ name, dir: optionalInput('manageMigrationGroupDir'), versions: [] }),
         });
         selectedMigrationGroupName = name;
         message(adminSuccessMessage('/api/admin/migration-group', result.message));
@@ -752,6 +802,7 @@
           .map((input) => input.dataset.migrationVersion);
         await postAdmin('/api/admin/migration-group', {
           name: selectedMigrationGroupName,
+          dir: null,
           versions,
         });
       } catch (error) {
@@ -760,6 +811,7 @@
     }
     function openMigrationGroupModal() {
       $('manageMigrationGroupName').value = '';
+      $('manageMigrationGroupDir').value = '';
       $('migrationGroupModal').hidden = false;
       $('manageMigrationGroupName').focus();
     }
@@ -1484,6 +1536,27 @@
       if (!value) throw new Error(t('required', label));
       return value;
     }
+    function optionalInput(id) {
+      const value = $(id).value.trim();
+      return value || null;
+    }
+    function positiveIntegerValue(id, label) {
+      const number = integerValue(id, label);
+      if (!Number.isInteger(number) || number < 1) throw new Error(`${label} は1以上の整数で入力してください`);
+      return number;
+    }
+    function nonNegativeIntegerValue(id, label) {
+      const number = integerValue(id, label);
+      if (!Number.isInteger(number) || number < 0) throw new Error(`${label} は0以上の整数で入力してください`);
+      return number;
+    }
+    function integerValue(id, label) {
+      const value = requireValue(id, label);
+      if (!/^\d+$/.test(value)) throw new Error(`${label} は整数で入力してください`);
+      const number = Number(value);
+      if (!Number.isSafeInteger(number)) throw new Error(`${label} が大きすぎます`);
+      return number;
+    }
     function generateSql(builder) {
       try {
         setSql(builder());
@@ -1505,6 +1578,25 @@
         if (!dryRun && selectedDatabase && (!database || selectedDatabase === database)) {
           await loadSchema({ showLoadedMessage: false });
         }
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function baselineTargets() {
+      const plans = resolveTargetPlans($('targetGroup').value, $('targetDatabase').value, $('targetLimit').value.trim());
+      if (!plans.length) {
+        message(t('noTargetDb'), true);
+        return;
+      }
+      if (!confirm(t('confirmBaseline'))) return;
+      try {
+        const report = await api('/api/admin/baseline', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ databases: plans.map((plan) => plan.database.id) }),
+        });
+        message(t('baselineDone', report.processed_databases, report.failed_databases));
+        await load({ showLoadedMessage: false });
       } catch (error) {
         message(error.message, true);
       }
@@ -1588,8 +1680,10 @@
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
     $('savePermissions').addEventListener('click', saveGuiPermissions);
+    $('saveSettings').addEventListener('click', saveSettings);
     $('dryRun').addEventListener('click', () => runMigrate('', true));
     $('backupAll').addEventListener('click', () => runBackup(''));
+    $('baselineAll').addEventListener('click', baselineTargets);
     $('migrateAll').addEventListener('click', () => runMigrate('', false));
     $('loadSchema').addEventListener('click', loadSchema);
     $('insertTemplate').addEventListener('click', insertSelectedTemplate);

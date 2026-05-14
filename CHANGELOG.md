@@ -11,6 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Treat migration file names as the migration identity instead of bare versions.
 - Keep `main` as the implicit default migration group when no explicit migration groups are configured.
+- Add GUI editing for DB discovery, migration/output/backup/audit paths, runtime settings, and GUI permissions.
+- Add GUI support for importing existing migration directories through migration group `dir`.
+- Add a GUI baseline action that records pending migrations as already applied without executing their SQL.
 - Read legacy `version` primary-key history tables and upgrade them to `filename` primary-key history after legacy entries resolve to local migration files and checksum validation passes.
 
 ## [0.1.3](https://github.com/0809android/sqlite-fleet/compare/v0.1.1...v0.1.3) - 2026-05-09

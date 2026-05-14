@@ -27,6 +27,7 @@ struct MigrationData {
 #[derive(Serialize)]
 struct MigrationGroupData {
     name: String,
+    dir: Option<String>,
     migrations: Vec<sqlite_fleet::MigrationSummary>,
     databases: Vec<String>,
 }
@@ -70,6 +71,30 @@ struct GuiPermissionRequest {
     allow_restore: bool,
     allow_sql_apply: bool,
     allow_migration_edit: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SettingsRequest {
+    project_name: Option<String>,
+    discovery: String,
+    databases_path_glob: Option<String>,
+    databases_source: Option<String>,
+    databases_query: Option<String>,
+    databases_id_column: Option<String>,
+    databases_path_column: Option<String>,
+    databases_path_template: Option<String>,
+    migrations_dir: String,
+    migrations_table: String,
+    report_format: String,
+    report_path: Option<String>,
+    backup_dir: String,
+    backup_before_migrate: bool,
+    backup_keep_last: usize,
+    audit_path: Option<String>,
+    parallel: usize,
+    lock_timeout_ms: u64,
+    continue_on_error: bool,
 }
 
 impl GuiPermissionData {
@@ -199,6 +224,7 @@ struct SqlResult {
 #[serde(deny_unknown_fields)]
 struct MigrationGroupRequest {
     name: String,
+    dir: Option<String>,
     versions: Vec<String>,
 }
 
@@ -240,6 +266,12 @@ struct MigrationFileUpdateRequest {
 struct DatabaseFileRequest {
     path: String,
     db_group: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct BaselineRequest {
+    databases: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -289,6 +321,12 @@ fn clean_name(value: &str, label: &str) -> Result<String> {
         bail!("{label} に空白は使用できません");
     }
     Ok(value.to_string())
+}
+
+fn clean_optional_string(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
 }
 
 fn clean_list(values: Vec<String>, label: &str) -> Result<Vec<String>> {
