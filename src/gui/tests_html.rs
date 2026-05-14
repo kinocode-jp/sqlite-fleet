@@ -261,6 +261,8 @@
         assert!(INDEX_HTML.contains("let pathBrowseView = localStorage.getItem('sqlite-fleet-path-browser-view') === 'icons' ? 'icons' : 'list';"));
         assert!(INDEX_HTML.contains("function setPathBrowserView(view, rerender = false)"));
         assert!(INDEX_HTML.contains("function pathBrowserEntryHtml(entry)"));
+        assert!(INDEX_HTML.contains("path-browser-name path-browser-link"));
+        assert!(INDEX_HTML.contains(r#"data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>"#));
         assert!(INDEX_HTML.contains("pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')"));
         assert!(!INDEX_HTML.contains(r#"<span class="muted">${escapeHtml(kindLabel)}</span>"#));
         assert!(INDEX_HTML.contains("function selectPathBrowser(path, kind)"));

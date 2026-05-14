@@ -617,17 +617,21 @@
     }
     function pathBrowserEntryHtml(entry) {
       const kindLabel = entry.kind === 'dir' ? t('folder') : t('file');
-      const iconLabel = entry.kind === 'dir' ? 'DIR' : 'FILE';
       const actionAttr = entry.kind === 'dir' ? 'data-path-open' : 'data-path-select';
       if (pathBrowseView === 'icons') {
+        if (entry.kind === 'file') {
+          return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
+            <button class="path-browser-name path-browser-link" type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+          </div>`;
+        }
         return `<div class="path-browser-tile" title="${escapeHtml(entry.path)}">
-          <span class="path-browser-icon" aria-hidden="true">${escapeHtml(iconLabel)}</span>
-          <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
+          <span class="path-browser-icon" aria-hidden="true">DIR</span>
+          <button class="path-browser-name path-browser-link" type="button" data-path-open="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
           <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
         </div>`;
       }
       return `<div class="path-browser-row" title="${escapeHtml(entry.path)}">
-        <span class="path-browser-icon" aria-hidden="true">${escapeHtml(iconLabel)}</span>
+        <span class="path-browser-icon" aria-hidden="true">${entry.kind === 'dir' ? 'DIR' : 'FILE'}</span>
         <button class="path-browser-name" type="button" ${actionAttr}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(entry.name)}</button>
         <span class="muted path-browser-kind">${escapeHtml(kindLabel)}</span>
         <code class="path-browser-path">${escapeHtml(entry.path)}</code>
