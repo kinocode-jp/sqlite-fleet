@@ -257,6 +257,7 @@
         assert!(INDEX_HTML.contains("await api(`/api/admin/path-entries${query}`)"));
         assert!(INDEX_HTML.contains("function selectPathBrowser(path, kind)"));
         assert!(INDEX_HTML.contains("document.querySelectorAll('[data-path-browse]').forEach"));
+        assert!(INDEX_HTML.contains("button.disabled = !permissions.allow_migration_edit;"));
         assert!(INDEX_HTML.contains("message(t('permissionEditDisabled'), true);"));
         assert!(INDEX_HTML.contains("async function baselineTargets()"));
         assert!(INDEX_HTML.contains("'/api/admin/gui-permissions': 'savedGuiPermissions'"));

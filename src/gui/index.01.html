@@ -474,6 +474,10 @@
       $('settingsContinueOnError').checked = Boolean(settings.continue_on_error);
       $('settingsBackupBeforeMigrate').checked = Boolean(settings.backup_before_migrate);
       $('saveSettings').disabled = !permissions.allow_migration_edit;
+      document.querySelectorAll('[data-path-browse]').forEach((button) => {
+        button.disabled = !permissions.allow_migration_edit;
+        button.title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
+      });
       $('basicSettings').innerHTML = keyItems([
         ['name', settings.project_name || t('unset')],
       ]);
