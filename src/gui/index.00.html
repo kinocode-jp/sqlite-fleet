@@ -295,7 +295,7 @@
       <section class="panel page active" data-page="execute" id="command-center">
         <div class="panel-header">
           <div class="panel-heading">
-            <h2>マイグレーション適用</h2>
+            <h2>対象設定</h2>
             <p class="panel-description">DBグループ、個別DB、limitを組み合わせて操作対象を決めます。</p>
           </div>
           <div class="panel-actions">
@@ -345,20 +345,6 @@
             </div>
             <p id="migrationGroupSimpleNote" class="simple-mode-note" hidden>全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。</p>
             <div id="migrationGroupChecklist" class="migration-checklist"></div>
-          </section>
-        </div>
-        <div id="migrationAssignmentEditor" class="migration-assignment-editor">
-          <section>
-            <h3>DB別マイグレーショングループ</h3>
-            <div class="info-card">
-              <label class="field"><span class="field-label">DB selector <span class="tool-tip" tabindex="0" data-tip="DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するマイグレーショングループを指定します。">?</span></span><input id="manageRuleSelector" placeholder="tenant-a"></label>
-              <label class="field"><span class="field-label">Applied Migration Groups <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするマイグレーショングループです。複数指定できます。未指定DBはmainを使います。">?</span></span><input id="manageRuleGroups" placeholder="main, premium"></label>
-              <button id="saveDatabaseRule" class="primary">割当を保存</button>
-            </div>
-          </section>
-          <section>
-            <h3>登録済みルール</h3>
-            <div id="databaseRules" class="card-list"></div>
           </section>
         </div>
       </section>
@@ -415,6 +401,20 @@
             <thead><tr><th class="col-id">ID</th><th class="col-status">Status</th><th class="col-groups">Migration Groups</th><th class="col-applied">Applied</th><th class="col-pending">Pending</th><th class="col-path">Path</th><th class="col-actions">Actions</th></tr></thead>
             <tbody id="databases"></tbody>
           </table>
+        </div>
+        <div id="migrationAssignmentEditor" class="migration-assignment-editor">
+          <section>
+            <h3>DBへのマイグレーショングループ割当</h3>
+            <div class="info-card">
+              <label class="field"><span class="field-label">DB <span class="tool-tip" tabindex="0" data-tip="マイグレーショングループを割り当てるDBです。未指定DBはmainを使います。">?</span></span><select id="manageRuleSelector"></select></label>
+              <div class="field"><span class="field-label">マイグレーショングループ <span class="tool-tip" tabindex="0" data-tip="このDBで適用対象にするマイグレーショングループです。複数指定できます。">?</span></span><div id="manageRuleGroups" class="db-selector-list"></div></div>
+              <button id="saveDatabaseRule" class="primary">割当を保存</button>
+            </div>
+          </section>
+          <section>
+            <h3>登録済みルール</h3>
+            <div id="databaseRules" class="card-list"></div>
+          </section>
         </div>
       </section>
 
@@ -768,7 +768,7 @@
           <section>
             <h3>操作</h3>
             <ul>
-              <li>CheckはDB状態、checksum、不明な適用履歴を検査します。</li>
+              <li>状態を検査はDB状態、checksum、不明な適用履歴を検査します。</li>
               <li>Dry runは対象DBの未適用マイグレーションを確認します。DBは変更しません。</li>
               <li>適用は対象DBの未適用マイグレーションをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。</li>
               <li>BackupはSQLite backup APIでDBの一貫したコピーを <code>backup.dir</code> に作成します。</li>
@@ -890,6 +890,7 @@
       'スキーマ作成': 'Schema builder',
       '設定': 'Settings',
       'ヘルプ': 'Help',
+      '対象設定': 'Target settings',
       '状態を更新': 'Refresh status',
       '状態を検査': 'Check status',
       '読み込み中...': 'Loading...',
@@ -933,6 +934,9 @@
       'マイグレーショングループを保存': 'Save Migration Group',
       'DBグループを保存': 'Save DB Group',
       'DB別マイグレーショングループ': 'Per-DB Migration Groups',
+      'DBへのマイグレーショングループ割当': 'DB Migration Group assignment',
+      'マイグレーション': 'Migrations',
+      'マイグレーショングループを割り当てるDBです。未指定DBはmainを使います。': 'The DB to assign Migration Groups to. Unassigned DBs use main.',
       'DB IDまたは設定ディレクトリ基準のDBパスです。このDBに適用するマイグレーショングループを指定します。': 'A DB ID or config-relative DB path. Assign Migration Groups that apply to this DB.',
       'Applied Migration Groups': 'Applied Migration Groups',
       'Migration files': 'Migration files',
@@ -1038,7 +1042,7 @@
       'DBではDBごとの適用済み件数、未適用マイグレーション、不整合を確認します。': 'DB shows applied counts, pending migrations, and inconsistencies per database.',
       'マイグレーションでは読み込まれているマイグレーションファイルとchecksumを確認します。': 'Migrations shows loaded migration files and checksums.',
       'マイグレーショングループではmainから分岐した各グループのマイグレーションをチェックボックスで編集できます。': 'Migration Groups edits migrations for each group branched from main with checkboxes.',
-      'CheckはDB状態、checksum、不明な適用履歴を検査します。': 'Check verifies DB state, checksums, and unknown applied history.',
+      '状態を検査はDB状態、checksum、不明な適用履歴を検査します。': 'Check status verifies DB state, checksums, and unknown applied history.',
       'Dry runは対象DBの未適用マイグレーションを確認します。DBは変更しません。': 'Dry run inspects pending migrations for target DBs without changing them.',
       '適用は対象DBの未適用マイグレーションをversion順に適用します。選択中の1ファイルだけを飛ばして適用する操作ではありません。': 'Apply runs all pending migrations for the target DBs in version order. It is not a one-file-only apply action.',
       'BackupはSQLite backup APIでDBの一貫したコピーを': 'Backup uses the SQLite backup API to create a consistent copy under',

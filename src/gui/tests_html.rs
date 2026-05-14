@@ -278,6 +278,8 @@
         assert!(INDEX_HTML.contains("function pathBrowserExtension(path)"));
         assert!(INDEX_HTML.contains("function formatPathModified(value)"));
         assert!(INDEX_HTML.contains("function canSelectCurrentPathBrowserDirectory()"));
+        assert!(INDEX_HTML.contains("function pathBrowserGlobSuffix()"));
+        assert!(INDEX_HTML.contains(r#"match(/\*\.([A-Za-z0-9]+)$/)"#));
         assert!(INDEX_HTML.contains(r#"id="pathBrowserUseCurrent" type="button">この場所を使う</button>"#));
         assert!(INDEX_HTML.contains("entry.modified_at_ms"));
         assert!(INDEX_HTML.contains("path-browser-date"));
@@ -500,6 +502,9 @@
         assert!(INDEX_HTML.contains("$('migrations').addEventListener('click', (event) =>"));
         assert!(INDEX_HTML.contains("openDatabaseFromMigration(databaseButton.dataset.openDatabase)"));
         assert!(INDEX_HTML.contains("state.database_migration_assignments || []"));
+        assert!(INDEX_HTML.contains("function matchingDatabaseMigrationAssignments(databaseId)"));
+        assert!(INDEX_HTML.contains("function databaseMigrationRuleSelectors(databaseId)"));
+        assert!(INDEX_HTML.contains("const selectors = databaseMigrationRuleSelectors(databaseId)"));
         assert!(INDEX_HTML.contains("selector: assignment.selector"));
         assert!(INDEX_HTML.contains("unassignMigrationDatabase(unassignButton.dataset.unassignMigrationDb, unassignButton.dataset.unassignMigrationGroup)"));
         assert!(INDEX_HTML.contains("openChecksumModal(checksumButton.dataset.checksum)"));

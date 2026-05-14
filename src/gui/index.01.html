@@ -306,10 +306,7 @@
       renderMigrationGroupEditor();
       renderMigrationFileGroupOptions();
 
-      $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
-        <strong>${escapeHtml(rule.selector)}</strong>
-        <div><span class="label">${escapeHtml(t('assignedGroupsLabel'))}</span><div>${chips(rule.migration_groups)}</div></div>
-      </article>`).join('') || `<p class="muted">${escapeHtml(t('noRules'))}</p>`;
+      renderDatabaseMigrationRuleEditor();
 
       renderSettings();
       updateTargetPreview();
@@ -323,7 +320,6 @@
       }
       const selectedGroup = groups.find((group) => group.name === selectedMigrationGroupName);
       $('migrationGroupEditor').classList.toggle('simple', simpleMode);
-      $('migrationAssignmentEditor').hidden = simpleMode;
       $('migrationGroupSimpleNote').hidden = !simpleMode;
       $('openMigrationGroupModal').textContent = simpleMode ? t('splitMigrationGroups') : t('newMigrationGroup');
       $('openMigrationGroupModalInline').hidden = !simpleMode;
@@ -442,6 +438,59 @@
       $('targetDatabase').innerHTML = `<option value="">${escapeHtml(t('noSelection'))}</option>` + plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('');
       if (currentGroup && state.db_groups.some((group) => group.name === currentGroup)) $('targetGroup').value = currentGroup;
       if (currentDatabase && plans.some((plan) => plan.database.id === currentDatabase)) $('targetDatabase').value = currentDatabase;
+    }
+    function renderDatabaseMigrationRuleEditor() {
+      const plans = state.status && state.status.plans ? state.status.plans : [];
+      const currentSelector = $('manageRuleSelector').value;
+      $('manageRuleSelector').innerHTML = plans.length
+        ? plans.map((plan) => `<option value="${escapeHtml(plan.database.id)}">${escapeHtml(plan.database.id)}</option>`).join('')
+        : `<option value="">${escapeHtml(t('noDb'))}</option>`;
+      if (currentSelector && plans.some((plan) => plan.database.id === currentSelector)) {
+        $('manageRuleSelector').value = currentSelector;
+      }
+      renderDatabaseMigrationGroupCheckboxes();
+      $('databaseRules').innerHTML = state.database_migration_rules.map((rule) => `<article class="info-card">
+        <strong>${escapeHtml(rule.selector)}</strong>
+        <div><span class="label">${escapeHtml(t('assignedGroupsLabel'))}</span><div>${chips(rule.migration_groups)}</div></div>
+      </article>`).join('') || `<p class="muted">${escapeHtml(t('noRules'))}</p>`;
+    }
+    function migrationGroupNamesForRuleEditor() {
+      const groups = (state.migration_groups || []).map((group) => group.name);
+      return groups.length ? groups : ['main'];
+    }
+    function matchingDatabaseMigrationAssignments(databaseId) {
+      return (state.database_migration_assignments || [])
+        .filter((assignment) => assignment.database_id === databaseId);
+    }
+    function databaseMigrationRuleSelectors(databaseId) {
+      const assignments = matchingDatabaseMigrationAssignments(databaseId);
+      return assignments.length ? assignments.map((assignment) => assignment.selector) : [databaseId];
+    }
+    function selectedDatabaseMigrationGroups(databaseId) {
+      const assignments = matchingDatabaseMigrationAssignments(databaseId);
+      if (assignments.length) {
+        const groups = [];
+        assignments.forEach((assignment) => {
+          (assignment.migration_groups || []).forEach((group) => {
+            if (!groups.includes(group)) groups.push(group);
+          });
+        });
+        return groups;
+      }
+      const plan = state.status && state.status.plans ? state.status.plans.find((item) => item.database.id === databaseId) : null;
+      return plan ? (plan.migration_groups || []) : [];
+    }
+    function renderDatabaseMigrationGroupCheckboxes() {
+      const selector = $('manageRuleSelector').value;
+      const selectedGroups = new Set(selectedDatabaseMigrationGroups(selector));
+      $('manageRuleGroups').innerHTML = migrationGroupNamesForRuleEditor().map((name) => {
+        const id = `manageRuleGroup-${name}`;
+        const checked = selectedGroups.has(name) ? ' checked' : '';
+        return `<label class="check-row" for="${escapeHtml(id)}">
+          <input id="${escapeHtml(id)}" type="checkbox" value="${escapeHtml(name)}"${checked}>
+          <span><strong>${escapeHtml(name)}</strong></span>
+        </label>`;
+      }).join('');
     }
     function renderSettings() {
       const permissions = state.gui_permissions;
@@ -688,12 +737,18 @@
     function canSelectCurrentPathBrowserDirectory() {
       return pathBrowseKindFilter === 'dir' || pathBrowseMode === 'glob';
     }
+    function pathBrowserGlobSuffix() {
+      const current = pathBrowseTargetId ? $(pathBrowseTargetId).value : '';
+      const match = String(current || '').match(/\*\.([A-Za-z0-9]+)$/);
+      if (match) return match[1].toLowerCase();
+      return pathBrowseAcceptExtensions[0] || 'db';
+    }
     function selectPathBrowser(path, kind) {
       if (!pathBrowseTargetId) return;
       const entry = pathBrowseEntries.find((item) => item.path === path && item.kind === kind);
       if (entry && !isPathBrowserSelectable(entry)) return;
       const value = pathBrowseMode === 'glob' && kind === 'dir'
-        ? `${path ? `${path}/` : ''}**/*.db`
+        ? `${path ? `${path}/` : ''}**/*.${pathBrowserGlobSuffix()}`
         : path;
       $(pathBrowseTargetId).value = value;
       closePathBrowser();
@@ -1052,10 +1107,18 @@
     }
     async function saveDatabaseRule() {
       try {
-        await postAdmin('/api/admin/database-migration-group', {
-          selector: $('manageRuleSelector').value,
-          groups: csvList($('manageRuleGroups').value),
-        });
+        const groups = Array.from($('manageRuleGroups').querySelectorAll('input[type="checkbox"]:checked')).map((input) => input.value);
+        const databaseId = requireValue('manageRuleSelector', 'DB');
+        const selectors = databaseMigrationRuleSelectors(databaseId);
+        for (const selector of selectors) {
+          await api('/api/admin/database-migration-group', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ selector, groups }),
+          });
+        }
+        message(t('savedDatabaseRule'));
+        await load({ showLoadedMessage: false });
       } catch (error) {
         message(error.message, true);
       }
@@ -1891,6 +1954,7 @@
     $('targetGroup').addEventListener('change', updateTargetPreview);
     $('targetDatabase').addEventListener('change', updateTargetPreview);
     $('targetLimit').addEventListener('input', updateTargetPreview);
+    $('manageRuleSelector').addEventListener('change', renderDatabaseMigrationGroupCheckboxes);
     document.querySelectorAll('[data-locale-button]').forEach((button) => {
       button.addEventListener('click', () => setLocale(button.dataset.localeButton));
     });
