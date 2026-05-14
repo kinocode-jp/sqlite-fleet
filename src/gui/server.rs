@@ -216,7 +216,6 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                     database: database.map(str::to_string),
                     group: group.map(str::to_string),
                     limit,
-                    ..DatabaseSelection::default()
                 },
             )
             .and_then(|report| {
