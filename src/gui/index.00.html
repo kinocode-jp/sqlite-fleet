@@ -780,7 +780,7 @@
               <li>SQLを選択DBに対してdry-runまたは適用できます。マイグレーション履歴には登録されません。</li>
               <li>SQL applyはatomic transactionで実行します。途中で失敗した場合はrollbackします。</li>
               <li><code>ATTACH</code> / <code>DETACH</code> はGUI SQLでは拒否されます。</li>
-              <li><code>VACUUM</code>、<code>VACUUM INTO</code>、<code>PRAGMA journal_mode</code> は単独SQLとしてだけ適用できます。</li>
+              <li><code>VACUUM</code>、<code>PRAGMA journal_mode</code> は単独SQLとしてだけ適用できます。<code>VACUUM INTO</code> はGUI SQLでは拒否されます。</li>
             </ul>
           </section>
           <section>
@@ -845,12 +845,12 @@
       pragma: ['PRAGMA', 'PRAGMA user_version;\nPRAGMA foreign_key_check;\nPRAGMA integrity_check;\nPRAGMA quick_check;\nPRAGMA optimize;\nPRAGMA wal_checkpoint(PASSIVE);'],
       pragma_journal_mode: ['PRAGMA journal_mode (single apply only)', '-- PRAGMA journal_modeはatomic transactionでは実行できないため、単独SQLとしてだけ適用できます。\n-- OFFは危険なためGUI SQLでは拒否されます。\nPRAGMA journal_mode = WAL;'],
       vacuum: ['VACUUM', 'VACUUM;'],
-      vacuum_into: ['VACUUM INTO (single apply only)', '-- VACUUM INTOは外部ファイルを作成するため、SQL dry-runでは拒否されます。\n-- atomic transactionでは実行できないため、単独SQLとしてだけ適用できます。\n-- 出力先パスを確認し、DBコピーを作成する意図がある場合だけ適用してください。\nVACUUM INTO \'backup.db\';'],
+      vacuum_into: ['VACUUM INTO (external tool)', '-- VACUUM INTOは外部ファイルを作成するため、GUI SQLでは拒否されます。\n-- DBコピーを作成する場合はsqlite3などの外部ツールで実行してください。\nVACUUM INTO \'backup.db\';'],
       analyze: ['ANALYZE', 'ANALYZE;'],
       reindex: ['REINDEX', 'REINDEX;'],
       attach_database: ['ATTACH DATABASE (external tool)', '-- ATTACH/DETACHは外部DBへ影響するため、GUI SQLではdry-run/適用とも拒否されます。\n-- sqlite3等でパスと内容を確認してから明示的に実行してください。\nATTACH DATABASE \'other.db\' AS other;\n-- SELECT * FROM other.sqlite_schema;\nDETACH DATABASE other;'],
       drop_table: ['DROP TABLE', 'DROP TABLE IF EXISTS "example";'],
-      custom: ['Custom SQL', '-- 任意のSQLite SQLをここに書いてください。\n-- 基本的にはdry-runで確認してから適用してください。\n-- GUI applyは自動的にatomic transactionで実行されます。\n-- ATTACH/DETACHはGUI SQLでは拒否され、VACUUM/VACUUM INTO/PRAGMA journal_modeは単独SQLとしてだけ適用できます。\n'],
+      custom: ['Custom SQL', '-- 任意のSQLite SQLをここに書いてください。\n-- 基本的にはdry-runで確認してから適用してください。\n-- GUI applyは自動的にatomic transactionで実行されます。\n-- ATTACH/DETACH/VACUUM INTOはGUI SQLでは拒否され、VACUUM/PRAGMA journal_modeは単独SQLとしてだけ適用できます。\n'],
     };
     let state = null;
     let schemaState = null;

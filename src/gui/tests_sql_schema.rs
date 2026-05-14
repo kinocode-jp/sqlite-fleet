@@ -157,7 +157,7 @@
     }
 
     #[test]
-    fn gui_sql_allows_vacuum_into_only_when_applying() {
+    fn gui_sql_rejects_vacuum_into_for_apply_and_dry_run() {
         let dir = tempfile::tempdir().unwrap();
         let data_dir = dir.path().join("data");
         std::fs::create_dir(&data_dir).unwrap();
@@ -186,13 +186,8 @@
 
         assert!(api_sql(&config, "tenant", true, &body).is_err());
         assert!(!copy_path.exists());
-        assert!(api_sql(&config, "tenant", false, &body).is_ok());
-
-        let copied_count: i64 = Connection::open(&copy_path)
-            .unwrap()
-            .query_row("SELECT count(*) FROM existing", [], |row| row.get(0))
-            .unwrap();
-        assert_eq!(copied_count, 1);
+        assert!(api_sql(&config, "tenant", false, &body).is_err());
+        assert!(!copy_path.exists());
 
         let mixed_sql = format!(
             "VACUUM INTO {}; INSERT INTO existing(id) VALUES (2);",
@@ -570,4 +565,3 @@
         assert_eq!(token.len(), 64);
         assert!(token.chars().all(|c| c.is_ascii_hexdigit()));
     }
-

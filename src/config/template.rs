@@ -64,11 +64,11 @@ path = "./sqlite-fleet-audit.jsonl"
 
 [gui]
 allow_check = true
-allow_migrate = true
-allow_backup = true
-allow_restore = true
-allow_sql_apply = true
-allow_migration_edit = true
+allow_migrate = false
+allow_backup = false
+allow_restore = false
+allow_sql_apply = false
+allow_migration_edit = false
 "#
 }
 

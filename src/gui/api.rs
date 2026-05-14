@@ -447,8 +447,8 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
     if dry_run && sql_contains_statement_keyword(sql, &["ATTACH", "DETACH"]) {
         bail!("ATTACH/DETACH を含むSQLはdry-runできません。外部DBへ影響する可能性があるため、内容を確認してから適用してください");
     }
-    if dry_run && sql_contains_vacuum_into(sql) {
-        bail!("VACUUM INTO を含むSQLはdry-runできません。外部ファイルを作成する可能性があるため、内容を確認してから適用してください");
+    if sql_contains_vacuum_into(sql) {
+        bail!("VACUUM INTO を含むSQLはGUIでは実行できません。外部ファイルを作成する可能性があるため、sqlite3などの外部ツールで実行してください");
     }
 
     let database = find_database(config, database_id)?;
@@ -841,11 +841,7 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
     })?;
     let path = migrations_dir.join(&filename);
     validate_path_stays_in_base(&config, &path, "migration file")?;
-    if path.exists() {
-        bail!("migration file は既に存在します: {}", path.display());
-    }
-    std::fs::write(&path, sql)
-        .with_context(|| format!("migration file を作成できません: {}", path.display()))?;
+    create_new_file_no_symlink(&path, sql.as_bytes(), "migration file")?;
     let preserves_implicit_main =
         config.migration_groups.is_empty() && target_group.as_deref() == Some(MAIN_MIGRATION_GROUP);
     if let Some(group) = target_group.filter(|_| !preserves_implicit_main) {
@@ -949,13 +945,11 @@ fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     let mut config = locked_config(state)?;
     let path = config.resolve_path(&relative_path);
     validate_path_stays_in_base(&config, &path, "DB path")?;
-    if path.exists() {
-        bail!("DB file は既に存在します: {}", path.display());
-    }
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent)
             .with_context(|| format!("DB directory を作成できません: {}", parent.display()))?;
     }
+    create_new_file_no_symlink(&path, &[], "DB file")?;
     Connection::open(&path)
         .with_context(|| format!("DB file を作成できません: {}", path.display()))?;
     if let Some(group) = request
@@ -978,4 +972,23 @@ fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminR
         "DB file を作成しました: {}",
         path.display()
     )))
+}
+
+fn create_new_file_no_symlink(path: &Path, content: &[u8], label: &str) -> Result<()> {
+    if let Ok(metadata) = std::fs::symlink_metadata(path) {
+        if metadata.file_type().is_symlink() {
+            bail!("{label} はシンボリックリンクにできません: {}", path.display());
+        }
+        bail!("{label} は既に存在します: {}", path.display());
+    }
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)
+        .with_context(|| format!("{label} を作成できません: {}", path.display()))?;
+    file.write_all(content)
+        .with_context(|| format!("{label} を書き込めません: {}", path.display()))?;
+    file.sync_all()
+        .with_context(|| format!("{label} を保存できません: {}", path.display()))?;
+    Ok(())
 }

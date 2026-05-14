@@ -588,8 +588,8 @@
         assert!(INDEX_HTML.contains("PRAGMA wal_checkpoint(PASSIVE)"));
         assert!(INDEX_HTML.contains("PRAGMA journal_mode (single apply only)"));
         assert!(INDEX_HTML.contains("PRAGMA journal_modeはatomic transactionでは実行できないため"));
-        assert!(INDEX_HTML.contains("VACUUM INTO (single apply only)"));
-        assert!(INDEX_HTML.contains("VACUUM INTOは外部ファイルを作成するため"));
+        assert!(INDEX_HTML.contains("VACUUM INTO (external tool)"));
+        assert!(INDEX_HTML.contains("VACUUM INTOは外部ファイルを作成するため、GUI SQLでは拒否されます"));
         assert!(INDEX_HTML.contains("ATTACH DATABASE (external tool)"));
         assert!(INDEX_HTML.contains("ATTACH/DETACHは外部DBへ影響するため"));
         assert!(INDEX_HTML.contains("基本的にはdry-runで確認してから適用してください"));

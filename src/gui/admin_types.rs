@@ -311,10 +311,23 @@ fn locked_config(state: &ServerState) -> Result<Config> {
 fn persist_config(state: &ServerState, config: Config) -> Result<()> {
     config.validate()?;
     let text = toml::to_string_pretty(&config).context("設定をTOMLへ変換できません")?;
-    let tmp = state.config_path.with_extension("toml.tmp");
-    std::fs::write(&tmp, text)
+    let tmp = unique_config_tmp_path(&state.config_path)?;
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&tmp)
         .with_context(|| format!("設定ファイルを書き込めません: {}", tmp.display()))?;
+    if let Err(error) = file
+        .write_all(text.as_bytes())
+        .and_then(|_| file.sync_all())
+        .with_context(|| format!("設定ファイルを書き込めません: {}", tmp.display()))
+    {
+        let _ = std::fs::remove_file(&tmp);
+        return Err(error);
+    }
+    drop(file);
     std::fs::rename(&tmp, &state.config_path).with_context(|| {
+        let _ = std::fs::remove_file(&tmp);
         format!(
             "設定ファイルを置き換えられません: {}",
             state.config_path.display()
@@ -325,6 +338,29 @@ fn persist_config(state: &ServerState, config: Config) -> Result<()> {
         .lock()
         .map_err(|_| anyhow::anyhow!("GUI設定状態が壊れています"))? = config;
     Ok(())
+}
+
+fn unique_config_tmp_path(config_path: &Path) -> Result<PathBuf> {
+    let parent = config_path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("設定ファイルの親ディレクトリが必要です"))?;
+    for _ in 0..16 {
+        let mut random = [0u8; 16];
+        getrandom::fill(&mut random).context("設定ファイルの一時名を生成できません")?;
+        let suffix = random
+            .iter()
+            .map(|byte| format!("{byte:02x}"))
+            .collect::<String>();
+        let filename = config_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("sqlite-fleet.toml");
+        let tmp = parent.join(format!(".{filename}.{suffix}.tmp"));
+        if std::fs::symlink_metadata(&tmp).is_err() {
+            return Ok(tmp);
+        }
+    }
+    bail!("設定ファイルの一時名を生成できません");
 }
 
 fn clean_name(value: &str, label: &str) -> Result<String> {

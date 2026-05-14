@@ -1387,6 +1387,77 @@
         assert_eq!(versions, vec!["005"]);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn api_create_migration_file_rejects_final_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let migration_dir = dir.path().join("migrations");
+        std::fs::create_dir(&migration_dir).unwrap();
+        let outside = dir.path().join("outside.sql");
+        std::os::unix::fs::symlink(&outside, migration_dir.join("005_symlinked.sql")).unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let result = api_create_migration_file(
+            &state,
+            br#"{"version":"005","name":"symlinked","group":"main","sql":"CREATE TABLE symlinked(id INTEGER);"}"#.to_vec(),
+        );
+
+        assert!(result.is_err());
+        assert!(!outside.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn api_create_database_file_rejects_final_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("data")).unwrap();
+        let outside = dir.path().join("outside.db");
+        std::os::unix::fs::symlink(&outside, dir.path().join("data/new.db")).unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, dir.path().join("sqlite-fleet.toml"));
+
+        let result =
+            api_create_database_file(&state, br#"{"path":"data/new.db","db_group":null}"#.to_vec());
+
+        assert!(result.is_err());
+        assert!(!outside.exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn persist_config_does_not_follow_fixed_tmp_symlink() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let fixed_tmp = dir.path().join("sqlite-fleet.toml.tmp");
+        let outside = dir.path().join("outside.txt");
+        std::fs::write(&outside, "original").unwrap();
+        std::os::unix::fs::symlink(&outside, &fixed_tmp).unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+        let state = test_server_state(config, config_path);
+
+        api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true}"#.to_vec(),
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read_to_string(outside).unwrap(), "original");
+        assert!(std::fs::symlink_metadata(fixed_tmp)
+            .unwrap()
+            .file_type()
+            .is_symlink());
+    }
+
     #[test]
     fn gui_sql_apply_writes_success_and_failure_audit_events() {
         let dir = tempfile::tempdir().unwrap();
@@ -1402,6 +1473,10 @@
             },
             audit: sqlite_fleet::AuditConfig {
                 path: Some("audit.jsonl".to_string()),
+            },
+            gui: sqlite_fleet::GuiConfig {
+                allow_sql_apply: true,
+                ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
         };
@@ -1462,6 +1537,10 @@
             audit: sqlite_fleet::AuditConfig {
                 path: Some("audit.jsonl".to_string()),
             },
+            gui: sqlite_fleet::GuiConfig {
+                allow_migrate: true,
+                ..sqlite_fleet::GuiConfig::default()
+            },
             ..Config::default()
         };
 
@@ -1506,6 +1585,10 @@
             audit: sqlite_fleet::AuditConfig {
                 path: Some("audit.jsonl".to_string()),
             },
+            gui: sqlite_fleet::GuiConfig {
+                allow_migrate: true,
+                ..sqlite_fleet::GuiConfig::default()
+            },
             ..Config::default()
         };
         let body = r#"{"databases":["tenant"]}"#;
@@ -1549,6 +1632,10 @@
             },
             audit: sqlite_fleet::AuditConfig {
                 path: Some("audit.jsonl".to_string()),
+            },
+            gui: sqlite_fleet::GuiConfig {
+                allow_backup: true,
+                ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
         };

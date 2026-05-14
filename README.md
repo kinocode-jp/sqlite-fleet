@@ -81,7 +81,7 @@ sqlite-fleet --config sqlite-fleet.toml gui
 
 画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
 
-`新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` は単独SQLとしてだけ適用でき、外部DBへ影響する `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
+`新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
 ## 設定例
 
@@ -124,11 +124,11 @@ path = "./sqlite-fleet-audit.jsonl"
 
 [gui]
 allow_check = true
-allow_migrate = true
-allow_backup = true
-allow_restore = true
-allow_sql_apply = true
-allow_migration_edit = true
+allow_migrate = false
+allow_backup = false
+allow_restore = false
+allow_sql_apply = false
+allow_migration_edit = false
 
 [db_groups]
 canary = ["tenant-a", "tenant-b"]
@@ -315,7 +315,7 @@ fn main() -> Result<()> {
 - GUI SQLでは `PRAGMA foreign_keys=OFF` と `PRAGMA ignore_check_constraints=ON` も拒否します
 - GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします
 - GUI SQLでは明示的な transaction 制御と、外部DBへ影響しうる `ATTACH` / `DETACH` は拒否します
-- GUI SQL dry-runでは外部ファイルへ影響しうる `VACUUM INTO` は拒否し、applyでは `VACUUM` / `VACUUM INTO` / `PRAGMA journal_mode` を単独SQLとしてだけ許可します
+- GUI SQLでは外部ファイルへ影響しうる `VACUUM INTO` を拒否し、`VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ許可します
 - migration 管理テーブルへの直接変更やDDLは拒否します
 - discovery query は読み取り専用の `SELECT` / `WITH` 系だけを許可します
 - TOML 設定の未知フィールドは拒否します
