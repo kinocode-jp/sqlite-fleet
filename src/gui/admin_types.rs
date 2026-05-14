@@ -76,9 +76,19 @@ impl GuiPermissionData {
 
 #[derive(Serialize)]
 struct SettingsData {
+    project_name: Option<String>,
     discovery: String,
+    databases_path_glob: Option<String>,
+    databases_source: Option<String>,
+    databases_query: Option<String>,
+    databases_id_column: Option<String>,
+    databases_path_column: Option<String>,
+    databases_path_template: Option<String>,
     migrations_dir: String,
     migrations_table: String,
+    migration_group_count: usize,
+    database_migration_rule_count: usize,
+    db_group_count: usize,
     backup_dir: String,
     backup_before_migrate: bool,
     backup_keep_last: usize,
@@ -93,9 +103,19 @@ struct SettingsData {
 impl SettingsData {
     fn from_config(config: &Config) -> Self {
         Self {
+            project_name: config.project.name.clone(),
             discovery: config.databases.discovery.clone(),
+            databases_path_glob: config.databases.path_glob.clone(),
+            databases_source: config.databases.source.clone(),
+            databases_query: config.databases.query.clone(),
+            databases_id_column: config.databases.id_column.clone(),
+            databases_path_column: config.databases.path_column.clone(),
+            databases_path_template: config.databases.path_template.clone(),
             migrations_dir: config.migrations.dir.clone(),
             migrations_table: config.migrations.table.clone(),
+            migration_group_count: config.migration_groups.len(),
+            database_migration_rule_count: config.database_migration_groups.len(),
+            db_group_count: config.db_groups.len() + config.groups.len(),
             backup_dir: config.backup.dir.clone(),
             backup_before_migrate: config.backup.before_migrate,
             backup_keep_last: config.backup.keep_last,

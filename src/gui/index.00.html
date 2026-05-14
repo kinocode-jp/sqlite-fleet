@@ -598,6 +598,18 @@
         </div>
         <div class="topology-grid">
           <section>
+            <h3>基本</h3>
+            <div id="basicSettings" class="key-grid"></div>
+          </section>
+          <section>
+            <h3>DB探索</h3>
+            <div id="discoverySettings" class="key-grid"></div>
+          </section>
+          <section>
+            <h3>マイグレーション</h3>
+            <div id="migrationSettings" class="key-grid"></div>
+          </section>
+          <section>
             <h3>GUI permissions</h3>
             <div id="permissions" class="card-list"></div>
           </section>
@@ -606,8 +618,8 @@
             <div id="runtimeSettings" class="key-grid"></div>
           </section>
           <section>
-            <h3>Paths</h3>
-            <div id="pathSettings" class="key-grid"></div>
+            <h3>出力/保全</h3>
+            <div id="outputSettings" class="key-grid"></div>
           </section>
         </div>
       </section>
@@ -855,6 +867,9 @@
       'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
       'GUIで許可されている操作、backup/report/audit/execution設定を確認します。': 'Review enabled GUI operations and backup/report/audit/execution settings.',
       'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
+      '基本': 'Basic',
+      'DB探索': 'DB Discovery',
+      '出力/保全': 'Output / Safeguards',
       '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。': 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
       '基本の考え方': 'Core model',
       '画面の見方': 'How to read the UI',

@@ -217,6 +217,9 @@
         assert!(INDEX_HTML.contains("'Search templates': 'テンプレート検索'"));
         assert!(INDEX_HTML.contains("'Save current SQL as snippet': '現在のSQLをスニペット保存'"));
         assert!(INDEX_HTML.contains("'ヘルプ': 'Help'"));
+        assert!(INDEX_HTML.contains("'基本': 'Basic'"));
+        assert!(INDEX_HTML.contains("'DB探索': 'DB Discovery'"));
+        assert!(INDEX_HTML.contains("'出力/保全': 'Output / Safeguards'"));
         assert!(INDEX_HTML.contains("const staticJapaneseTranslations = {"));
         assert!(INDEX_HTML.contains("'Migration Groups': 'マイグレーショングループ'"));
         assert!(INDEX_HTML
@@ -239,7 +242,9 @@
         assert!(INDEX_HTML.contains("t('migrationFilesLabel')"));
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
-        assert!(INDEX_HTML.contains("[t('lockTimeout'), `${settings.lock_timeout_ms} ms`]"));
+        assert!(INDEX_HTML.contains("['execution.lock_timeout_ms', `${settings.lock_timeout_ms} ms`]"));
+        assert!(INDEX_HTML.contains("['databases.path_glob', settings.databases_path_glob || t('unset')]"));
+        assert!(INDEX_HTML.contains("['report.format', settings.report_format]"));
         assert!(INDEX_HTML.contains("message(adminSuccessMessage(path, result.message))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('column'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('objectDefinitions'))"));
