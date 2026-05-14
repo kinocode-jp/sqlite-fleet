@@ -787,7 +787,8 @@
             <h3>安全設定と監査ログ</h3>
             <ul>
               <li><code>[gui]</code> の <code>allow_*</code> でGUI操作を制限できます。デフォルトでは読み取り系の <code>check</code> だけを許可します。</li>
-              <li>DBを書き換える操作、backup/restore、SQL apply、migration編集は、対応する <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_restore</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code> を明示的に <code>true</code> にした場合だけ有効です。</li>
+              <li>DBを書き換える操作、backup、SQL apply、migration編集は、対応する <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code> を明示的に <code>true</code> にした場合だけ有効です。</li>
+              <li><code>allow_restore</code> は設定として保存できますが、現在のGUIにはrestore実行画面はありません。復元はCLIの <code>sqlite-fleet restore</code> を使ってください。</li>
               <li><code>audit.path</code> を設定すると、GUIのmigrate、backup、SQL applyもJSONLへ記録されます。</li>
               <li>監査ログを書けない場合、GUI APIは成功扱いにしません。</li>
             </ul>

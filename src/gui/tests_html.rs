@@ -593,7 +593,8 @@
         assert!(INDEX_HTML.contains("ATTACH DATABASE (external tool)"));
         assert!(INDEX_HTML.contains("ATTACH/DETACHは外部DBへ影響するため"));
         assert!(INDEX_HTML.contains("デフォルトでは読み取り系の <code>check</code> だけを許可します"));
-        assert!(INDEX_HTML.contains("allow_restore"));
+        assert!(INDEX_HTML.contains("現在のGUIにはrestore実行画面はありません"));
+        assert!(INDEX_HTML.contains("sqlite-fleet restore"));
         assert!(INDEX_HTML.contains("allow_migration_edit"));
         assert!(INDEX_HTML.contains("基本的にはdry-runで確認してから適用してください"));
         assert!(INDEX_HTML.contains("GUI applyは自動的にatomic transactionで実行されます"));
