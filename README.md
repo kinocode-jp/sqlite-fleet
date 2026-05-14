@@ -73,6 +73,8 @@ sqlite-fleet --config sqlite-fleet.toml gui
 
 デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、必要なときだけ起動し、`--host 127.0.0.1` でループバックアドレスに閉じる運用を推奨します。`--host` にはループバックアドレスだけ指定でき、`--host 0.0.0.0` などでGUIを公開する運用はサポートされません。外部から接続させる必要がある場合も、GUIはローカルにbindしたまま、SSHトンネル、VPN、Zero Trustアクセスなどを利用者側の責任で構成してください。
 
+By default, the GUI starts an HTTP server on `127.0.0.1:8765`. The GUI is intended for local operation, so start it only when needed and prefer `--host 127.0.0.1` to keep it bound to a loopback address. `--host` only accepts loopback addresses, and publishing the GUI with `--host 0.0.0.0` or another non-loopback address is not supported. If remote access is required, keep the GUI bound locally and configure SSH tunnels, VPN, Zero Trust access, or equivalent controls on the user/operator side.
+
 管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
 
 - マイグレーション: ファイル名単位でSQL内容、所属グループ、適用済DB、未適用DBを確認します。グループに分けたい場合だけ、画面上でマイグレーショングループを作成します。
@@ -80,6 +82,8 @@ sqlite-fleet --config sqlite-fleet.toml gui
 - オーバービュー: 最新migration、未適用があるDB、失敗・不整合の有無をまとめて確認します。
 
 画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、backup、SQL apply、migration編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
+
+From the GUI, you can run `check`, `migrate --dry-run`, `migrate` for one or all databases, and backup operations. By default, only the read-only `check` operation is allowed. Operations that write databases, backup, SQL apply, and migration editing are enabled only when the corresponding `[gui]` `allow_*` setting is explicitly set to `true`. Restrict GUI operation permissions to the minimum necessary in `sqlite-fleet.toml` under `[gui]`. The current GUI does not provide a restore screen, so use `sqlite-fleet restore` from the CLI for restores. The migration detail database rows do not include an "apply only this SQL" button because `migrate` applies the pending migrations for the target database in order.
 
 `新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 

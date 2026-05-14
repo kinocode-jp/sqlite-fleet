@@ -33,9 +33,13 @@ Do not allow untrusted users to write configuration, discovery queries, or migra
 - Back up production databases before running `migrate`.
 - Run `doctor`, `plan`, and `migrate --dry-run` before production migration.
 - Start the GUI only when needed, and prefer `--host 127.0.0.1`.
+- GUIは必要なときだけ起動し、`--host 127.0.0.1` を推奨します。
 - The GUI only supports loopback hosts; publishing it with `--host 0.0.0.0` or another non-loopback address is not supported.
+- GUIはループバックホストだけをサポートします。`--host 0.0.0.0` などの非ループバックアドレスで公開する運用はサポートされません。
 - Restrict GUI operation permissions in `sqlite-fleet.toml` under `[gui]`.
+- GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で絞ってください。
 - If remote access is required, keep the GUI bound to `127.0.0.1` and configure SSH tunnels, VPN, Zero Trust access, or equivalent network controls on the user/operator side.
+- リモートアクセスが必要な場合も、GUIは `127.0.0.1` にbindしたまま、SSHトンネル、VPN、Zero Trustアクセスなどのネットワーク制御を利用者または運用者側で構成してください。
 - Store JSON reports from CI/CD runs.
 - Keep migration SQL in source control and require code review.
 - Use conservative `--parallel` values on busy systems or slow disks.
