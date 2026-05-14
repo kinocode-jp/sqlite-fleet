@@ -435,36 +435,36 @@
       $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `<article class="info-card"><strong>${escapeHtml(key)}</strong><span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span></article>`).join('');
       const settings = state.settings;
       $('basicSettings').innerHTML = keyItems([
-        ['project.name', settings.project_name || t('unset')],
+        ['name', settings.project_name || t('unset')],
       ]);
       $('discoverySettings').innerHTML = keyItems([
-        ['databases.discovery', settings.discovery],
-        ['databases.path_glob', settings.databases_path_glob || t('unset')],
-        ['databases.source', settings.databases_source || t('unset')],
-        ['databases.query', settings.databases_query || t('unset')],
-        ['databases.id_column', settings.databases_id_column || t('unset')],
-        ['databases.path_column', settings.databases_path_column || t('unset')],
-        ['databases.path_template', settings.databases_path_template || t('unset')],
+        ['discovery', settings.discovery],
+        ['path_glob', settings.databases_path_glob || t('unset')],
+        ['source', settings.databases_source || t('unset')],
+        ['query', settings.databases_query || t('unset')],
+        ['id_column', settings.databases_id_column || t('unset')],
+        ['path_column', settings.databases_path_column || t('unset')],
+        ['path_template', settings.databases_path_template || t('unset')],
       ]);
       $('migrationSettings').innerHTML = keyItems([
-        ['migrations.dir', settings.migrations_dir],
-        ['migrations.table', settings.migrations_table],
-        ['migration_groups', settings.migration_group_count],
-        ['database_migration_groups', settings.database_migration_rule_count],
-        ['db_groups / groups', settings.db_group_count],
+        ['dir', settings.migrations_dir],
+        ['table', settings.migrations_table],
+        ['groups', settings.migration_group_count],
+        ['DB assignments', settings.database_migration_rule_count],
+        ['DB groups', settings.db_group_count],
       ]);
       $('runtimeSettings').innerHTML = keyItems([
-        ['execution.parallel', settings.parallel],
-        ['execution.lock_timeout_ms', `${settings.lock_timeout_ms} ms`],
-        ['execution.continue_on_error', settings.continue_on_error ? 'true' : 'false'],
+        ['parallel', settings.parallel],
+        ['lock_timeout_ms', `${settings.lock_timeout_ms} ms`],
+        ['continue_on_error', settings.continue_on_error ? 'true' : 'false'],
       ]);
       $('outputSettings').innerHTML = keyItems([
-        ['report.format', settings.report_format],
-        ['report.path', settings.report_path || t('unset')],
-        ['backup.dir', settings.backup_dir],
-        ['backup.before_migrate', settings.backup_before_migrate ? 'true' : 'false'],
-        ['backup.keep_last', settings.backup_keep_last],
-        ['audit.path', settings.audit_path || t('unset')],
+        ['format', settings.report_format],
+        ['report', settings.report_path || t('unset')],
+        ['backup', settings.backup_dir],
+        ['before_migrate', settings.backup_before_migrate ? 'true' : 'false'],
+        ['keep_last', settings.backup_keep_last],
+        ['audit', settings.audit_path || t('unset')],
       ]);
     }
     function keyItems(entries) {

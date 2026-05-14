@@ -242,9 +242,9 @@
         assert!(INDEX_HTML.contains("t('migrationFilesLabel')"));
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
-        assert!(INDEX_HTML.contains("['execution.lock_timeout_ms', `${settings.lock_timeout_ms} ms`]"));
-        assert!(INDEX_HTML.contains("['databases.path_glob', settings.databases_path_glob || t('unset')]"));
-        assert!(INDEX_HTML.contains("['report.format', settings.report_format]"));
+        assert!(INDEX_HTML.contains("['lock_timeout_ms', `${settings.lock_timeout_ms} ms`]"));
+        assert!(INDEX_HTML.contains("['path_glob', settings.databases_path_glob || t('unset')]"));
+        assert!(INDEX_HTML.contains("['format', settings.report_format]"));
         assert!(INDEX_HTML.contains("message(adminSuccessMessage(path, result.message))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('column'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('objectDefinitions'))"));
