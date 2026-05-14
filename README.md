@@ -71,7 +71,7 @@ sqlite-fleet --config sqlite-fleet.toml --parallel 8 migrate
 sqlite-fleet --config sqlite-fleet.toml gui
 ```
 
-デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、`--host` にはループバックアドレスだけ指定できます。
+デフォルトでは `127.0.0.1:8765` でHTTPサーバを起動します。GUIはローカル操作用のため、必要なときだけ起動し、`--host 127.0.0.1` でループバックアドレスに閉じる運用を推奨します。`--host` にはループバックアドレスだけ指定でき、`--host 0.0.0.0` などでGUIを公開する運用はサポートされません。外部から接続させる必要がある場合も、GUIはローカルにbindしたまま、SSHトンネル、VPN、Zero Trustアクセスなどを利用者側の責任で構成してください。
 
 管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
 
@@ -79,7 +79,7 @@ sqlite-fleet --config sqlite-fleet.toml gui
 - DB: DB単位で対象マイグレーショングループ、適用済み件数、未適用migration、checksum不一致などを確認します。DBグループはDBをまとめて操作したい場合にだけ使います。
 - オーバービュー: 最新migration、未適用があるDB、失敗・不整合の有無をまとめて確認します。
 
-画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、backup、SQL apply、migration編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
+画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、backup、SQL apply、migration編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
 
 `新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
