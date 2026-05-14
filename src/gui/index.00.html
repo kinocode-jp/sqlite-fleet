@@ -275,13 +275,6 @@
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
         <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
       </nav>
-      <section class="side-card" aria-label="主要操作">
-        <p class="side-title">Global</p>
-        <div class="actions">
-          <button id="refresh">更新</button>
-          <button id="check">Check</button>
-        </div>
-      </section>
       <section class="side-card" aria-label="Language">
         <p class="side-title">Language</p>
         <div class="language-toggle" role="group" aria-label="Language">
@@ -305,7 +298,11 @@
             <h2>マイグレーション適用</h2>
             <p class="panel-description">DBグループ、個別DB、limitを組み合わせて操作対象を決めます。</p>
           </div>
-          <span class="tool-tip" tabindex="0" data-tip="DBグループはどのDBへ実行するか、マイグレーショングループは各DBにどのマイグレーションを適用するかを決めます。">?</span>
+          <div class="panel-actions">
+            <button id="refresh">状態を更新</button>
+            <button id="check">状態を検査</button>
+            <span class="tool-tip" tabindex="0" data-tip="DBグループはどのDBへ実行するか、マイグレーショングループは各DBにどのマイグレーションを適用するかを決めます。">?</span>
+          </div>
         </div>
         <div class="form-grid">
           <label class="field"><span class="field-label">DB group <span class="tool-tip" tabindex="0" data-tip="db_groups/groups に定義した対象DBのまとまりです。未指定なら全DBが対象です。">?</span></span><select id="targetGroup"></select></label>
@@ -893,8 +890,8 @@
       'スキーマ作成': 'Schema builder',
       '設定': 'Settings',
       'ヘルプ': 'Help',
-      '主要操作': 'Primary actions',
-      '更新': 'Refresh',
+      '状態を更新': 'Refresh status',
+      '状態を検査': 'Check status',
       '読み込み中...': 'Loading...',
       '状態サマリー': 'Status summary',
       'DBグループ、個別DB、limitを組み合わせて操作対象を決めます。': 'Choose targets with DB groups, individual DB overrides, and optional limits.',
@@ -1054,7 +1051,6 @@
     };
     const staticJapaneseTranslations = {
       'Fleet migration control plane': 'Fleet migration コントロール',
-      'Global': 'グローバル',
       'Language': '言語',
       'Check': 'Check',
       'DB group': 'DBグループ',
