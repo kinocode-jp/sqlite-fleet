@@ -262,6 +262,10 @@
         assert!(INDEX_HTML.contains("await api(`/api/admin/path-entries${query}`)"));
         assert!(INDEX_HTML.contains("let pathBrowseView = localStorage.getItem('sqlite-fleet-path-browser-view') === 'icons' ? 'icons' : 'list';"));
         assert!(INDEX_HTML.contains("function setPathBrowserView(view, rerender = false)"));
+        assert!(INDEX_HTML.contains("function pathBrowserContentHtml()"));
+        assert!(INDEX_HTML.contains("function pathBrowserListHeaderHtml()"));
+        assert!(INDEX_HTML.contains("path-browser-header"));
+        assert!(INDEX_HTML.contains("t('modifiedLabel')"));
         assert!(INDEX_HTML.contains("function pathBrowserEntryHtml(entry)"));
         assert!(INDEX_HTML.contains("path-browser-name path-browser-link"));
         assert!(INDEX_HTML.contains("pathBrowseAcceptExtensions"));

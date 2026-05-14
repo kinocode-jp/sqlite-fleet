@@ -23,6 +23,7 @@
         groupLabel: 'グループ',
         checksumLabel: 'Checksum',
         pathLabel: 'パス',
+        modifiedLabel: '更新日時',
         latestMigrationFilename: (filename) => `現在の最新ファイル名は ${filename} です`,
         noLatestMigrationFilename: 'マイグレーションファイルはまだありません',
         targetDbLabel: '対象DB',
@@ -593,9 +594,7 @@
       });
       $('pathBrowserList').className = `path-browser-list ${pathBrowseView}`;
       if (rerender) {
-        $('pathBrowserList').innerHTML = pathBrowseEntries.length
-          ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')
-          : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+        $('pathBrowserList').innerHTML = pathBrowserContentHtml();
       }
     }
     async function loadPathBrowser(dir) {
@@ -616,9 +615,23 @@
       $('pathBrowserUseCurrent').hidden = !canSelectCurrentPathBrowserDirectory();
       pathBrowseEntries = data.entries || [];
       setPathBrowserView(pathBrowseView);
-      $('pathBrowserList').innerHTML = pathBrowseEntries.length
-        ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('')
-        : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+      $('pathBrowserList').innerHTML = pathBrowserContentHtml();
+    }
+    function pathBrowserContentHtml() {
+      const empty = `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+      if (pathBrowseView === 'list') {
+        return `${pathBrowserListHeaderHtml()}${pathBrowseEntries.length ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('') : empty}`;
+      }
+      return pathBrowseEntries.length ? pathBrowseEntries.map((entry) => pathBrowserEntryHtml(entry)).join('') : empty;
+    }
+    function pathBrowserListHeaderHtml() {
+      return `<div class="path-browser-header" aria-hidden="true">
+        <span></span>
+        <span>${escapeHtml(t('name'))}</span>
+        <span class="path-browser-kind">${escapeHtml(t('type'))}</span>
+        <span class="path-browser-path">${escapeHtml(t('pathLabel'))}</span>
+        <span>${escapeHtml(t('modifiedLabel'))}</span>
+      </div>`;
     }
     function pathBrowserEntryHtml(entry) {
       const kindLabel = entry.kind === 'dir' ? t('folder') : t('file');

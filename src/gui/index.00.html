@@ -168,6 +168,7 @@
     .path-browser-list.list { display:grid; gap:4px; }
     .path-browser-list.icons { grid-template-columns:repeat(auto-fill, minmax(132px, 1fr)); align-items:stretch; }
     .path-browser-row { display:grid; grid-template-columns:24px minmax(0, 1.1fr) 72px minmax(0, 1fr) 128px; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-header { position:sticky; top:0; z-index:1; display:grid; grid-template-columns:24px minmax(0, 1.1fr) 72px minmax(0, 1fr) 128px; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid var(--line); background:var(--surface); color:var(--muted); font-size:12px; font-weight:800; }
     .path-browser-row.disabled, .path-browser-tile.disabled { opacity:.45; background:var(--surface-2); }
     .path-browser-tile { display:grid; gap:8px; align-content:start; border:1px solid var(--line); border-radius:8px; padding:10px; background:var(--surface); min-height:92px; }
     .path-browser-icon { position:relative; display:inline-flex; align-items:center; justify-content:center; width:18px; height:16px; }
@@ -245,7 +246,7 @@
     .editor-meta { display:flex; justify-content:space-between; gap:10px; color:var(--muted); font-size:12px; }
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
-    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
+    @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row, .path-browser-header { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind, .path-browser-header .path-browser-path, .path-browser-header .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
   </style>
 </head>
 <body>
@@ -1179,6 +1180,7 @@
         groupLabel: 'Group',
         checksumLabel: 'Checksum',
         pathLabel: 'Path',
+        modifiedLabel: 'Modified',
         latestMigrationFilename: (filename) => `Latest file name is ${filename}`,
         noLatestMigrationFilename: 'No migration files yet',
         targetDbLabel: 'Target DB',
