@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.1.4](https://github.com/0809android/sqlite-fleet/compare/v0.1.3...v0.1.4) - 2026-05-14
+## [0.2.0](https://github.com/0809android/sqlite-fleet/compare/v0.1.3...v0.2.0) - 2026-05-14
 
 ### Changed
 
@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add GUI support for importing existing migration directories through migration group `dir`.
 - Add a GUI baseline action that records pending migrations as already applied without executing their SQL.
 - Read legacy `version` primary-key history tables and upgrade them to `filename` primary-key history after legacy entries resolve to local migration files and checksum validation passes.
+- Harden GUI SQL/file operations by rejecting `VACUUM INTO`, avoiding final symlink writes, and using randomized config save temp files.
+- Disable destructive GUI permissions by default and document that GUI restore is not currently available.
+- Declare Rust 1.85 as the minimum supported Rust version.
 
 ## [0.1.3](https://github.com/0809android/sqlite-fleet/compare/v0.1.1...v0.1.3) - 2026-05-09
 
