@@ -786,9 +786,9 @@
           <section>
             <h3>安全設定と監査ログ</h3>
             <ul>
-              <li><code>[gui]</code> の <code>allow_*</code> でGUI操作を制限できます。デフォルトでは読み取り系の <code>check</code> だけを許可します。</li>
-              <li>DBを書き換える操作、backup、SQL apply、migration編集は、対応する <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code> を明示的に <code>true</code> にした場合だけ有効です。</li>
-              <li><code>allow_restore</code> は設定として保存できますが、現在のGUIにはrestore実行画面はありません。復元はCLIの <code>sqlite-fleet restore</code> を使ってください。</li>
+              <li><code>[gui]</code>: GUI操作権限を制限します。デフォルトでは読み取り系の <code>check</code> だけを許可します。</li>
+              <li>DBを書き換える操作、backup、SQL apply、migration編集を有効にする権限: <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code></li>
+              <li><code>allow_restore</code>: 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください: <code>sqlite-fleet restore</code></li>
               <li><code>audit.path</code> を設定すると、GUIのmigrate、backup、SQL applyもJSONLへ記録されます。</li>
               <li>監査ログを書けない場合、GUI APIは成功扱いにしません。</li>
             </ul>
@@ -1054,6 +1054,10 @@
       'はGUI SQLでは拒否されます。': 'are rejected by GUI SQL.',
       '、': ', ',
       'は単独SQLとしてだけ適用できます。': 'can only be applied as single statements.',
+      ': GUI操作権限を制限します。デフォルトでは読み取り系の': ': controls GUI permissions. By default, only read-only',
+      'だけを許可します。': 'is allowed.',
+      'DBを書き換える操作、backup、SQL apply、migration編集を有効にする権限:': 'Permissions that enable database-changing operations, backup, SQL apply, and migration editing:',
+      ': 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください:': ': the current GUI has no restore screen. Run restores with the CLI:',
     };
     const staticJapaneseTranslations = {
       'Fleet migration control plane': 'Fleet migration コントロール',

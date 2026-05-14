@@ -184,6 +184,9 @@
         assert!(INDEX_HTML.contains("'グループ作成': 'Create group'"));
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
+        assert!(INDEX_HTML.contains("': GUI操作権限を制限します。デフォルトでは読み取り系の': ': controls GUI permissions. By default, only read-only'"));
+        assert!(INDEX_HTML.contains("'DBを書き換える操作、backup、SQL apply、migration編集を有効にする権限:': 'Permissions that enable database-changing operations, backup, SQL apply, and migration editing:'"));
+        assert!(INDEX_HTML.contains("': 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください:': ': the current GUI has no restore screen. Run restores with the CLI:'"));
         assert!(INDEX_HTML.contains("'Version': 'Version'"));
         assert!(INDEX_HTML.contains("'File name': 'File name'"));
         assert!(INDEX_HTML.contains("'Status': 'Status'"));
@@ -592,7 +595,7 @@
         assert!(INDEX_HTML.contains("VACUUM INTOは外部ファイルを作成するため、GUI SQLでは拒否されます"));
         assert!(INDEX_HTML.contains("ATTACH DATABASE (external tool)"));
         assert!(INDEX_HTML.contains("ATTACH/DETACHは外部DBへ影響するため"));
-        assert!(INDEX_HTML.contains("デフォルトでは読み取り系の <code>check</code> だけを許可します"));
+        assert!(INDEX_HTML.contains("GUI操作権限を制限します。デフォルトでは読み取り系の <code>check</code> だけを許可します"));
         assert!(INDEX_HTML.contains("現在のGUIにはrestore実行画面はありません"));
         assert!(INDEX_HTML.contains("sqlite-fleet restore"));
         assert!(INDEX_HTML.contains("allow_migration_edit"));
