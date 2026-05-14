@@ -310,7 +310,10 @@
         assert!(INDEX_HTML.contains("Number(value)"));
         assert!(!INDEX_HTML.contains("function integerValue(id, label) {\n      const value = requireValue(id, label);\n      const number = Number.parseInt"));
         assert!(INDEX_HTML.contains("function nonNegativeIntegerValue(id, label)"));
-        assert!(INDEX_HTML.contains("`${label} は0以上の整数で入力してください`"));
+        assert!(INDEX_HTML.contains("throw new Error(t('nonNegativeInteger', label))"));
+        assert!(INDEX_HTML.contains("function localizeErrorMessage(text)"));
+        assert!(INDEX_HTML.contains("serverNoTargetDb: 'No target DBs found'"));
+        assert!(INDEX_HTML.contains("[/^対象DBが見つかりません$/, () => t('serverNoTargetDb')]"));
         assert!(INDEX_HTML.contains("['path_glob', settings.databases_path_glob || t('unset')]"));
         assert!(INDEX_HTML.contains("['format', settings.report_format]"));
         assert!(INDEX_HTML.contains("message(adminSuccessMessage(path, result.message))"));
@@ -513,7 +516,8 @@
         assert!(INDEX_HTML.contains("openChecksumModal(checksumButton.dataset.checksum)"));
         assert!(!INDEX_HTML.contains("$('closeMigrationDetailModal').addEventListener('click', closeMigrationDetailModal)"));
         assert!(INDEX_HTML.contains("return `${String(maxVersion + 1).padStart(width, '0')}_new_migration.sql`"));
-        assert!(INDEX_HTML.contains("migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください"));
+        assert!(INDEX_HTML.contains("migrationFilenameFormat: 'Migration file name must use <version>_<name>.sql or <name>_<version>.sql'"));
+        assert!(INDEX_HTML.contains("throw new Error(t('migrationFilenameFormat'))"));
         assert!(INDEX_HTML.contains("$('newMigrationGroup').value = names.includes('main') ? 'main' : names[0]"));
         assert!(!INDEX_HTML.contains("newMigrationVersion"));
         assert!(!INDEX_HTML.contains("newMigrationName"));

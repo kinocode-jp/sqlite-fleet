@@ -72,6 +72,21 @@
         sqlFileSaved: (filename) => `SQLファイルを保存しました: ${filename}`,
         sqlGenerated: 'SQLを生成しました。dry-run後に適用してください',
         required: (label) => `${label} を入力してください`,
+        migrationFilenameNoPath: 'migration file name にパス区切りは使用できません',
+        migrationFilenameSqlExt: 'migration file name は .sql で終わる必要があります',
+        migrationFilenameFormat: 'migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください',
+        migrationVersionAscii: 'migration version はASCII数字のみ使用できます',
+        migrationNameChars: 'migration name は英数字、_、- のみ使用できます',
+        positiveInteger: (label) => `${label} は1以上の整数で入力してください`,
+        nonNegativeInteger: (label) => `${label} は0以上の整数で入力してください`,
+        integerRequired: (label) => `${label} は整数で入力してください`,
+        integerTooLarge: (label) => `${label} が大きすぎます`,
+        serverNoTargetDb: '対象DBが見つかりません',
+        serverDatabaseNotFound: (selector) => `指定されたDBが見つかりません: ${selector}`,
+        serverDbGroupNotFound: (group) => `指定されたDB groupが見つかりません: ${group}`,
+        serverDbGroupEmpty: (group) => `DB group に一致するDBが見つかりません: ${group}`,
+        serverDbGroupSelectorNotFound: (selector) => `指定されたDB group selectorが見つかりません: ${selector}`,
+        serverLimitPositive: 'limit は1以上が必要です',
         allDbTarget: '全DB',
         confirmMigrate: (target) => `${target} へマイグレーションを適用します。続行しますか？`,
         confirmBaseline: '対象DBの未適用マイグレーションを実行せず、読み取り済みとして履歴登録します。続行しますか？',
@@ -195,10 +210,27 @@
       }
     }
     function message(text, isError = false) {
-      $('messageText').textContent = text;
+      $('messageText').textContent = isError ? localizeErrorMessage(text) : text;
       const el = $('messageBar');
       el.className = `message ${isError ? 'error' : 'muted'}`;
       el.hidden = false;
+    }
+    function localizeErrorMessage(text) {
+      const value = String(text || '');
+      if (currentLocale === 'ja') return value;
+      const translations = [
+        [/^対象DBが見つかりません$/, () => t('serverNoTargetDb')],
+        [/^指定されたDBが見つかりません: (.+)$/, (match) => t('serverDatabaseNotFound', match[1])],
+        [/^指定されたDB groupが見つかりません: (.+)$/, (match) => t('serverDbGroupNotFound', match[1])],
+        [/^DB group に一致するDBが見つかりません: (.+)$/, (match) => t('serverDbGroupEmpty', match[1])],
+        [/^指定されたDB group selectorが見つかりません: (.+)$/, (match) => t('serverDbGroupSelectorNotFound', match[1])],
+        [/^limit は1以上が必要です$/, () => t('serverLimitPositive')],
+      ];
+      for (const [pattern, translate] of translations) {
+        const match = value.match(pattern);
+        if (match) return translate(match);
+      }
+      return value;
     }
     function clearMessage() {
       $('messageText').textContent = '';
@@ -1178,20 +1210,20 @@
     function parseMigrationFilename(value) {
       const filename = String(value || '').trim();
       if (!filename) throw new Error(t('required', t('fileNameLabel')));
-      if (filename.includes('/') || filename.includes('\\')) throw new Error('migration file name にパス区切りは使用できません');
-      if (!filename.endsWith('.sql')) throw new Error('migration file name は .sql で終わる必要があります');
+      if (filename.includes('/') || filename.includes('\\')) throw new Error(t('migrationFilenameNoPath'));
+      if (!filename.endsWith('.sql')) throw new Error(t('migrationFilenameSqlExt'));
       const stem = filename.slice(0, -4);
       const firstSeparator = stem.indexOf('_');
       const lastSeparator = stem.lastIndexOf('_');
       if (firstSeparator <= 0 || firstSeparator === stem.length - 1) {
-        throw new Error('migration file name は <version>_<name>.sql または <name>_<version>.sql 形式で入力してください');
+        throw new Error(t('migrationFilenameFormat'));
       }
       const prefix = stem.slice(0, firstSeparator);
       const suffix = stem.slice(lastSeparator + 1);
       const version = /^[0-9]+$/.test(prefix) ? prefix : suffix;
       const name = /^[0-9]+$/.test(prefix) ? stem.slice(firstSeparator + 1) : stem.slice(0, lastSeparator);
-      if (!/^[0-9]+$/.test(version)) throw new Error('migration version はASCII数字のみ使用できます');
-      if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error('migration name は英数字、_、- のみ使用できます');
+      if (!/^[0-9]+$/.test(version)) throw new Error(t('migrationVersionAscii'));
+      if (!/^[A-Za-z0-9_-]+$/.test(name)) throw new Error(t('migrationNameChars'));
       return { version, name, filename };
     }
     async function createDatabaseFile() {
@@ -1766,19 +1798,19 @@
     }
     function positiveIntegerValue(id, label) {
       const number = integerValue(id, label);
-      if (!Number.isInteger(number) || number < 1) throw new Error(`${label} は1以上の整数で入力してください`);
+      if (!Number.isInteger(number) || number < 1) throw new Error(t('positiveInteger', label));
       return number;
     }
     function nonNegativeIntegerValue(id, label) {
       const number = integerValue(id, label);
-      if (!Number.isInteger(number) || number < 0) throw new Error(`${label} は0以上の整数で入力してください`);
+      if (!Number.isInteger(number) || number < 0) throw new Error(t('nonNegativeInteger', label));
       return number;
     }
     function integerValue(id, label) {
       const value = requireValue(id, label);
-      if (!/^\d+$/.test(value)) throw new Error(`${label} は整数で入力してください`);
+      if (!/^\d+$/.test(value)) throw new Error(t('integerRequired', label));
       const number = Number(value);
-      if (!Number.isSafeInteger(number)) throw new Error(`${label} が大きすぎます`);
+      if (!Number.isSafeInteger(number)) throw new Error(t('integerTooLarge', label));
       return number;
     }
     function generateSql(builder) {
