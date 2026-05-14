@@ -61,6 +61,17 @@ struct GuiPermissionData {
     allow_migration_edit: bool,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GuiPermissionRequest {
+    allow_check: bool,
+    allow_migrate: bool,
+    allow_backup: bool,
+    allow_restore: bool,
+    allow_sql_apply: bool,
+    allow_migration_edit: bool,
+}
+
 impl GuiPermissionData {
     fn from_config(config: &Config) -> Self {
         Self {

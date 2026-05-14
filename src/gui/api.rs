@@ -375,6 +375,20 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
     })
 }
 
+fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
+    let request: GuiPermissionRequest =
+        serde_json::from_slice(&body).context("GUI permissions request body のJSONが不正です")?;
+    let mut config = locked_config(state)?;
+    config.gui.allow_check = request.allow_check;
+    config.gui.allow_migrate = request.allow_migrate;
+    config.gui.allow_backup = request.allow_backup;
+    config.gui.allow_restore = request.allow_restore;
+    config.gui.allow_sql_apply = request.allow_sql_apply;
+    config.gui.allow_migration_edit = request.allow_migration_edit;
+    persist_config(state, config)?;
+    Ok(AdminResult::new("GUI permissions を保存しました".to_string()))
+}
+
 fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationGroupRequest =
         serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;

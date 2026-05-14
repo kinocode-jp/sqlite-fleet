@@ -352,6 +352,44 @@
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI backup は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_migration_edit = false;
+        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI permission edit は設定で無効化されています"));
+    }
+
+    #[test]
+    fn api_save_gui_permissions_persists_allow_flags() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(Config::default(), config_path.clone());
+
+        api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert!(!config.gui.allow_check);
+        assert!(config.gui.allow_migrate);
+        assert!(!config.gui.allow_backup);
+        assert!(config.gui.allow_restore);
+        assert!(!config.gui.allow_sql_apply);
+        assert!(config.gui.allow_migration_edit);
+        let saved = std::fs::read_to_string(config_path).unwrap();
+        assert!(saved.contains("allow_check = false"), "{saved}");
+        assert!(saved.contains("allow_sql_apply = false"), "{saved}");
     }
 
     #[test]

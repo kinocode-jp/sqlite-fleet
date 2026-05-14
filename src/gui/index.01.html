@@ -179,6 +179,9 @@
       if (!disabled && state && !selectedMigrationGroupName) {
         $('saveMigrationGroupMembership').disabled = true;
       }
+      if (!disabled && state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
+        $('savePermissions').disabled = true;
+      }
     }
     function message(text, isError = false) {
       $('messageText').textContent = text;
@@ -431,7 +434,15 @@
     }
     function renderSettings() {
       const permissions = state.gui_permissions;
-      $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `<article class="info-card"><strong>${escapeHtml(key)}</strong><span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span></article>`).join('');
+      $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `
+        <label class="permission-card">
+          <span><strong>${escapeHtml(key)}</strong></span>
+          <span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span>
+          <input type="checkbox" data-permission-key="${escapeHtml(key)}" ${value ? 'checked' : ''} ${permissions.allow_migration_edit ? '' : 'disabled'}>
+        </label>
+      `).join('');
+      $('savePermissions').disabled = !permissions.allow_migration_edit;
+      $('savePermissions').title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
       const settings = state.settings;
       $('basicSettings').innerHTML = keyItems([
         ['name', settings.project_name || t('unset')],
@@ -465,6 +476,17 @@
         ['keep_last', settings.backup_keep_last],
         ['audit', settings.audit_path || t('unset')],
       ]);
+    }
+    async function saveGuiPermissions() {
+      try {
+        const payload = {};
+        $('permissions').querySelectorAll('input[data-permission-key]').forEach((input) => {
+          payload[input.dataset.permissionKey] = input.checked;
+        });
+        await postAdmin('/api/admin/gui-permissions', payload);
+      } catch (error) {
+        message(error.message, true);
+      }
     }
     function keyItems(entries) {
       return entries.map(([key, value]) => `<div class="key-item"><span>${escapeHtml(key)}</span><code>${escapeHtml(value)}</code></div>`).join('');
@@ -688,6 +710,7 @@
         '/api/admin/migration-group': 'savedMigrationGroup',
         '/api/admin/db-group': 'savedDbGroup',
         '/api/admin/database-migration-group': 'savedDatabaseRule',
+        '/api/admin/gui-permissions': 'savedGuiPermissions',
         '/api/admin/migration-file': 'createdMigrationFile',
         '/api/admin/migration-file/update': 'savedMigrationFile',
         '/api/admin/database-file': 'createdDatabaseFile',
@@ -1564,6 +1587,7 @@
     document.addEventListener('focusout', hideAppTooltip);
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
+    $('savePermissions').addEventListener('click', saveGuiPermissions);
     $('dryRun').addEventListener('click', () => runMigrate('', true));
     $('backupAll').addEventListener('click', () => runBackup(''));
     $('migrateAll').addEventListener('click', () => runMigrate('', false));

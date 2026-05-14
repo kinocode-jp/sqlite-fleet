@@ -268,6 +268,22 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             };
             write_json_result(&mut stream, result)
         }
+        ("POST", "/api/admin/gui-permissions") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI permission edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_save_gui_permissions(state, request_body.unwrap_or_default()),
+            )
+        }
         ("POST", "/api/admin/migration-group") => {
             if !config.gui.allow_migration_edit {
                 return write_json_error(

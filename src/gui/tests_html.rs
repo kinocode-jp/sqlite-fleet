@@ -199,6 +199,7 @@
         assert!(INDEX_HTML.contains("'スニペット削除': 'Delete snippet'"));
         assert!(INDEX_HTML.contains("'テンプレート検索': 'Search templates'"));
         assert!(INDEX_HTML.contains("'現在のSQLをスニペット保存': 'Save current SQL as snippet'"));
+        assert!(INDEX_HTML.contains("'権限を保存': 'Save permissions'"));
         assert!(INDEX_HTML.contains("'Migration Apply': 'マイグレーション適用'"));
         assert!(INDEX_HTML.contains("'SQL Console': 'SQLコンソール'"));
         assert!(INDEX_HTML.contains("'Create new': '新規作成'"));
@@ -242,6 +243,11 @@
         assert!(INDEX_HTML.contains("t('migrationFilesLabel')"));
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
+        assert!(INDEX_HTML.contains(r#"<button id="savePermissions" class="primary">権限を保存</button>"#));
+        assert!(INDEX_HTML.contains("async function saveGuiPermissions()"));
+        assert!(INDEX_HTML.contains("'/api/admin/gui-permissions': 'savedGuiPermissions'"));
+        assert!(INDEX_HTML.contains("!state.gui_permissions.allow_migration_edit"));
+        assert!(INDEX_HTML.contains("permissionEditDisabled"));
         assert!(INDEX_HTML.contains("['lock_timeout_ms', `${settings.lock_timeout_ms} ms`]"));
         assert!(INDEX_HTML.contains("['path_glob', settings.databases_path_glob || t('unset')]"));
         assert!(INDEX_HTML.contains("['format', settings.report_format]"));

@@ -146,6 +146,11 @@
     .card-list { display:grid; gap:10px; }
     .info-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
     .info-card strong { font-size:14px; overflow-wrap:anywhere; }
+    .permission-form { display:grid; gap:10px; }
+    .permission-card { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .permission-card strong { font-size:14px; overflow-wrap:anywhere; }
+    .permission-card .pill { min-width:48px; justify-content:center; }
+    .permission-card input { width:18px; height:18px; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
     .chip.action-chip { gap:4px; padding-right:4px; }
@@ -593,7 +598,7 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>設定</h2>
-            <p class="panel-description">現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認できます。</p>
+            <p class="panel-description">現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認・変更できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
         </div>
@@ -612,7 +617,8 @@
           </section>
           <section>
             <h3>GUI permissions</h3>
-            <div id="permissions" class="card-list"></div>
+            <div id="permissions" class="permission-form"></div>
+            <div class="actions" style="margin-top:10px;"><button id="savePermissions" class="primary">権限を保存</button></div>
           </section>
           <section>
             <h3>Runtime</h3>
@@ -866,7 +872,8 @@
       '変更前のカラム名です。': 'Current column name.',
       '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
       'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
-      '現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認できます。': 'Review the current project settings, DB discovery, output, backup, and GUI operation permissions.',
+      '現在のプロジェクト設定、DB探索、出力、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project settings, DB discovery, output, backup, and GUI operation permissions.',
+      '権限を保存': 'Save permissions',
       'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
       '基本': 'Basic',
       'DB探索': 'DB Discovery',
@@ -994,6 +1001,8 @@
         savedMigrationGroup: 'Migration Group saved',
         savedDbGroup: 'DB Group saved',
         savedDatabaseRule: 'DB assignment saved',
+        savedGuiPermissions: 'GUI permissions saved',
+        permissionEditDisabled: 'Permission changes are disabled by allow_migration_edit',
         createdMigrationFile: 'Migration file registered',
         savedMigrationFile: 'Migration file saved',
         editMigrationTitle: 'Migration details',
@@ -1103,3 +1112,5 @@
         savedMigrationGroup: 'マイグレーショングループを保存しました',
         savedDbGroup: 'DBグループを保存しました',
         savedDatabaseRule: 'DBの割当を保存しました',
+        savedGuiPermissions: 'GUI権限を保存しました',
+        permissionEditDisabled: 'allow_migration_edit が無効のため権限変更できません',
