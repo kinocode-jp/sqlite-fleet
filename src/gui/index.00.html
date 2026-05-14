@@ -155,6 +155,12 @@
     .settings-form { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
     .settings-form .wide { grid-column:1 / -1; }
     .settings-actions { margin-top:10px; }
+    .input-action-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:6px; align-items:center; }
+    .input-action-row button { white-space:nowrap; }
+    .path-browser-current { display:flex; gap:8px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:var(--surface-2); }
+    .path-browser-list { display:grid; gap:6px; max-height:50vh; overflow:auto; }
+    .path-browser-row { display:grid; grid-template-columns:minmax(0, 1fr) auto auto; gap:8px; align-items:center; border:1px solid var(--line); border-radius:6px; padding:7px 8px; background:var(--surface); }
+    .path-browser-name { justify-content:flex-start; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .chip-row { display:flex; flex-wrap:wrap; gap:6px; }
     .chip { display:inline-flex; align-items:center; min-height:24px; border:1px solid var(--line); border-radius:999px; padding:2px 8px; background:var(--surface-3); font-size:12px; font-weight:650; }
     .chip.action-chip { gap:4px; padding-right:4px; }
@@ -335,7 +341,7 @@
           </div>
           <div class="modal-body">
             <label class="field"><span class="field-label">Group name</span><input id="manageMigrationGroupName" placeholder="premium"></label>
-            <label class="field"><span class="field-label">Migration dir</span><input id="manageMigrationGroupDir" placeholder="existing/migrations"></label>
+            <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="manageMigrationGroupDir" placeholder="existing/migrations"><button type="button" data-path-browse="manageMigrationGroupDir">参照</button></span></label>
           </div>
           <div class="modal-actions">
             <button id="cancelMigrationGroup" type="button">キャンセル</button>
@@ -614,18 +620,18 @@
             <div class="settings-form">
               <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
               <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
-              <label class="field"><span class="field-label">DB path glob</span><input id="settingsPathGlob" placeholder="./data/**/*.db"></label>
-              <label class="field"><span class="field-label">Discovery source</span><input id="settingsSource"></label>
+              <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob">参照</button></span></label>
+              <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource">参照</button></span></label>
               <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
               <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
               <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
               <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
-              <label class="field"><span class="field-label">Migration dir</span><input id="settingsMigrationsDir"></label>
+              <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir">参照</button></span></label>
               <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
               <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
-              <label class="field"><span class="field-label">Report path</span><input id="settingsReportPath"></label>
-              <label class="field"><span class="field-label">Backup dir</span><input id="settingsBackupDir"></label>
-              <label class="field"><span class="field-label">Audit path</span><input id="settingsAuditPath"></label>
+              <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath">参照</button></span></label>
+              <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir">参照</button></span></label>
+              <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath">参照</button></span></label>
               <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
               <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
               <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
@@ -661,6 +667,22 @@
           </section>
         </div>
       </section>
+
+      <div id="pathBrowserModal" class="modal-backdrop" hidden>
+        <section class="modal wide" role="dialog" aria-modal="true" aria-labelledby="pathBrowserModalTitle">
+          <div class="modal-header">
+            <h2 id="pathBrowserModalTitle">パスを参照</h2>
+            <button id="closePathBrowser" type="button">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="path-browser-current"><code id="pathBrowserCurrent">.</code><button id="pathBrowserParent" type="button">上へ</button></div>
+            <div id="pathBrowserList" class="path-browser-list"></div>
+          </div>
+          <div class="modal-actions">
+            <button id="cancelPathBrowser" type="button">キャンセル</button>
+          </div>
+        </section>
+      </div>
 
       <section class="panel page" data-page="help" id="help">
         <div class="panel-header">
@@ -782,6 +804,9 @@
     let editingMigration = null;
     let migrationFileInitialSql = '';
     let pendingMigrationFileClose = false;
+    let pathBrowseTargetId = null;
+    let pathBrowseMode = 'path';
+    let pathBrowseCurrent = '';
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
@@ -830,6 +855,12 @@
       '全DBに適用されるマイグレーションファイルです。グループに分けたい時だけ新しいグループを作成してください。': 'These migration files apply to all DBs. Create a new group only when you need to split migrations.',
       'キャンセル': 'Cancel',
       'Migration dir': 'Migration dir',
+      '参照': 'Browse',
+      'パスを参照': 'Browse path',
+      '上へ': 'Up',
+      '選択': 'Select',
+      'フォルダ': 'Folder',
+      'ファイル': 'File',
       '作成': 'Create',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。': 'Manage target database sets such as canaries, customers, and environments.',
       'カナリア、顧客単位、環境単位など、操作対象DBのまとまりを管理します。実行ページのDB groupで選択できます。': 'Manage target database sets such as canaries, customers, and environments. Select them from DB group in Run.',
@@ -1015,6 +1046,12 @@
       'Discovery query': '探索クエリ',
       'Path template': 'パステンプレート',
       'Migration dir': 'マイグレーションディレクトリ',
+      'Browse': '参照',
+      'Browse path': 'パスを参照',
+      'Up': '上へ',
+      'Select': '選択',
+      'Folder': 'フォルダ',
+      'File': 'ファイル',
       'History table': '履歴テーブル',
       'Lock timeout ms': 'ロックタイムアウトms',
       'Backup keep last': 'backup保持数',
@@ -1057,6 +1094,7 @@
         noDbGroups: 'No DB groups',
         noRules: 'No per-DB assignments. Unassigned DBs use the main Migration Group.',
         noTables: 'No tables',
+        noPathEntries: 'No entries',
         selectDbForSchema: 'Select a DB and load schema',
         unset: 'Unset',
         saved: 'Saved',
@@ -1156,6 +1194,9 @@
         apply: 'Apply',
         yes: 'yes',
         no: 'no',
+        select: 'Select',
+        folder: 'Folder',
+        file: 'File',
         table: 'table',
       },
       ja: {
@@ -1173,6 +1214,10 @@
         noDbGroups: 'DB group はありません',
         noRules: 'DBごとの指定はありません。未指定DBはmainマイグレーショングループを使います。',
         noTables: 'テーブルはありません',
+        noPathEntries: '項目がありません',
+        select: '選択',
+        folder: 'フォルダ',
+        file: 'ファイル',
         selectDbForSchema: 'DBを選択してスキーマを読み込んでください',
         unset: '未設定',
         saved: '保存しました',

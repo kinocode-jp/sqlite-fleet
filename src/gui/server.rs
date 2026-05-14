@@ -128,6 +128,27 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             }
             write_json(&mut stream, 200, &api_plan(&config))
         }
+        ("GET", "/api/admin/path-entries") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                );
+            }
+            let query = match parse_query(query) {
+                Ok(query) => query,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            if let Err(error) = validate_query_keys(&query, &["dir"]) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            let dir = match optional_nonempty_query(&query, "dir") {
+                Ok(dir) => dir,
+                Err(error) => return write_json_error(&mut stream, 400, error),
+            };
+            write_json_result(&mut stream, api_path_entries(&config, dir))
+        }
         ("GET", "/api/schema") => {
             let query = match parse_query(query) {
                 Ok(query) => query,

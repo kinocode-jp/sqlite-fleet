@@ -366,6 +366,15 @@
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI permission edit は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_migration_edit = false;
+        let response = send_test_http_request_with_config(
+            "GET /api/admin/path-entries HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI migration edit は設定で無効化されています"));
     }
 
     #[test]
@@ -429,6 +438,43 @@
         let saved = std::fs::read_to_string(config_path).unwrap();
         assert!(saved.contains("name = \"Existing App\""), "{saved}");
         assert!(saved.contains("dir = \"db/migrate\""), "{saved}");
+    }
+
+    #[test]
+    fn api_path_entries_lists_base_relative_entries() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("data/nested")).unwrap();
+        std::fs::write(dir.path().join("data/tenant.db"), "").unwrap();
+        std::fs::write(dir.path().join(".hidden"), "").unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+
+        let root = api_path_entries(&config, None).unwrap();
+        assert_eq!(root.current, "");
+        assert!(root.entries.iter().any(|entry| entry.path == "data" && entry.kind == "dir"));
+        assert!(!root.entries.iter().any(|entry| entry.name == ".hidden"));
+
+        let data = api_path_entries(&config, Some("data")).unwrap();
+        assert_eq!(data.current, "data");
+        assert_eq!(data.parent.as_deref(), Some(""));
+        assert!(data
+            .entries
+            .iter()
+            .any(|entry| entry.path == "data/tenant.db" && entry.kind == "file"));
+    }
+
+    #[test]
+    fn api_path_entries_rejects_outside_or_glob_paths() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            ..Config::default()
+        };
+
+        assert!(api_path_entries(&config, Some("../")).is_err());
+        assert!(api_path_entries(&config, Some("data/**/*.db")).is_err());
     }
 
     #[test]

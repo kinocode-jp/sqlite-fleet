@@ -247,8 +247,17 @@
         assert!(INDEX_HTML.contains(r#"<button id="saveSettings" class="primary">設定を保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="baselineAll">対象を読み取り済みにする</button>"#));
         assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupDir""#));
+        assert!(INDEX_HTML.contains(r#"id="pathBrowserModal" class="modal-backdrop" hidden"#));
+        assert!(INDEX_HTML.contains(r#"data-path-browse="settingsMigrationsDir""#));
+        assert!(INDEX_HTML.contains(r#"data-path-browse="settingsPathGlob" data-path-mode="glob""#));
+        assert!(INDEX_HTML.contains(r#"data-path-browse="manageMigrationGroupDir""#));
         assert!(INDEX_HTML.contains("async function saveGuiPermissions()"));
         assert!(INDEX_HTML.contains("async function saveSettings()"));
+        assert!(INDEX_HTML.contains("async function openPathBrowser(targetId, mode = 'path')"));
+        assert!(INDEX_HTML.contains("await api(`/api/admin/path-entries${query}`)"));
+        assert!(INDEX_HTML.contains("function selectPathBrowser(path, kind)"));
+        assert!(INDEX_HTML.contains("document.querySelectorAll('[data-path-browse]').forEach"));
+        assert!(INDEX_HTML.contains("message(t('permissionEditDisabled'), true);"));
         assert!(INDEX_HTML.contains("async function baselineTargets()"));
         assert!(INDEX_HTML.contains("'/api/admin/gui-permissions': 'savedGuiPermissions'"));
         assert!(INDEX_HTML.contains("'/api/admin/settings': 'savedSettings'"));

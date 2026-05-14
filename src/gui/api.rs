@@ -260,6 +260,98 @@ fn api_check(config: &Config) -> ApiEnvelope<sqlite_fleet::CheckReport> {
     }
 }
 
+fn api_path_entries(config: &Config, dir: Option<&str>) -> Result<PathEntriesData> {
+    let base_dir = std::fs::canonicalize(&config.base_dir)
+        .with_context(|| format!("base_dir を解決できません: {}", config.base_dir.display()))?;
+    let requested = dir.unwrap_or("").trim();
+    if requested.contains('*') {
+        bail!("参照パスにglobは指定できません");
+    }
+    let target = if requested.is_empty() || requested == "." {
+        base_dir.clone()
+    } else {
+        config.resolve_path(requested)
+    };
+    let target = std::fs::canonicalize(&target)
+        .with_context(|| format!("参照パスを解決できません: {}", target.display()))?;
+    if !target.starts_with(&base_dir) {
+        bail!("参照パスはbase_dir配下である必要があります: {}", target.display());
+    }
+    if !target.is_dir() {
+        bail!("参照パスはディレクトリである必要があります: {}", target.display());
+    }
+    let current = relative_path_string(&base_dir, &target)?;
+    let parent = target
+        .parent()
+        .filter(|parent| parent.starts_with(&base_dir) && *parent != target)
+        .map(|parent| relative_path_string(&base_dir, parent))
+        .transpose()?;
+    let mut entries = Vec::new();
+    for entry in std::fs::read_dir(&target)
+        .with_context(|| format!("参照パスを読めません: {}", target.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        let metadata = match std::fs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(_) => continue,
+        };
+        if !metadata.is_dir() && !metadata.is_file() {
+            continue;
+        }
+        let canonical_path = match std::fs::canonicalize(&path) {
+            Ok(path) => path,
+            Err(_) => continue,
+        };
+        if !canonical_path.starts_with(&base_dir) {
+            continue;
+        }
+        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if name.starts_with('.') {
+            continue;
+        }
+        let kind = if metadata.is_dir() { "dir" } else { "file" };
+        entries.push(PathEntryData {
+            name: name.to_string(),
+            path: relative_path_string(&base_dir, &path)?,
+            kind: kind.to_string(),
+        });
+    }
+    entries.sort_by(|a, b| {
+        (a.kind != "dir")
+            .cmp(&(b.kind != "dir"))
+            .then_with(|| a.name.cmp(&b.name))
+    });
+    entries.truncate(500);
+    Ok(PathEntriesData {
+        current,
+        parent,
+        entries,
+    })
+}
+
+fn relative_path_string(base_dir: &Path, path: &Path) -> Result<String> {
+    let relative = path
+        .strip_prefix(base_dir)
+        .with_context(|| format!("base_dirからの相対パスを作れません: {}", path.display()))?;
+    if relative.as_os_str().is_empty() {
+        return Ok(String::new());
+    }
+    let parts = relative
+        .components()
+        .map(|component| {
+            component
+                .as_os_str()
+                .to_str()
+                .map(str::to_string)
+                .ok_or_else(|| anyhow::anyhow!("参照パスはUTF-8である必要があります"))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    Ok(parts.join("/"))
+}
+
 fn api_schema(config: &Config, database_id: &str) -> Result<SchemaData> {
     let database = find_database(config, database_id)?;
     let conn = open_gui_database(config, &database, true)?;

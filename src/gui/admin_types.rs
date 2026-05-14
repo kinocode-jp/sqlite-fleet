@@ -97,6 +97,20 @@ struct SettingsRequest {
     continue_on_error: bool,
 }
 
+#[derive(Serialize)]
+struct PathEntryData {
+    name: String,
+    path: String,
+    kind: String,
+}
+
+#[derive(Serialize)]
+struct PathEntriesData {
+    current: String,
+    parent: Option<String>,
+    entries: Vec<PathEntryData>,
+}
+
 impl GuiPermissionData {
     fn from_config(config: &Config) -> Self {
         Self {

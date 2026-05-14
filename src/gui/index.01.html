@@ -183,6 +183,14 @@
       if (!disabled && state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
         $('savePermissions').disabled = true;
         $('saveSettings').disabled = true;
+        document.querySelectorAll('[data-path-browse]').forEach((button) => {
+          button.disabled = true;
+          button.title = t('permissionEditDisabled');
+        });
+      } else {
+        document.querySelectorAll('[data-path-browse]').forEach((button) => {
+          button.title = '';
+        });
       }
     }
     function message(text, isError = false) {
@@ -536,6 +544,68 @@
       } catch (error) {
         message(error.message, true);
       }
+    }
+    function pathBrowseStartDir(value) {
+      const text = String(value || '').trim();
+      if (!text || text === '.') return '';
+      const wildcardIndex = text.search(/[*?[]/);
+      const path = wildcardIndex >= 0 ? text.slice(0, wildcardIndex) : text;
+      const trimmed = path.replace(/\/+$/, '');
+      if (!trimmed) return '';
+      const lastSlash = trimmed.lastIndexOf('/');
+      if (wildcardIndex >= 0) return lastSlash >= 0 ? trimmed.slice(0, lastSlash) : '';
+      const lastSegment = lastSlash >= 0 ? trimmed.slice(lastSlash + 1) : trimmed;
+      if (lastSegment.includes('.')) return lastSlash >= 0 ? trimmed.slice(0, lastSlash) : '';
+      return trimmed;
+    }
+    async function openPathBrowser(targetId, mode = 'path') {
+      if (state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
+        message(t('permissionEditDisabled'), true);
+        return;
+      }
+      pathBrowseTargetId = targetId;
+      pathBrowseMode = mode;
+      pathBrowseCurrent = pathBrowseStartDir($(targetId).value);
+      $('pathBrowserModal').hidden = false;
+      await loadPathBrowser(pathBrowseCurrent);
+    }
+    function closePathBrowser() {
+      $('pathBrowserModal').hidden = true;
+      pathBrowseTargetId = null;
+      pathBrowseMode = 'path';
+      pathBrowseCurrent = '';
+    }
+    async function loadPathBrowser(dir) {
+      try {
+        pathBrowseCurrent = dir || '';
+        const query = pathBrowseCurrent ? `?dir=${encodeURIComponent(pathBrowseCurrent)}` : '';
+        const data = await api(`/api/admin/path-entries${query}`);
+        renderPathBrowser(data);
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    function renderPathBrowser(data) {
+      pathBrowseCurrent = data.current || '';
+      $('pathBrowserCurrent').textContent = pathBrowseCurrent || '.';
+      $('pathBrowserParent').hidden = data.parent === null || data.parent === undefined;
+      $('pathBrowserParent').dataset.pathParent = data.parent || '';
+      const entries = data.entries || [];
+      $('pathBrowserList').innerHTML = entries.length ? entries.map((entry) => `
+        <div class="path-browser-row">
+          <button class="path-browser-name" type="button" data-path-${entry.kind === 'dir' ? 'open' : 'select'}="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}" title="${escapeHtml(entry.path)}">${escapeHtml(entry.name)}</button>
+          <span class="muted">${escapeHtml(entry.kind === 'dir' ? t('folder') : t('file'))}</span>
+          <button type="button" data-path-select="${escapeHtml(entry.path)}" data-path-kind="${escapeHtml(entry.kind)}">${escapeHtml(t('select'))}</button>
+        </div>
+      `).join('') : `<div class="muted">${escapeHtml(t('noPathEntries'))}</div>`;
+    }
+    function selectPathBrowser(path, kind) {
+      if (!pathBrowseTargetId) return;
+      const value = pathBrowseMode === 'glob' && kind === 'dir'
+        ? `${path ? `${path}/` : ''}**/*.db`
+        : path;
+      $(pathBrowseTargetId).value = value;
+      closePathBrowser();
     }
     function keyItems(entries) {
       return entries.map(([key, value]) => `<div class="key-item"><span>${escapeHtml(key)}</span><code>${escapeHtml(value)}</code></div>`).join('');
@@ -1677,10 +1747,32 @@
       showAppTooltip(target, { clientX: rect.left, clientY: rect.bottom });
     });
     document.addEventListener('focusout', hideAppTooltip);
+    document.addEventListener('click', (event) => {
+      const browseButton = event.target.closest('[data-path-browse]');
+      if (browseButton) {
+        event.preventDefault();
+        openPathBrowser(browseButton.dataset.pathBrowse, browseButton.dataset.pathMode || 'path');
+        return;
+      }
+      const openButton = event.target.closest('[data-path-open]');
+      if (openButton) {
+        event.preventDefault();
+        loadPathBrowser(openButton.dataset.pathOpen);
+        return;
+      }
+      const selectButton = event.target.closest('[data-path-select]');
+      if (selectButton) {
+        event.preventDefault();
+        selectPathBrowser(selectButton.dataset.pathSelect, selectButton.dataset.pathKind || 'path');
+      }
+    });
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
     $('savePermissions').addEventListener('click', saveGuiPermissions);
     $('saveSettings').addEventListener('click', saveSettings);
+    $('closePathBrowser').addEventListener('click', closePathBrowser);
+    $('cancelPathBrowser').addEventListener('click', closePathBrowser);
+    $('pathBrowserParent').addEventListener('click', () => loadPathBrowser($('pathBrowserParent').dataset.pathParent || ''));
     $('dryRun').addEventListener('click', () => runMigrate('', true));
     $('backupAll').addEventListener('click', () => runBackup(''));
     $('baselineAll').addEventListener('click', baselineTargets);
