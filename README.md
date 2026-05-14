@@ -334,13 +334,12 @@ fn main() -> Result<()> {
 
 ```bash
 cargo fmt -- --check
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
-cargo build
-cargo package --allow-dirty
+cargo clippy --locked --all-targets --all-features -- -D warnings
+cargo test --locked
+cargo publish --locked --dry-run
 ```
 
-内部計画や作業メモは crate package に含めません。配布対象は `Cargo.toml` の `include` で `README.md`、`LICENSE`、`src/**`、`tests/**` を中心に絞っています。
+内部計画や作業メモは crate package に含めません。配布対象は `Cargo.toml` の `include` で `README.md`、`CHANGELOG.md`、`LICENSE`、`SECURITY.md`、`src/**`、`tests/**` を中心に絞っています。
 
 ## ライセンス
 
