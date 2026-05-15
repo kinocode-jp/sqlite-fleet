@@ -563,9 +563,6 @@
         button.disabled = !permissions.allow_migration_edit;
         button.title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
       });
-      $('basicSettings').innerHTML = keyItems([
-        ['name', settings.project_name || t('unset')],
-      ]);
       $('discoverySettings').innerHTML = keyItems([
         ['discovery', settings.discovery],
         ['path_glob', settings.databases_path_glob || t('unset')],
