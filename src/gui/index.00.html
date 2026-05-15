@@ -120,7 +120,6 @@
     .schema-table table { min-width:640px; }
     .group-divider th { padding:9px 12px; background:var(--surface-2); color:#405163; font-size:13px; text-align:left; }
     .schema-sql { margin:0; max-height:180px; overflow:auto; white-space:pre-wrap; word-break:break-word; }
-    .quick-builder { padding-top:0; }
     .builder-block { display:grid; gap:10px; padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-2); }
     .builder-block .actions { justify-content:flex-end; }
     .target-preview { min-height:38px; padding:9px 10px; border:1px solid var(--line); border-radius:6px; background:var(--surface-2); }
@@ -289,7 +288,6 @@
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション管理</a>
         <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQLコンソール</a>
-        <a href='#schema-panel' data-page-link="schema"><span class="nav-icon">DDL</span>スキーマSQL生成</a>
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
         <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
       </nav>
@@ -615,39 +613,8 @@
             <button id="loadSchema">スキーマを再読み込み</button>
           </div>
         </div>
-      </section>
-      <section class="panel page" data-page="schema" id="schema-panel">
-        <div class="form-grid quick-builder">
-          <section class="builder-block">
-            <h3>テーブル作成SQL</h3>
-            <label class="field"><span class="field-label">新規テーブル <span class="tool-tip" tabindex="0" data-tip="作成するテーブル名です。識別子は自動でダブルクォートされます。">?</span></span><input id="newTableName" placeholder="new_table"></label>
-            <label class="field"><span class="field-label">カラム定義 <span class="tool-tip" tabindex="0" data-tip="カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。">?</span></span><input id="newTableColumns" placeholder="id INTEGER PRIMARY KEY, name TEXT"></label>
-            <div class="actions"><button id="generateCreateTable">CREATE TABLE SQLを生成</button></div>
-          </section>
-          <section class="builder-block">
-            <h3>カラム追加SQL</h3>
-            <label class="field"><span class="field-label">対象テーブル <span class="tool-tip" tabindex="0" data-tip="カラムを追加する既存テーブル名です。">?</span></span><input id="alterTableName" placeholder="target_table"></label>
-            <label class="field"><span class="field-label">追加カラム <span class="tool-tip" tabindex="0" data-tip="追加するカラム名です。">?</span></span><input id="newColumnName" placeholder="new_column"></label>
-            <label class="field"><span class="field-label">カラム定義 <span class="tool-tip" tabindex="0" data-tip="型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。">?</span></span><input id="newColumnDefinition" placeholder="TEXT NOT NULL DEFAULT ''"></label>
-            <div class="actions"><button id="generateAddColumn">ADD COLUMN SQLを生成</button></div>
-          </section>
-          <section class="builder-block">
-            <h3>テーブル名変更SQL</h3>
-            <label class="field"><span class="field-label">変更前テーブル <span class="tool-tip" tabindex="0" data-tip="変更前のテーブル名です。">?</span></span><input id="renameTableFrom" placeholder="old_table"></label>
-            <label class="field"><span class="field-label">変更後テーブル <span class="tool-tip" tabindex="0" data-tip="変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。">?</span></span><input id="renameTableTo" placeholder="new_table"></label>
-            <div class="actions"><button id="generateRenameTable">RENAME TABLE SQLを生成</button></div>
-          </section>
-          <section class="builder-block">
-            <h3>カラム名変更SQL</h3>
-            <label class="field"><span class="field-label">対象テーブル <span class="tool-tip" tabindex="0" data-tip="カラム名を変更するテーブルです。">?</span></span><input id="renameColumnTable" placeholder="target_table"></label>
-            <label class="field"><span class="field-label">変更前カラム <span class="tool-tip" tabindex="0" data-tip="変更前のカラム名です。">?</span></span><input id="renameColumnFrom" placeholder="old_column"></label>
-            <label class="field"><span class="field-label">変更後カラム <span class="tool-tip" tabindex="0" data-tip="変更後のカラム名です。アプリケーション側の参照も更新が必要です。">?</span></span><input id="renameColumnTo" placeholder="new_column"></label>
-            <div class="actions"><button id="generateRenameColumn">RENAME COLUMN SQLを生成</button></div>
-          </section>
-        </div>
         <div id="schema" class="schema-list"></div>
       </section>
-
       <section class="panel page" data-page="settings" id="settings-panel">
         <div class="settings-accordion">
           <details class="settings-section" open>
@@ -898,7 +865,6 @@
       'DB管理': 'DB Management',
       'マイグレーション管理': 'Migration Management',
       'SQLコンソール': 'SQL Console',
-      'スキーマSQL生成': 'DDL builder',
       '設定': 'Settings',
       'ヘルプ': 'Help',
       '初期セットアップ': 'Initial Setup',
@@ -1010,34 +976,6 @@
       'SQLファイル保存': 'Save SQL file',
       'SQLを適用': 'Apply SQL',
       'スキーマを再読み込み': 'Reload schema',
-      'よく使うDDLを生成し、現在のスキーマと照らし合わせて作業できます。': 'Generate common DDL and compare it with the current schema while editing.',
-      'テーブル作成SQL': 'CREATE TABLE SQL',
-      '新規テーブル': 'New table',
-      'カラム定義': 'Column definition',
-      'カラム追加SQL': 'ADD COLUMN SQL',
-      '対象テーブル': 'Target table',
-      '追加カラム': 'New column',
-      'テーブル名変更SQL': 'RENAME TABLE SQL',
-      '変更前テーブル': 'Rename table from',
-      '変更後テーブル': 'Rename table to',
-      'カラム名変更SQL': 'RENAME COLUMN SQL',
-      '変更前カラム': 'Rename column from',
-      '変更後カラム': 'Rename column to',
-      'ここで生成したSQLはSQLコンソールへ入ります。実行前に必ずDry runしてください。': 'Generated SQL is placed in the SQL console. Always Dry run before applying.',
-      '作成するテーブル名です。識別子は自動でダブルクォートされます。': 'The table to create. Identifiers are double-quoted automatically.',
-      'カラム定義をそのままCREATE TABLEへ入れます。制約やDEFAULTもここに記述します。': 'Column definitions inserted directly into CREATE TABLE, including constraints and DEFAULT values.',
-      'CREATE TABLE SQLを生成': 'Generate CREATE TABLE SQL',
-      'カラムを追加する既存テーブル名です。': 'The existing table to alter.',
-      '追加するカラム名です。': 'The column to add.',
-      '型、NOT NULL、DEFAULTなどの定義です。SQLiteのADD COLUMN制約に注意してください。': 'Type, NOT NULL, DEFAULT, and related definition. Check SQLite ADD COLUMN limitations.',
-      'ADD COLUMN SQLを生成': 'Generate ADD COLUMN SQL',
-      '変更前のテーブル名です。': 'Current table name.',
-      '変更後のテーブル名です。関連viewやtriggerへの影響も確認してください。': 'New table name. Check impact on related views and triggers.',
-      'RENAME TABLE SQLを生成': 'Generate RENAME TABLE SQL',
-      'カラム名を変更するテーブルです。': 'Table containing the column to rename.',
-      '変更前のカラム名です。': 'Current column name.',
-      '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
-      'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
       '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
       '権限を保存': 'Save permissions',
       '設定変更': 'Edit settings',
@@ -1225,7 +1163,6 @@
       'Database management': 'DB管理',
       'Migration management': 'マイグレーション管理',
       'Migrations': 'マイグレーション',
-      'DDL builder': 'スキーマSQL生成',
       'Settings': '設定',
       'Settings / permissions': '設定',
       'Add DB': 'DBを追加',
@@ -1351,7 +1288,6 @@
         enterSnippetName: 'Enter a snippet name',
         enterSqlToSave: 'Enter SQL to save',
         sqlFileSaved: (filename) => `SQL file saved: ${filename}`,
-        sqlGenerated: 'SQL generated. Dry run before applying.',
         required: (label) => `Enter ${label}`,
         migrationFilenameNoPath: 'Migration file name cannot contain path separators',
         migrationFilenameSqlExt: 'Migration file name must end with .sql',
@@ -1381,16 +1317,6 @@
         fileNul: 'SQL files cannot contain NUL characters',
         fileLoaded: (name) => `SQL file loaded: ${name}`,
         apply: 'Apply',
-        schemaNewTableLabel: 'New table',
-        schemaCreateColumnsLabel: 'Columns',
-        schemaTargetTableLabel: 'Target table',
-        schemaNewColumnLabel: 'New column',
-        schemaColumnDefinitionLabel: 'Column definition',
-        schemaRenameTableFromLabel: 'Rename table from',
-        schemaRenameTableToLabel: 'Rename table to',
-        schemaRenameColumnTableLabel: 'Target table',
-        schemaRenameColumnFromLabel: 'Rename column from',
-        schemaRenameColumnToLabel: 'Rename column to',
         yes: 'yes',
         no: 'no',
         select: 'Select',

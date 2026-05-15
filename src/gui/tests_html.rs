@@ -214,7 +214,6 @@
         assert!(INDEX_HTML.contains("'スニペット削除': 'Delete snippet'"));
         assert!(INDEX_HTML.contains("'テンプレート検索': 'Search templates'"));
         assert!(INDEX_HTML.contains("'現在のSQLをスニペット保存': 'Save current SQL as snippet'"));
-        assert!(INDEX_HTML.contains("'カラム定義': 'Column definition'"));
         assert!(INDEX_HTML.contains("'権限を保存': 'Save permissions'"));
         assert!(INDEX_HTML.contains("'Migration Apply': 'マイグレーション適用'"));
         assert!(INDEX_HTML.contains("'SQL Console': 'SQLコンソール'"));

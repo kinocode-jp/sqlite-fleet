@@ -72,7 +72,6 @@
         enterSnippetName: 'スニペット名を入力してください',
         enterSqlToSave: '保存するSQLを入力してください',
         sqlFileSaved: (filename) => `SQLファイルを保存しました: ${filename}`,
-        sqlGenerated: 'SQLを生成しました。Dry run後に適用してください',
         required: (label) => `${label} を入力してください`,
         migrationFilenameNoPath: 'マイグレーションファイル名にパス区切りは使用できません',
         migrationFilenameSqlExt: 'マイグレーションファイル名は .sql で終わる必要があります',
@@ -102,16 +101,6 @@
         fileNul: 'SQLファイルにNUL文字は指定できません',
         fileLoaded: (name) => `SQLファイルを読み込みました: ${name}`,
         apply: '適用',
-        schemaNewTableLabel: '新規テーブル',
-        schemaCreateColumnsLabel: 'カラム定義',
-        schemaTargetTableLabel: '対象テーブル',
-        schemaNewColumnLabel: '追加カラム',
-        schemaColumnDefinitionLabel: 'カラム定義',
-        schemaRenameTableFromLabel: '変更前テーブル',
-        schemaRenameTableToLabel: '変更後テーブル',
-        schemaRenameColumnTableLabel: '対象テーブル',
-        schemaRenameColumnFromLabel: '変更前カラム',
-        schemaRenameColumnToLabel: '変更後カラム',
         yes: 'yes',
         no: 'no',
         table: 'テーブル',
@@ -128,7 +117,6 @@
         databases: 'DB Management',
         migrations: 'Migration Management',
         sql: 'SQL Console',
-        schema: 'DDL builder',
         settings: 'Settings / permissions',
         help: 'Help',
       },
@@ -140,7 +128,6 @@
         databases: 'DB管理',
         migrations: 'マイグレーション管理',
         sql: 'SQLコンソール',
-        schema: 'スキーマSQL生成',
         settings: '設定',
         help: 'ヘルプ',
       },
@@ -153,7 +140,6 @@
         databases: 'Check status, assigned Migration Groups, and pending migrations per database.',
         migrations: 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.',
         sql: 'Run ad hoc SQL outside migration history after checking it with Dry run. SQL apply runs in an atomic transaction when possible.',
-        schema: 'Generate CREATE/ALTER/RENAME SQL from form inputs and send it to the SQL console for Dry run and apply. This page does not change the DB directly.',
         settings: 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
         help: 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
       },
@@ -164,7 +150,6 @@
         databases: 'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。',
         migrations: '読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。',
         sql: 'マイグレーション履歴に残さないSQLを、Dry runで確認してから適用できます。SQL適用は可能な範囲でatomic transactionとして実行されます。',
-        schema: 'フォーム入力からCREATE/ALTER/RENAMEのSQLを生成し、Dry runと適用のためにSQLコンソールへ送ります。DBを直接変更する画面ではありません。',
         settings: '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。',
         help: '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。',
       },
@@ -1849,14 +1834,6 @@
         await loadSchema({ showLoadedMessage: false });
       }
     }
-    function quoteIdent(name) {
-      return `"${String(name).replace(/"/g, '""')}"`;
-    }
-    function setSql(sql) {
-      $('sqlInput').value = sql;
-      updateSqlInputMeta();
-      $('sqlInput').focus();
-    }
     function insertIntoTextarea(textarea, text) {
       const start = textarea.selectionStart || 0;
       const end = textarea.selectionEnd || 0;
@@ -1932,14 +1909,6 @@
       const number = Number(value);
       if (!Number.isSafeInteger(number)) throw new Error(t('integerTooLarge', label));
       return number;
-    }
-    function generateSql(builder) {
-      try {
-        setSql(builder());
-        message(t('sqlGenerated'));
-      } catch (error) {
-        message(error.message, true);
-      }
     }
     async function runMigrate(database, dryRun) {
       const params = database ? new URLSearchParams([['database', database]]) : selectedTargetQuery();
@@ -2295,17 +2264,3 @@
       $('sqlFileName').value = sanitizeSqlFileName(file.name);
       message(t('fileLoaded', file.name));
     });
-    $('generateCreateTable').addEventListener('click', () => generateSql(() => {
-      const table = requireValue('newTableName', t('schemaNewTableLabel'));
-      const columns = requireValue('newTableColumns', t('schemaCreateColumnsLabel'));
-      return `CREATE TABLE ${quoteIdent(table)} (${columns});`;
-    }));
-    $('generateAddColumn').addEventListener('click', () => generateSql(() => {
-      const table = requireValue('alterTableName', t('schemaTargetTableLabel'));
-      const column = requireValue('newColumnName', t('schemaNewColumnLabel'));
-      const definition = requireValue('newColumnDefinition', t('schemaColumnDefinitionLabel'));
-      return `ALTER TABLE ${quoteIdent(table)} ADD COLUMN ${quoteIdent(column)} ${definition};`;
-    }));
-    $('generateRenameTable').addEventListener('click', () => generateSql(() => {
-      const from = requireValue('renameTableFrom', t('schemaRenameTableFromLabel'));
-      const to = requireValue('renameTableTo', t('schemaRenameTableToLabel'));

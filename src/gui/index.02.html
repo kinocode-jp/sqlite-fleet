@@ -1,11 +1,3 @@
-      return `ALTER TABLE ${quoteIdent(from)} RENAME TO ${quoteIdent(to)};`;
-    }));
-    $('generateRenameColumn').addEventListener('click', () => generateSql(() => {
-      const table = requireValue('renameColumnTable', t('schemaRenameColumnTableLabel'));
-      const from = requireValue('renameColumnFrom', t('schemaRenameColumnFromLabel'));
-      const to = requireValue('renameColumnTo', t('schemaRenameColumnToLabel'));
-      return `ALTER TABLE ${quoteIdent(table)} RENAME COLUMN ${quoteIdent(from)} TO ${quoteIdent(to)};`;
-    }));
     $('databases').addEventListener('click', (event) => {
       const button = event.target.closest('button[data-action]');
       if (!button) return;
