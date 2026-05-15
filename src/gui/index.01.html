@@ -290,6 +290,9 @@
     function openPage(page) {
       document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
       document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
+      document.querySelectorAll('[data-page-actions]').forEach((actions) => {
+        actions.hidden = actions.dataset.pageActions !== page;
+      });
       updatePageHeading(page);
     }
     function navigateToPage(page, options = {}) {

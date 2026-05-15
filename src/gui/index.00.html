@@ -31,6 +31,9 @@
     .page-title { display:grid; gap:4px; }
     .page-title h2 { margin:0; font-size:24px; line-height:1.2; }
     .page-title p { margin:0; color:var(--muted); }
+    .page-actions { display:flex; justify-content:flex-end; gap:8px; margin-left:auto; }
+    .page-action-set { display:flex; justify-content:flex-end; gap:8px; }
+    .page-action-set[hidden] { display:none; }
     .message { min-width:280px; max-width:520px; margin:0; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); color:var(--muted); box-shadow:var(--shadow); display:flex; align-items:center; justify-content:space-between; gap:12px; }
     .message[hidden] { display:none; }
     .message.error { border-color:#f2b8b5; background:var(--danger-bg); color:var(--danger); }
@@ -45,7 +48,6 @@
     .page.active { display:block; }
     .summary.page.active { display:grid; }
     .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:15px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
-    .panel-header.action-only { justify-content:flex-end; }
     .panel-heading { display:grid; gap:3px; }
     .panel-title { display:flex; align-items:center; gap:7px; }
     .panel-actions { display:flex; justify-content:flex-end; gap:8px; margin-left:auto; }
@@ -305,6 +307,16 @@
           <h2 id="pageHeading">マイグレーション適用</h2>
           <p id="pageDescription" hidden></p>
         </div>
+        <div id="pageActions" class="page-actions">
+          <div class="page-action-set" data-page-actions="databases" hidden>
+            <button id="openDatabaseFileModal" class="primary">新規作成</button>
+            <button id="openDbGroupModalFromDatabases">グループ作成</button>
+          </div>
+          <div class="page-action-set" data-page-actions="migrations" hidden>
+            <button id="openMigrationFileModal" class="primary">新規作成</button>
+            <button id="openMigrationGroupModalFromMigrations" hidden>グループ作成</button>
+          </div>
+        </div>
         <div id="messageBar" class="message muted" hidden><span id="messageText"></span><button id="clearMessage" type="button" aria-label="Close">×</button></div>
       </header>
       <section class="panel page" data-page="setup" id="setup-panel">
@@ -415,12 +427,6 @@
       </div>
 
       <section class="panel page" data-page="databases" id="databases-panel">
-        <div class="panel-header action-only">
-          <div class="panel-actions">
-            <button id="openDatabaseFileModal" class="primary">新規作成</button>
-            <button id="openDbGroupModalFromDatabases">グループ作成</button>
-          </div>
-        </div>
         <div class="table-wrap">
           <table class="db-table">
             <thead><tr><th class="col-id">ID</th><th class="col-status">Status</th><th class="col-groups">Migration Groups</th><th class="col-applied">Applied</th><th class="col-pending">Pending</th><th class="col-path">Path</th><th class="col-actions">Actions</th></tr></thead>
@@ -460,12 +466,6 @@
       </div>
 
       <section class="panel page" data-page="migrations" id="migrations-panel">
-        <div class="panel-header action-only">
-          <div class="panel-actions">
-            <button id="openMigrationFileModal" class="primary">新規作成</button>
-            <button id="openMigrationGroupModalFromMigrations" hidden>グループ作成</button>
-          </div>
-        </div>
         <div class="table-wrap">
           <table>
             <thead><tr><th>File name</th><th>DB</th><th>Checksum</th></tr></thead>
