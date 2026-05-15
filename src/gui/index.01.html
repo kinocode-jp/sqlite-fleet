@@ -1171,7 +1171,8 @@
     function closeMigrationGroupModal() {
       $('migrationGroupModal').hidden = true;
     }
-    function openMigrationFileModal() {
+    function openMigrationFileModal(initialSql = '') {
+      const sql = typeof initialSql === 'string' ? initialSql : '';
       migrationFileMode = 'create';
       editingMigration = null;
       $('migrationFileModalTitle').textContent = t('createMigrationTitle');
@@ -1181,8 +1182,8 @@
       $('newMigrationFilename').value = nextMigrationFileName();
       $('newMigrationFilename').disabled = false;
       $('newMigrationGroup').disabled = false;
-      $('newMigrationSql').value = '';
-      migrationFileInitialSql = '';
+      $('newMigrationSql').value = sql;
+      migrationFileInitialSql = sql;
       $('newMigrationSql').readOnly = false;
       $('migrationFileStatus').hidden = true;
       $('migrationTemplateRow').hidden = false;
@@ -1195,6 +1196,14 @@
       $('migrationFileModal').hidden = false;
       $('newMigrationFilename').focus();
       $('newMigrationFilename').select();
+    }
+    function openMigrationFileModalFromSql() {
+      const sql = $('sqlInput').value;
+      if (!sql.trim()) {
+        message(t('enterSqlToSave'), true);
+        return;
+      }
+      openMigrationFileModal(sql);
     }
     function isMigrationSqlDirty() {
       return $('newMigrationSql').value !== migrationFileInitialSql;
@@ -2090,6 +2099,7 @@
     $('loadSchema').addEventListener('click', loadSchema);
     $('insertTemplate').addEventListener('click', insertSelectedTemplate);
     $('downloadSql').addEventListener('click', downloadSqlFile);
+    $('createMigrationFromSql').addEventListener('click', openMigrationFileModalFromSql);
     $('sqlDryRun').addEventListener('click', () => runSql(true));
     $('sqlApply').addEventListener('click', () => runSql(false));
     $('sqlDatabase').addEventListener('change', clearSchema);
@@ -2141,7 +2151,7 @@
     $('migrationGroupModal').addEventListener('click', (event) => {
       if (event.target === $('migrationGroupModal')) closeMigrationGroupModal();
     });
-    $('openMigrationFileModal').addEventListener('click', openMigrationFileModal);
+    $('openMigrationFileModal').addEventListener('click', () => openMigrationFileModal());
     $('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal);
     $('cancelMigrationFile').addEventListener('click', closeMigrationFileModal);
     $('migrationFileModal').addEventListener('click', (event) => {

@@ -468,7 +468,9 @@
         assert!(INDEX_HTML.contains(r#"<div id="newMigrationSqlCompletions" class="sql-completion-list" hidden></div>"#));
         assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlCursor">Ln 1, Col 1</span>"#));
         assert!(INDEX_HTML.contains(r#"<span id="newMigrationSqlStats">0 bytes / 0 lines</span>"#));
-        assert!(INDEX_HTML.contains("function openMigrationFileModal()"));
+        assert!(INDEX_HTML.contains("function openMigrationFileModal(initialSql = '')"));
+        assert!(INDEX_HTML.contains("const sql = typeof initialSql === 'string' ? initialSql : ''"));
+        assert!(INDEX_HTML.contains("function openMigrationFileModalFromSql()"));
         assert!(INDEX_HTML.contains("function closeMigrationFileModal(force = false)"));
         assert!(INDEX_HTML.contains("function isMigrationSqlDirty()"));
         assert!(INDEX_HTML.contains("const forceClose = force === true"));
@@ -546,7 +548,9 @@
         assert!(!INDEX_HTML.contains("newMigrationVersion"));
         assert!(!INDEX_HTML.contains("newMigrationName"));
         assert!(INDEX_HTML.contains("$('newMigrationGroupField').hidden = names.length <= 1 && names[0] === 'main'"));
-        assert!(INDEX_HTML.contains("$('openMigrationFileModal').addEventListener('click', openMigrationFileModal)"));
+        assert!(INDEX_HTML.contains(
+            "$('openMigrationFileModal').addEventListener('click', () => openMigrationFileModal())"
+        ));
         assert!(INDEX_HTML.contains("$('closeMigrationFileModal').addEventListener('click', closeMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('cancelMigrationFile').addEventListener('click', closeMigrationFileModal)"));
         assert!(INDEX_HTML.contains("$('confirmMigrationSqlDiscard').addEventListener('click', confirmMigrationSqlDiscard)"));
@@ -647,6 +651,12 @@
         assert!(INDEX_HTML.contains(r#"<input id="sqlFile" type="file""#));
         assert!(INDEX_HTML.contains(r#"<textarea id="sqlInput""#));
         assert!(INDEX_HTML.contains(r#"<button id="downloadSql">SQLファイル保存</button>"#));
+        assert!(
+            INDEX_HTML.contains(r#"<button id="createMigrationFromSql">マイグレーションとして作成</button>"#)
+        );
+        assert!(INDEX_HTML.contains(
+            "$('createMigrationFromSql').addEventListener('click', openMigrationFileModalFromSql)"
+        ));
         assert!(INDEX_HTML.contains("$('sqlInput').addEventListener('keydown', handleSqlEditorKeydown)"));
         assert!(INDEX_HTML.contains("function updateSqlInputMeta()"));
         assert!(INDEX_HTML.contains("new Blob([sql]"));
