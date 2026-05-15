@@ -252,7 +252,7 @@
         assert!(INDEX_HTML.contains(r#"<details class="settings-section" open>"#));
         assert!(INDEX_HTML.contains(r#"<summary>DB検出</summary>"#));
         assert!(INDEX_HTML.contains(r#"<summary>GUI permissions</summary>"#));
-        assert!(INDEX_HTML.contains(".settings-section { border:1px solid var(--line); border-radius:8px; background:var(--app-bg); overflow:visible; }"));
+        assert!(INDEX_HTML.contains(".settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:visible; }"));
         assert!(INDEX_HTML.contains(".settings-section[open] summary"));
         assert!(INDEX_HTML.contains(r#"<button id="baselineAll">対象を読み取り済みにする</button>"#));
         assert!(INDEX_HTML.contains(r#"<input id="manageMigrationGroupDir""#));
