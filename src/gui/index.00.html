@@ -164,6 +164,12 @@
     .settings-section[open] summary::after { content:"-"; }
     .settings-section-body { display:grid; gap:12px; padding:12px 14px 14px; }
     .settings-section .key-grid { margin-top:2px; }
+    .setup-guide { display:grid; gap:14px; }
+    .setup-checklist { display:grid; gap:8px; }
+    .setup-check-item { display:grid; grid-template-columns:24px minmax(0, 1fr) auto; gap:10px; align-items:start; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .setup-check-mark { display:grid; place-items:center; width:20px; height:20px; border:1px solid var(--line-strong); border-radius:50%; color:var(--muted); font-size:12px; font-weight:900; }
+    .setup-check-item.done .setup-check-mark { border-color:#16835d; background:#dff6ec; color:#116849; }
+    .setup-check-title { font-weight:800; }
     .allowed-root-list { display:grid; gap:8px; }
     .allowed-root-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:8px; align-items:start; border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; }
     .allowed-root-path { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap:anywhere; }
@@ -273,6 +279,7 @@
         <div class="subtitle">Fleet migration control plane</div>
       </div>
       <nav class="sidebar-nav" aria-label="管理画面ナビゲーション">
+        <a href='#setup-panel' data-page-link="setup"><span class="nav-icon">SET</span>初期セットアップ</a>
         <a href='#command-center' data-page-link="execute"><span class="nav-icon">RUN</span>マイグレーション適用</a>
         <a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups"><span class="nav-icon">MIG</span>マイグレーショングループ</a>
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション管理</a>
@@ -297,6 +304,66 @@
         </div>
         <div id="messageBar" class="message muted" hidden><span id="messageText"></span><button id="clearMessage" type="button" aria-label="Close">×</button></div>
       </header>
+      <section class="panel page" data-page="setup" id="setup-panel">
+        <div class="panel-header">
+          <div class="panel-heading">
+            <h2>初期セットアップ</h2>
+            <p class="panel-description">sqlite-fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。</p>
+          </div>
+        </div>
+        <div class="setup-guide">
+          <section class="builder-block">
+            <h3>導入手順</h3>
+            <ol>
+              <li>設定ファイルを配置し、sqlite-fleetが触ってよいディレクトリをAllowed rootsに登録します。</li>
+              <li>DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。</li>
+              <li>Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。</li>
+              <li>Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。</li>
+            </ol>
+          </section>
+          <section class="builder-block">
+            <h3>開始前チェック</h3>
+            <div id="setupChecklist" class="setup-checklist"></div>
+          </section>
+          <div class="settings-accordion">
+            <details class="settings-section" open>
+              <summary>DB検出</summary>
+              <div class="settings-section-body">
+                <div class="settings-form">
+                  <label class="field"><span class="field-label">DB discovery <span class="tool-tip" tabindex="0" data-tip="globはファイルパターンでDBを探します。queryは管理DBへSELECTを実行してDB一覧を取得します。">?</span></span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
+                  <label class="field"><span class="field-label">DB path glob <span class="tool-tip" tabindex="0" data-tip="glob discoveryで使うDBファイルのパターンです。allowed_roots配下だけを指定できます。例: ./data/**/*.db">?</span></span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                  <label class="field"><span class="field-label">Discovery source <span class="tool-tip" tabindex="0" data-tip="query discoveryでSELECTを実行する管理DBです。tenant一覧などを持つSQLite DBを指定します。">?</span></span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                  <label class="field"><span class="field-label">ID column <span class="tool-tip" tabindex="0" data-tip="query結果からDB IDとして読む列名です。未指定時は id を使います。">?</span></span><input id="settingsIdColumn"></label>
+                  <label class="field"><span class="field-label">Path column <span class="tool-tip" tabindex="0" data-tip="query結果からDBパスとして読む列名です。path_templateを使う場合は空にできます。">?</span></span><input id="settingsPathColumn"></label>
+                  <label class="field"><span class="field-label">Path template <span class="tool-tip" tabindex="0" data-tip="ID columnの値からDBパスを組み立てるテンプレートです。例: ./data/tenants/{id}.db">?</span></span><input id="settingsPathTemplate"></label>
+                  <label class="field wide"><span class="field-label">Discovery query <span class="tool-tip" tabindex="0" data-tip="query discoveryで実行する読み取り専用SELECTです。id列と、path_columnまたはpath_templateに必要な列を返します。">?</span></span><textarea id="settingsQuery" rows="3"></textarea></label>
+                </div>
+                <div class="actions"><button id="previewDiscovery" type="button">Preview discovery</button></div>
+                <div id="discoveryPreview" class="discovery-preview"></div>
+                <div id="discoverySettings" class="key-grid"></div>
+              </div>
+            </details>
+            <details class="settings-section" open>
+              <summary>Allowed roots <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。">?</span></summary>
+              <div class="settings-section-body">
+                <div id="allowedRoots" class="allowed-root-list"></div>
+                <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp" aria-label="Allowed root path"><button id="addAllowedRoot" type="button">追加</button></div>
+              </div>
+            </details>
+            <details class="settings-section" open>
+              <summary>マイグレーション</summary>
+              <div class="settings-section-body">
+                <div class="settings-form">
+                  <label class="field"><span class="field-label">Migration dir <span class="tool-tip" tabindex="0" data-tip="マイグレーションSQLファイルを読むディレクトリです。allowed_roots配下だけを指定できます。">?</span></span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
+                  <label class="field"><span class="field-label">History table <span class="tool-tip" tabindex="0" data-tip="各DBに作成するマイグレーション履歴テーブル名です。SQLite識別子として検証されます。">?</span></span><input id="settingsMigrationsTable"></label>
+                </div>
+                <div id="migrationSettings" class="key-grid"></div>
+              </div>
+            </details>
+            <div class="actions settings-actions"><button id="saveSetupSettings" class="primary">設定を保存</button></div>
+          </div>
+        </div>
+      </section>
       <section class="summary page active" data-page="execute" id="summary" aria-label="状態サマリー"></section>
 
       <section class="panel page active" data-page="execute" id="command-center">
@@ -646,7 +713,7 @@
       <section class="panel page" data-page="settings" id="settings-panel">
         <div class="panel-header">
           <div class="panel-heading">
-            <p class="panel-description">現在のプロジェクト設定、DB検出、出力先、バックアップ、GUI操作権限を確認・変更できます。</p>
+            <p class="panel-description">現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。</p>
           </div>
           <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
         </div>
@@ -657,40 +724,6 @@
               <div class="settings-form">
                 <label class="field"><span class="field-label">Project name <span class="tool-tip" tabindex="0" data-tip="画面表示やレポートで使う任意のプロジェクト名です。空でも動作します。">?</span></span><input id="settingsProjectName"></label>
               </div>
-            </div>
-          </details>
-          <details class="settings-section" open>
-            <summary>DB検出</summary>
-            <div class="settings-section-body">
-              <div class="settings-form">
-                <label class="field"><span class="field-label">DB discovery <span class="tool-tip" tabindex="0" data-tip="globはファイルパターンでDBを探します。queryは管理DBへSELECTを実行してDB一覧を取得します。">?</span></span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
-                <label class="field"><span class="field-label">DB path glob <span class="tool-tip" tabindex="0" data-tip="glob discoveryで使うDBファイルのパターンです。allowed_roots配下だけを指定できます。例: ./data/**/*.db">?</span></span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-                <label class="field"><span class="field-label">Discovery source <span class="tool-tip" tabindex="0" data-tip="query discoveryでSELECTを実行する管理DBです。tenant一覧などを持つSQLite DBを指定します。">?</span></span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-                <label class="field"><span class="field-label">ID column <span class="tool-tip" tabindex="0" data-tip="query結果からDB IDとして読む列名です。未指定時は id を使います。">?</span></span><input id="settingsIdColumn"></label>
-                <label class="field"><span class="field-label">Path column <span class="tool-tip" tabindex="0" data-tip="query結果からDBパスとして読む列名です。path_templateを使う場合は空にできます。">?</span></span><input id="settingsPathColumn"></label>
-                <label class="field"><span class="field-label">Path template <span class="tool-tip" tabindex="0" data-tip="ID columnの値からDBパスを組み立てるテンプレートです。例: ./data/tenants/{id}.db">?</span></span><input id="settingsPathTemplate"></label>
-                <label class="field wide"><span class="field-label">Discovery query <span class="tool-tip" tabindex="0" data-tip="query discoveryで実行する読み取り専用SELECTです。id列と、path_columnまたはpath_templateに必要な列を返します。">?</span></span><textarea id="settingsQuery" rows="3"></textarea></label>
-              </div>
-              <div class="actions"><button id="previewDiscovery" type="button">Preview discovery</button></div>
-              <div id="discoveryPreview" class="discovery-preview"></div>
-              <div id="discoverySettings" class="key-grid"></div>
-            </div>
-          </details>
-          <details class="settings-section" open>
-            <summary>Allowed roots <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。">?</span></summary>
-            <div class="settings-section-body">
-              <div id="allowedRoots" class="allowed-root-list"></div>
-              <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp" aria-label="Allowed root path"><button id="addAllowedRoot" type="button">追加</button></div>
-            </div>
-          </details>
-          <details class="settings-section">
-            <summary>マイグレーション</summary>
-            <div class="settings-section-body">
-              <div class="settings-form">
-                <label class="field"><span class="field-label">Migration dir <span class="tool-tip" tabindex="0" data-tip="マイグレーションSQLファイルを読むディレクトリです。allowed_roots配下だけを指定できます。">?</span></span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
-                <label class="field"><span class="field-label">History table <span class="tool-tip" tabindex="0" data-tip="各DBに作成するマイグレーション履歴テーブル名です。SQLite識別子として検証されます。">?</span></span><input id="settingsMigrationsTable"></label>
-              </div>
-              <div id="migrationSettings" class="key-grid"></div>
             </div>
           </details>
           <details class="settings-section">
@@ -908,6 +941,14 @@
       'スキーマ作成': 'Schema builder',
       '設定': 'Settings',
       'ヘルプ': 'Help',
+      '初期セットアップ': 'Initial Setup',
+      'sqlite-fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。': 'Before using sqlite-fleet, confirm DB discovery, allowed roots, and the migration SQL location.',
+      '導入手順': 'Setup steps',
+      '設定ファイルを配置し、sqlite-fleetが触ってよいディレクトリをAllowed rootsに登録します。': 'Place the config file and register directories sqlite-fleet may touch in Allowed roots.',
+      'DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。': 'Choose the database discovery method and check results with Preview discovery before saving.',
+      'Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。': 'Put trusted SQL files in Migration dir and check load status in Migration Management.',
+      'Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。': 'Confirm target DBs and planned changes with dry-run before moving to Migration Apply.',
+      '開始前チェック': 'Preflight checklist',
       '対象設定': 'Target settings',
       '状態を更新': 'Refresh status',
       '状態を検査': 'Check status',
@@ -1023,7 +1064,7 @@
       '変更前のカラム名です。': 'Current column name.',
       '変更後のカラム名です。アプリケーション側の参照も更新が必要です。': 'New column name. Application references may also need updates.',
       'RENAME COLUMN SQLを生成': 'Generate RENAME COLUMN SQL',
-      '現在のプロジェクト設定、DB検出、出力先、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project settings, DB discovery, output paths, backup, and GUI operation permissions.',
+      '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
       '権限を保存': 'Save permissions',
       '設定変更': 'Edit settings',
       '設定を保存': 'Save settings',
@@ -1111,6 +1152,9 @@
       'Database override': 'DB指定',
       'Limit': 'Limit',
       'Resolved target': '解決済み対象',
+      'Initial Setup': '初期セットアップ',
+      'Setup steps': '導入手順',
+      'Preflight checklist': '開始前チェック',
       'Migration Groups': 'マイグレーショングループ',
       'Create group': 'グループ作成',
       'Create new': '新規作成',
@@ -1236,6 +1280,20 @@
         savedDatabaseRule: 'DB assignment saved',
         savedGuiPermissions: 'GUI permissions saved',
         savedSettings: 'Settings saved',
+        done: 'Done',
+        todo: 'To do',
+        setupAllowedRootsTitle: 'Allowed roots are confirmed',
+        setupAllowedRootsDetail: 'Keep the default . root, or add explicit external DB and migration directories.',
+        setupDiscoveryTitle: 'DB discovery is configured',
+        setupDiscoveryDetail: 'Choose glob or query and enter the path pattern or source query used to find DBs.',
+        setupPreviewTitle: (count) => `Discovery currently finds ${count} DBs`,
+        setupPreviewDetail: 'Use Preview discovery before saving or applying migrations.',
+        setupMigrationDirTitle: 'Migration directory is configured',
+        setupMigrationDirDetail: 'Point Migration dir at the trusted SQL directory and keep the history table name set.',
+        setupMigrationFilesTitle: (count) => `${count} migration files are loaded`,
+        setupMigrationFilesDetail: 'Check Migration Management if no files are loaded yet.',
+        setupDryRunTitle: 'Current status has no failed DBs',
+        setupDryRunDetail: 'Run dry-run from Migration Apply before applying changes.',
         baselineDone: (processed, failed) => `baseline complete: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'Permission changes are disabled by allow_migration_edit',
         createdMigrationFile: 'Migration file registered',
@@ -1373,5 +1431,19 @@
         savedDatabaseRule: 'DBの割当を保存しました',
         savedGuiPermissions: 'GUI権限を保存しました',
         savedSettings: '設定を保存しました',
+        done: '完了',
+        todo: '未確認',
+        setupAllowedRootsTitle: 'Allowed rootsを確認する',
+        setupAllowedRootsDetail: 'デフォルトの . を維持するか、外部DBやmigrationのディレクトリを明示的に追加します。',
+        setupDiscoveryTitle: 'DB検出を設定する',
+        setupDiscoveryDetail: 'globまたはqueryを選び、DBを探すパターンや参照元クエリを入力します。',
+        setupPreviewTitle: (count) => `現在 ${count} DB を検出しています`,
+        setupPreviewDetail: '保存や適用の前にPreview discoveryで検出結果を確認します。',
+        setupMigrationDirTitle: 'Migration dirを設定する',
+        setupMigrationDirDetail: '信頼済みSQLを置いたディレクトリと履歴テーブル名を確認します。',
+        setupMigrationFilesTitle: (count) => `${count} 件のmigrationファイルを読み込んでいます`,
+        setupMigrationFilesDetail: '読み込まれていない場合はマイグレーション管理で状態を確認します。',
+        setupDryRunTitle: '失敗中のDBがないことを確認する',
+        setupDryRunDetail: '適用前にマイグレーション適用ページでdry-runを実行します。',
         baselineDone: (processed, failed) => `baseline 完了: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'allow_migration_edit が無効のため権限変更できません',

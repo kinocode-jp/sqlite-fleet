@@ -127,6 +127,8 @@
         assert!(INDEX_HTML.contains("function navigateToPage(page, options = {})"));
         assert!(INDEX_HTML.contains("history.pushState(null, '', hash)"));
         assert!(INDEX_HTML.contains("window.addEventListener('popstate', () => openPage(pageFromHash()))"));
+        assert!(INDEX_HTML.contains(r#"<a href='#setup-panel' data-page-link="setup"><span class="nav-icon">SET</span>初期セットアップ</a>"#));
+        assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="setup" id="setup-panel">"#));
         assert!(INDEX_HTML
             .contains(r#"<section class="summary page active" data-page="execute" id="summary""#));
         assert!(INDEX_HTML.contains(
@@ -143,6 +145,13 @@
         let database_nav = INDEX_HTML
             .find(r#"<a href='#databases-panel' data-page-link="databases">"#)
             .expect("database nav link exists");
+        let setup_nav = INDEX_HTML
+            .find(r#"<a href='#setup-panel' data-page-link="setup">"#)
+            .expect("setup nav link exists");
+        let execute_nav = INDEX_HTML
+            .find(r#"<a href='#command-center' data-page-link="execute">"#)
+            .expect("execute nav link exists");
+        assert!(setup_nav < execute_nav);
         assert!(migration_group_nav < migration_nav);
         assert!(migration_nav < database_nav);
         assert!(INDEX_HTML.contains("function updateConditionalNav()"));
@@ -248,6 +257,12 @@
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
         assert!(INDEX_HTML.contains(r#"<button id="savePermissions" class="primary">権限を保存</button>"#));
         assert!(INDEX_HTML.contains(r#"<button id="saveSettings" class="primary">設定を保存</button>"#));
+        assert!(INDEX_HTML.contains(r#"<button id="saveSetupSettings" class="primary">設定を保存</button>"#));
+        assert!(INDEX_HTML.contains("function renderSetupChecklist(settings)"));
+        assert!(INDEX_HTML.contains("setupDiscoveryTitle"));
+        assert!(INDEX_HTML.contains("title: t('setupPreviewTitle', databaseCount)"));
+        assert!(INDEX_HTML.contains("title: t('setupMigrationFilesTitle', migrationCount)"));
+        assert!(INDEX_HTML.contains("$('saveSetupSettings').addEventListener('click', saveSettings)"));
         assert!(INDEX_HTML.contains(r#"<div class="settings-accordion">"#));
         assert!(INDEX_HTML.contains(r#"<details class="settings-section" open>"#));
         assert!(INDEX_HTML.contains(r#"<summary>DB検出</summary>"#));

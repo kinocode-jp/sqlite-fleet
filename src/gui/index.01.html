@@ -108,6 +108,7 @@
     };
     const pageTitles = {
       en: {
+        setup: 'Initial Setup',
         execute: 'Migration Apply',
         'migration-groups': 'Migration Groups',
         'db-groups': 'DB Groups',
@@ -119,6 +120,7 @@
         help: 'Help',
       },
       ja: {
+        setup: '初期セットアップ',
         execute: 'マイグレーション適用',
         'migration-groups': 'マイグレーショングループ',
         'db-groups': 'DBグループ',
@@ -199,6 +201,7 @@
       if (!disabled && state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
         $('savePermissions').disabled = true;
         $('saveSettings').disabled = true;
+        $('saveSetupSettings').disabled = true;
         document.querySelectorAll('[data-path-browse]').forEach((button) => {
           button.disabled = true;
           button.title = t('permissionEditDisabled');
@@ -558,6 +561,7 @@
       $('settingsContinueOnError').checked = Boolean(settings.continue_on_error);
       $('settingsBackupBeforeMigrate').checked = Boolean(settings.backup_before_migrate);
       $('saveSettings').disabled = !permissions.allow_migration_edit;
+      $('saveSetupSettings').disabled = !permissions.allow_migration_edit;
       renderAllowedRoots();
       document.querySelectorAll('[data-path-browse]').forEach((button) => {
         button.disabled = !permissions.allow_migration_edit;
@@ -592,6 +596,30 @@
         ['keep_last', settings.backup_keep_last],
         ['audit', settings.audit_path || t('unset')],
       ]);
+      renderSetupChecklist(settings);
+    }
+    function renderSetupChecklist(settings) {
+      const discovery = settings.discovery || 'glob';
+      const discoveryReady = discovery === 'query'
+        ? Boolean(settings.databases_source && settings.databases_query && (settings.databases_path_column || settings.databases_path_template))
+        : Boolean(settings.databases_path_glob);
+      const databaseCount = state && state.status ? state.status.database_count : 0;
+      const migrationCount = state && state.migrations ? uniqueMigrationsByFilename(state.migrations).length : 0;
+      const items = [
+        { done: (settings.allowed_roots || []).length > 0, title: t('setupAllowedRootsTitle'), detail: t('setupAllowedRootsDetail') },
+        { done: discoveryReady, title: t('setupDiscoveryTitle'), detail: t('setupDiscoveryDetail') },
+        { done: databaseCount > 0, title: t('setupPreviewTitle', databaseCount), detail: t('setupPreviewDetail') },
+        { done: Boolean(settings.migrations_dir && settings.migrations_table), title: t('setupMigrationDirTitle'), detail: t('setupMigrationDirDetail') },
+        { done: migrationCount > 0, title: t('setupMigrationFilesTitle', migrationCount), detail: t('setupMigrationFilesDetail') },
+        { done: state && state.status && state.status.failed === 0, title: t('setupDryRunTitle'), detail: t('setupDryRunDetail') },
+      ];
+      $('setupChecklist').innerHTML = items.map((item) => `
+        <div class="setup-check-item ${item.done ? 'done' : ''}">
+          <span class="setup-check-mark">${item.done ? '✓' : ''}</span>
+          <span><span class="setup-check-title">${escapeHtml(item.title)}</span><br><span class="muted">${escapeHtml(item.detail)}</span></span>
+          <span class="pill ${item.done ? 'ok' : 'warn'}">${escapeHtml(item.done ? t('done') : t('todo'))}</span>
+        </div>
+      `).join('');
     }
     function renderAllowedRoots() {
       const detailsByValue = new Map((state.settings.allowed_roots || []).map((root) => [root.value, root]));
@@ -2006,6 +2034,7 @@
     $('check').addEventListener('click', runCheck);
     $('savePermissions').addEventListener('click', saveGuiPermissions);
     $('saveSettings').addEventListener('click', saveSettings);
+    $('saveSetupSettings').addEventListener('click', saveSettings);
     $('previewDiscovery').addEventListener('click', previewDiscovery);
     $('addAllowedRoot').addEventListener('click', () => {
       const value = $('newAllowedRoot').value.trim();
