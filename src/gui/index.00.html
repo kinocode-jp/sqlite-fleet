@@ -106,7 +106,7 @@
     .field-hint { color:var(--muted); font-size:11px; font-weight:500; }
     .tool-tip { position:relative; display:inline-grid; place-items:center; width:18px; height:18px; border:1px solid var(--line-strong); border-radius:50%; color:var(--accent-strong); background:#fff; font-size:12px; font-weight:800; cursor:help; }
     .tool-tip:hover, .tool-tip:focus { z-index:40; }
-    .tool-tip::after { content:attr(data-tip); position:absolute; z-index:1; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:min(280px, 82vw); padding:9px 10px; border-radius:6px; background:#17212b; color:#fff; font-size:12px; font-weight:500; line-height:1.45; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:none; }
+    .tool-tip::after { content:attr(data-tip); position:absolute; z-index:1; left:50%; bottom:calc(100% + 8px); transform:translateX(-50%); width:min(340px, 82vw); max-width:calc(100vw - 32px); padding:9px 10px; border-radius:6px; background:#17212b; color:#fff; font-size:12px; font-weight:500; line-height:1.45; white-space:normal; overflow-wrap:anywhere; text-align:left; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:none; }
     .tool-tip::before { content:""; position:absolute; z-index:1; left:50%; bottom:calc(100% + 3px); transform:translateX(-50%); border:5px solid transparent; border-top-color:#17212b; opacity:0; transition:none; }
     .tool-tip:hover::after, .tool-tip:focus::after, .tool-tip:hover::before, .tool-tip:focus::before { opacity:1; }
     .app-tooltip { position:fixed; z-index:100; max-width:min(360px, calc(100vw - 24px)); padding:8px 10px; border-radius:6px; background:#17212b; color:#fff; font-size:12px; line-height:1.45; box-shadow:var(--shadow); pointer-events:none; opacity:0; transform:translate(10px, 10px); }
@@ -156,7 +156,7 @@
     .settings-form .wide { grid-column:1 / -1; }
     .settings-actions { margin-top:10px; }
     .settings-accordion { display:grid; gap:10px; }
-    .settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:hidden; }
+    .settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:visible; }
     .settings-section summary { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; cursor:pointer; font-weight:800; }
     .settings-section summary::-webkit-details-marker { display:none; }
     .settings-section summary::after { content:"+"; color:var(--muted); font-weight:900; }
