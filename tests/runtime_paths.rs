@@ -412,3 +412,83 @@ fn allowed_roots_rejects_symlink_escape() {
     assert!(error.contains("DBパス"));
     assert!(error.contains("許可ルート外"));
 }
+
+#[test]
+fn allowed_roots_reject_parent_directory_components() {
+    let dir = tempdir().unwrap();
+    let config = Config {
+        base_dir: dir.path().to_path_buf(),
+        security: SecurityConfig {
+            allowed_roots: vec!["..".to_string()],
+        },
+        ..Config::default()
+    };
+
+    let error = config.validate_discovery().unwrap_err().to_string();
+    assert!(error.contains("security.allowed_roots"));
+    assert!(error.contains("親ディレクトリ"));
+}
+
+#[test]
+fn configured_paths_reject_leading_parent_even_under_allowed_root() {
+    let root = tempdir().unwrap();
+    let dir = root.path().join("project");
+    let outside = root.path().join("external");
+    fs::create_dir(&dir).unwrap();
+    fs::create_dir(&outside).unwrap();
+    Connection::open(outside.join("tenant.db")).unwrap();
+    let config = Config {
+        base_dir: dir.to_path_buf(),
+        security: SecurityConfig {
+            allowed_roots: vec![".".to_string(), outside.display().to_string()],
+        },
+        databases: DatabasesConfig {
+            discovery: "glob".to_string(),
+            path_glob: Some("../external/*.db".to_string()),
+            ..DatabasesConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let error = discover_databases(&config).unwrap_err().to_string();
+    assert!(error.contains("databases.path_glob"));
+    assert!(error.contains("親ディレクトリ"));
+}
+
+#[test]
+fn discovered_paths_reject_leading_parent_even_under_allowed_root() {
+    let root = tempdir().unwrap();
+    let dir = root.path().join("project");
+    let outside = root.path().join("external");
+    fs::create_dir(&dir).unwrap();
+    fs::create_dir(&outside).unwrap();
+    let source = dir.join("shared.db");
+    let conn = Connection::open(&source).unwrap();
+    conn.execute("CREATE TABLE tenants(id TEXT, db_path TEXT)", [])
+        .unwrap();
+    conn.execute(
+        "INSERT INTO tenants(id, db_path) VALUES ('tenant', '../external/tenant.db')",
+        [],
+    )
+    .unwrap();
+    let config = Config {
+        base_dir: dir.to_path_buf(),
+        security: SecurityConfig {
+            allowed_roots: vec![".".to_string(), outside.display().to_string()],
+        },
+        databases: DatabasesConfig {
+            discovery: "query".to_string(),
+            path_glob: None,
+            source: Some("shared.db".to_string()),
+            query: Some("SELECT id, db_path FROM tenants".to_string()),
+            path_column: Some("db_path".to_string()),
+            path_template: None,
+            ..DatabasesConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let error = discover_databases(&config).unwrap_err().to_string();
+    assert!(error.contains("path_column"));
+    assert!(error.contains("親ディレクトリ"));
+}

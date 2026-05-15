@@ -9,7 +9,7 @@ use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 pub const DEFAULT_CONFIG_PATH: &str = "sqlite-fleet.toml";
 pub const DEFAULT_MIGRATIONS_TABLE: &str = "_sqlite_fleet_migrations";
@@ -735,6 +735,12 @@ impl Config {
                 }
                 if root.is_empty() {
                     bail!("security.allowed_roots に空のパスは指定できません");
+                }
+                if Path::new(&root)
+                    .components()
+                    .any(|component| component == Component::ParentDir)
+                {
+                    bail!("security.allowed_roots に親ディレクトリ成分は使用できません: {root}");
                 }
                 Ok(normalize_path_for_comparison(&self.resolve_path(root)))
             })
