@@ -316,7 +316,7 @@
           <section class="builder-block">
             <h3>導入手順</h3>
             <ol>
-              <li>設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリをAllowed rootsに登録します。</li>
+              <li>設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリを許可ルートに登録します。</li>
               <li>DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。</li>
               <li>Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。</li>
               <li>Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。</li>
@@ -943,7 +943,7 @@
       '初期セットアップ': 'Initial Setup',
       'Sqlite Fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。': 'Before using Sqlite Fleet, confirm DB discovery, allowed roots, and the migration SQL location.',
       '導入手順': 'Setup steps',
-      '設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリをAllowed rootsに登録します。': 'Place the config file and register directories Sqlite Fleet may touch in Allowed roots.',
+      '設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリを許可ルートに登録します。': 'Place the config file and register directories Sqlite Fleet may touch in allowed roots.',
       'DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。': 'Choose the database discovery method and check results with Preview discovery before saving.',
       'Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。': 'Put trusted SQL files in Migration dir and check load status in Migration Management.',
       'Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。': 'Confirm target DBs and planned changes with dry-run before moving to Migration Apply.',
@@ -1438,7 +1438,7 @@
         savedSettings: '設定を保存しました',
         done: '設定あり',
         todo: '要設定',
-        setupAllowedRootsTitle: 'Allowed roots',
+        setupAllowedRootsTitle: '許可ルート',
         setupAllowedRootsDetail: 'デフォルトの . を維持するか、外部DBやmigrationのディレクトリを明示的に追加します。',
         setupDiscoveryTitle: 'DB検出',
         setupDiscoveryDetail: 'globまたはqueryを選び、DBを探すパターンや参照元クエリを入力します。',
