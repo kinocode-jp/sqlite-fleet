@@ -655,7 +655,7 @@
             <summary>基本</summary>
             <div class="settings-section-body">
               <div class="settings-form">
-                <label class="field"><span class="field-label">Project name</span><input id="settingsProjectName"></label>
+                <label class="field"><span class="field-label">Project name <span class="tool-tip" tabindex="0" data-tip="画面表示やレポートで使う任意のプロジェクト名です。空でも動作します。">?</span></span><input id="settingsProjectName"></label>
               </div>
               <div id="basicSettings" class="key-grid"></div>
             </div>
@@ -664,13 +664,13 @@
             <summary>DB検出</summary>
             <div class="settings-section-body">
               <div class="settings-form">
-                <label class="field"><span class="field-label">DB discovery</span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
-                <label class="field"><span class="field-label">DB path glob</span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-                <label class="field"><span class="field-label">Discovery source</span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
-                <label class="field"><span class="field-label">ID column</span><input id="settingsIdColumn"></label>
-                <label class="field"><span class="field-label">Path column</span><input id="settingsPathColumn"></label>
-                <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
-                <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
+                <label class="field"><span class="field-label">DB discovery <span class="tool-tip" tabindex="0" data-tip="globはファイルパターンでDBを探します。queryは管理DBへSELECTを実行してDB一覧を取得します。">?</span></span><select id="settingsDiscovery"><option value="glob">glob</option><option value="query">query</option></select></label>
+                <label class="field"><span class="field-label">DB path glob <span class="tool-tip" tabindex="0" data-tip="glob discoveryで使うDBファイルのパターンです。allowed_roots配下だけを指定できます。例: ./data/**/*.db">?</span></span><span class="input-action-row"><input id="settingsPathGlob" placeholder="./data/**/*.db"><button type="button" data-path-browse="settingsPathGlob" data-path-mode="glob" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                <label class="field"><span class="field-label">Discovery source <span class="tool-tip" tabindex="0" data-tip="query discoveryでSELECTを実行する管理DBです。tenant一覧などを持つSQLite DBを指定します。">?</span></span><span class="input-action-row"><input id="settingsSource"><button type="button" data-path-browse="settingsSource" data-path-accept="db,sqlite,sqlite3">参照</button></span></label>
+                <label class="field"><span class="field-label">ID column <span class="tool-tip" tabindex="0" data-tip="query結果からDB IDとして読む列名です。未指定時は id を使います。">?</span></span><input id="settingsIdColumn"></label>
+                <label class="field"><span class="field-label">Path column <span class="tool-tip" tabindex="0" data-tip="query結果からDBパスとして読む列名です。path_templateを使う場合は空にできます。">?</span></span><input id="settingsPathColumn"></label>
+                <label class="field"><span class="field-label">Path template <span class="tool-tip" tabindex="0" data-tip="ID columnの値からDBパスを組み立てるテンプレートです。例: ./data/tenants/{id}.db">?</span></span><input id="settingsPathTemplate"></label>
+                <label class="field wide"><span class="field-label">Discovery query <span class="tool-tip" tabindex="0" data-tip="query discoveryで実行する読み取り専用SELECTです。id列と、path_columnまたはpath_templateに必要な列を返します。">?</span></span><textarea id="settingsQuery" rows="3"></textarea></label>
               </div>
               <div class="actions"><button id="previewDiscovery" type="button">Preview discovery</button></div>
               <div id="discoveryPreview" class="discovery-preview"></div>
@@ -678,18 +678,18 @@
             </div>
           </details>
           <details class="settings-section" open>
-            <summary>Allowed roots</summary>
+            <summary>Allowed roots <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。">?</span></summary>
             <div class="settings-section-body">
               <div id="allowedRoots" class="allowed-root-list"></div>
-              <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp"><button id="addAllowedRoot" type="button">追加</button></div>
+              <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp" aria-label="Allowed root path"><button id="addAllowedRoot" type="button">追加</button></div>
             </div>
           </details>
           <details class="settings-section">
             <summary>マイグレーション</summary>
             <div class="settings-section-body">
               <div class="settings-form">
-                <label class="field"><span class="field-label">Migration dir</span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
-                <label class="field"><span class="field-label">History table</span><input id="settingsMigrationsTable"></label>
+                <label class="field"><span class="field-label">Migration dir <span class="tool-tip" tabindex="0" data-tip="マイグレーションSQLファイルを読むディレクトリです。allowed_roots配下だけを指定できます。">?</span></span><span class="input-action-row"><input id="settingsMigrationsDir"><button type="button" data-path-browse="settingsMigrationsDir" data-path-kind-filter="dir">参照</button></span></label>
+                <label class="field"><span class="field-label">History table <span class="tool-tip" tabindex="0" data-tip="各DBに作成するマイグレーション履歴テーブル名です。SQLite識別子として検証されます。">?</span></span><input id="settingsMigrationsTable"></label>
               </div>
               <div id="migrationSettings" class="key-grid"></div>
             </div>
@@ -698,12 +698,12 @@
             <summary>出力/保全</summary>
             <div class="settings-section-body">
               <div class="settings-form">
-                <label class="field"><span class="field-label">Report format</span><input id="settingsReportFormat"></label>
-                <label class="field"><span class="field-label">Report path</span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath" data-path-accept="json">参照</button></span></label>
-                <label class="field"><span class="field-label">Backup dir</span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir" data-path-kind-filter="dir">参照</button></span></label>
-                <label class="field"><span class="field-label">Backup before migrate</span><input id="settingsBackupBeforeMigrate" type="checkbox"></label>
-                <label class="field"><span class="field-label">Backup keep last</span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
-                <label class="field"><span class="field-label">Audit path</span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath" data-path-accept="jsonl,log">参照</button></span></label>
+                <label class="field"><span class="field-label">Report format <span class="tool-tip" tabindex="0" data-tip="CLIが書き出すレポート形式です。現在は json のみ対応しています。">?</span></span><input id="settingsReportFormat"></label>
+                <label class="field"><span class="field-label">Report path <span class="tool-tip" tabindex="0" data-tip="status、plan、migrate、check、doctorのJSONレポート出力先です。allowed_roots配下だけを指定できます。">?</span></span><span class="input-action-row"><input id="settingsReportPath"><button type="button" data-path-browse="settingsReportPath" data-path-accept="json">参照</button></span></label>
+                <label class="field"><span class="field-label">Backup dir <span class="tool-tip" tabindex="0" data-tip="backupやmigrate前backupの保存先ディレクトリです。DBごとのサブディレクトリが作られます。">?</span></span><span class="input-action-row"><input id="settingsBackupDir"><button type="button" data-path-browse="settingsBackupDir" data-path-kind-filter="dir">参照</button></span></label>
+                <label class="field"><span class="field-label">Backup before migrate <span class="tool-tip" tabindex="0" data-tip="migrate実行前に対象DBのバックアップを自動作成します。CLIの --backup でも上書きできます。">?</span></span><input id="settingsBackupBeforeMigrate" type="checkbox"></label>
+                <label class="field"><span class="field-label">Backup keep last <span class="tool-tip" tabindex="0" data-tip="DBごとに保持する最新バックアップ数です。古いバックアップは削除対象になります。">?</span></span><input id="settingsBackupKeepLast" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Audit path <span class="tool-tip" tabindex="0" data-tip="migrate、backup、restore、drift、GUI操作をJSONLで追記する監査ログです。">?</span></span><span class="input-action-row"><input id="settingsAuditPath"><button type="button" data-path-browse="settingsAuditPath" data-path-accept="jsonl,log">参照</button></span></label>
               </div>
               <div id="outputSettings" class="key-grid"></div>
             </div>
@@ -712,9 +712,9 @@
             <summary>Runtime</summary>
             <div class="settings-section-body">
               <div class="settings-form">
-                <label class="field"><span class="field-label">Parallel</span><input id="settingsParallel" inputmode="numeric"></label>
-                <label class="field"><span class="field-label">Lock timeout ms</span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
-                <label class="field"><span class="field-label">Continue on error</span><input id="settingsContinueOnError" type="checkbox"></label>
+                <label class="field"><span class="field-label">Parallel <span class="tool-tip" tabindex="0" data-tip="複数DBに対する処理の並列数です。負荷が高い環境では小さめにします。">?</span></span><input id="settingsParallel" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Lock timeout ms <span class="tool-tip" tabindex="0" data-tip="SQLite busy_timeoutとsqlite-fleetのDB操作ロック待ち時間です。">?</span></span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Continue on error <span class="tool-tip" tabindex="0" data-tip="一部DBで失敗しても残りのDB処理を続けます。失敗はレポートに残ります。">?</span></span><input id="settingsContinueOnError" type="checkbox"></label>
               </div>
               <div id="runtimeSettings" class="key-grid"></div>
             </div>
@@ -1029,17 +1029,45 @@
       '設定変更': 'Edit settings',
       '設定を保存': 'Save settings',
       'Project name': 'Project name',
+      '画面表示やレポートで使う任意のプロジェクト名です。空でも動作します。': 'Optional project name used in the UI and reports. It can be empty.',
       'DB discovery': 'DB discovery',
+      'globはファイルパターンでDBを探します。queryは管理DBへSELECTを実行してDB一覧を取得します。': 'glob finds databases by file pattern. query runs a SELECT against a management database to list databases.',
       'DB path glob': 'DB path glob',
+      'glob discoveryで使うDBファイルのパターンです。allowed_roots配下だけを指定できます。例: ./data/**/*.db': 'Database file pattern used by glob discovery. It must stay under allowed_roots. Example: ./data/**/*.db',
       'Discovery source': 'Discovery source',
+      'query discoveryでSELECTを実行する管理DBです。tenant一覧などを持つSQLite DBを指定します。': 'Management database used by query discovery. Point this at a SQLite DB that stores tenant rows or similar metadata.',
       'ID column': 'ID column',
+      'query結果からDB IDとして読む列名です。未指定時は id を使います。': 'Column read as the database ID from query results. Defaults to id.',
       'Path column': 'Path column',
+      'query結果からDBパスとして読む列名です。path_templateを使う場合は空にできます。': 'Column read as the database path from query results. Leave empty when using path_template.',
       'Discovery query': 'Discovery query',
+      'query discoveryで実行する読み取り専用SELECTです。id列と、path_columnまたはpath_templateに必要な列を返します。': 'Read-only SELECT used by query discovery. Return the ID column and any columns needed by path_column or path_template.',
       'Path template': 'Path template',
+      'ID columnの値からDBパスを組み立てるテンプレートです。例: ./data/tenants/{id}.db': 'Template that builds a database path from the ID column. Example: ./data/tenants/{id}.db',
+      'Allowed roots': 'Allowed roots',
+      'sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。': 'Directories sqlite-fleet may access for databases, migrations, reports, and backups. The default . means the config file directory.',
+      'Allowed root path': 'Allowed root path',
+      '追加': 'Add',
       'History table': 'History table',
+      'マイグレーションSQLファイルを読むディレクトリです。allowed_roots配下だけを指定できます。': 'Directory containing migration SQL files. It must stay under allowed_roots.',
+      '各DBに作成するマイグレーション履歴テーブル名です。SQLite識別子として検証されます。': 'Migration history table created in each database. It is validated as a SQLite identifier.',
+      'Report format': 'Report format',
+      'CLIが書き出すレポート形式です。現在は json のみ対応しています。': 'Report format written by CLI commands. Currently only json is supported.',
+      'Report path': 'Report path',
+      'status、plan、migrate、check、doctorのJSONレポート出力先です。allowed_roots配下だけを指定できます。': 'JSON report output path for status, plan, migrate, check, and doctor. It must stay under allowed_roots.',
+      'Backup dir': 'Backup dir',
+      'backupやmigrate前backupの保存先ディレクトリです。DBごとのサブディレクトリが作られます。': 'Directory for backups and pre-migrate backups. Per-database subdirectories are created under it.',
+      'migrate実行前に対象DBのバックアップを自動作成します。CLIの --backup でも上書きできます。': 'Automatically backs up target databases before migrate. CLI --backup can also override this.',
+      'DBごとに保持する最新バックアップ数です。古いバックアップは削除対象になります。': 'Number of latest backups to keep per database. Older backups become pruning candidates.',
+      'Audit path': 'Audit path',
+      'migrate、backup、restore、drift、GUI操作をJSONLで追記する監査ログです。': 'JSONL audit log for migrate, backup, restore, drift, and GUI operations.',
       'Lock timeout ms': 'Lock timeout ms',
+      'Parallel': 'Parallel',
+      '複数DBに対する処理の並列数です。負荷が高い環境では小さめにします。': 'Parallelism for multi-database operations. Use smaller values on busy systems.',
+      'SQLite busy_timeoutとsqlite-fleetのDB操作ロック待ち時間です。': 'SQLite busy_timeout and sqlite-fleet database operation lock wait time.',
       'Backup keep last': 'Backup keep last',
       'Continue on error': 'Continue on error',
+      '一部DBで失敗しても残りのDB処理を続けます。失敗はレポートに残ります。': 'Continue processing remaining databases after some fail. Failures remain in reports.',
       'Backup before migrate': 'Backup before migrate',
       'allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。': 'Operations with allow_* set to false are rejected server-side. Audit log write failures are not treated as success.',
       '基本': 'Basic',
@@ -1136,6 +1164,9 @@
       'Path column': 'パスカラム',
       'Discovery query': '探索クエリ',
       'Path template': 'パステンプレート',
+      'Preview discovery': 'DB検出プレビュー',
+      'Allowed roots': '許可ルート',
+      'Allowed root path': '許可ルートパス',
       'Migration dir': 'マイグレーションディレクトリ',
       'Browse': '参照',
       'Browse path': 'パスを参照',
@@ -1149,6 +1180,11 @@
       'Folder': 'フォルダ',
       'File': 'ファイル',
       'History table': '履歴テーブル',
+      'Report format': 'レポート形式',
+      'Report path': 'レポートパス',
+      'Backup dir': 'バックアップディレクトリ',
+      'Audit path': '監査ログパス',
+      'Parallel': '並列数',
       'Lock timeout ms': 'ロックタイムアウトms',
       'Backup keep last': 'backup保持数',
       'Continue on error': 'エラー時に続行',

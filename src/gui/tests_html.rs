@@ -559,6 +559,15 @@
         assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション管理 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます"#));
+        assert!(INDEX_HTML.contains(r#"DB discovery <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="globはファイルパターンでDBを探します"#));
+        assert!(INDEX_HTML.contains(r#"DB path glob <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="glob discoveryで使うDBファイルのパターンです"#));
+        assert!(INDEX_HTML.contains(r#"Allowed roots <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです"#));
+        assert!(INDEX_HTML.contains(r#"Migration dir <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"Report path <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains(r#"Parallel <span class="tool-tip""#));
         assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));
     }
 
