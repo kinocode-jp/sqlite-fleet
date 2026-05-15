@@ -117,11 +117,13 @@
         assert!(!INDEX_HTML.contains(r#"<p id="message" class="message muted">読み込み中...</p>"#));
         assert!(INDEX_HTML.contains(".sidebar-nav a[hidden] { display:none; }"));
         assert!(INDEX_HTML.contains(r#"<h2 id="pageHeading">マイグレーション適用</h2>"#));
+        assert!(INDEX_HTML.contains(r#"<p id="pageDescription" hidden></p>"#));
         assert!(!INDEX_HTML.contains("実行計画から管理するSQLite fleet"));
         assert!(!INDEX_HTML.contains(
             "「何を適用するか」と「どこへ適用するか」を分けて確認し、DB群へ安全に展開します。"
         ));
         assert!(INDEX_HTML.contains("const pageTitles = {"));
+        assert!(INDEX_HTML.contains("const pageDescriptions = {"));
         assert!(INDEX_HTML.contains("function updatePageHeading(page)"));
         assert!(INDEX_HTML.contains("function hashForPage(page)"));
         assert!(INDEX_HTML.contains("function navigateToPage(page, options = {})"));
@@ -129,6 +131,7 @@
         assert!(INDEX_HTML.contains("window.addEventListener('popstate', () => openPage(pageFromHash()))"));
         assert!(INDEX_HTML.contains(r#"<a href='#setup-panel' data-page-link="setup"><span class="nav-icon">SET</span>初期セットアップ</a>"#));
         assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="setup" id="setup-panel">"#));
+        assert!(!INDEX_HTML.contains(r#"<h2>初期セットアップ</h2>"#));
         assert!(INDEX_HTML
             .contains(r#"<section class="summary page active" data-page="execute" id="summary""#));
         assert!(INDEX_HTML.contains(

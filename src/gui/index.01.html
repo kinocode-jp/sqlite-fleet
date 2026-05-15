@@ -135,6 +135,14 @@
         help: 'ヘルプ',
       },
     };
+    const pageDescriptions = {
+      en: {
+        setup: 'Before using Sqlite Fleet, confirm DB discovery, allowed roots, and the migration SQL location.',
+      },
+      ja: {
+        setup: 'Sqlite Fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。',
+      },
+    };
 
     function t(key, ...args) {
       const value = (localeText[currentLocale] && localeText[currentLocale][key]) || localeText.en[key] || key;
@@ -257,7 +265,11 @@
     }
     function updatePageHeading(page) {
       const titles = pageTitles[currentLocale] || pageTitles.en;
+      const descriptions = pageDescriptions[currentLocale] || pageDescriptions.en;
+      const description = descriptions[page] || '';
       $('pageHeading').textContent = titles[page] || titles.execute;
+      $('pageDescription').textContent = description;
+      $('pageDescription').hidden = !description;
     }
     function openPage(page) {
       document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
