@@ -45,6 +45,7 @@
     .page.active { display:block; }
     .summary.page.active { display:grid; }
     .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; padding:15px 16px; border-bottom:1px solid var(--line); background:var(--surface-2); }
+    .panel-header.action-only { justify-content:flex-end; }
     .panel-heading { display:grid; gap:3px; }
     .panel-title { display:flex; align-items:center; gap:7px; }
     .panel-actions { display:flex; justify-content:flex-end; gap:8px; margin-left:auto; }
@@ -356,13 +357,6 @@
       </section>
 
       <section class="panel page" data-page="migration-groups" id="migration-groups-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2>マイグレーショングループ</h2>
-            <p class="panel-description">通常はグループを意識せず、全DBに同じマイグレーションを適用します。分けたい時だけグループを追加します。</p>
-          </div>
-          <span class="tool-tip" tabindex="0" data-tip="マイグレーショングループは各DBへ適用するマイグレーションのセットです。DBグループとは別に管理します。">?</span>
-        </div>
         <div id="migrationGroupEditor" class="migration-group-editor">
           <section class="migration-group-sidebar">
             <div class="section-header">
@@ -421,10 +415,7 @@
       </div>
 
       <section class="panel page" data-page="databases" id="databases-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2 class="panel-title">DB管理 <span class="tool-tip" tabindex="0" data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。">?</span></h2>
-          </div>
+        <div class="panel-header action-only">
           <div class="panel-actions">
             <button id="openDatabaseFileModal" class="primary">新規作成</button>
             <button id="openDbGroupModalFromDatabases">グループ作成</button>
@@ -469,10 +460,7 @@
       </div>
 
       <section class="panel page" data-page="migrations" id="migrations-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2 class="panel-title">マイグレーション管理 <span class="tool-tip" tabindex="0" data-tip="読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。">?</span></h2>
-          </div>
+        <div class="panel-header action-only">
           <div class="panel-actions">
             <button id="openMigrationFileModal" class="primary">新規作成</button>
             <button id="openMigrationGroupModalFromMigrations" hidden>グループ作成</button>
@@ -583,13 +571,6 @@
       </div>
 
       <section class="panel page" data-page="sql" id="sql-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2>SQLコンソール</h2>
-            <p class="panel-description">マイグレーション履歴に残さないSQLを、Dry runで確認してから適用できます。</p>
-          </div>
-          <span class="tool-tip" tabindex="0" data-tip="SQL適用は自動的にatomic transactionで実行されます。ATTACH/DETACHはGUIでは拒否されます。">?</span>
-        </div>
         <div class="form-grid">
           <label class="field"><span class="field-label">Target DB <span class="tool-tip" tabindex="0" data-tip="SQLを実行するDBです。スキーマ読み込みの対象もこのDBになります。">?</span></span><select id="sqlDatabase"></select></label>
           <label class="field"><span class="field-label">SQL file <span class="tool-tip" tabindex="0" data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます。2MiBを超えるファイルは拒否されます。">?</span></span><input id="sqlFile" type="file" accept=".sql,text/sql,text/plain"></label>
@@ -636,13 +617,6 @@
         </div>
       </section>
       <section class="panel page" data-page="schema" id="schema-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2>スキーマ作成</h2>
-            <p class="panel-description">よく使うDDLを生成し、現在のスキーマと照らし合わせて作業できます。</p>
-          </div>
-          <span class="tool-tip" tabindex="0" data-tip="ここで生成したSQLはSQLコンソールへ入ります。実行前に必ずDry runしてください。">?</span>
-        </div>
         <div class="form-grid quick-builder">
           <section class="builder-block">
             <label class="field"><span class="field-label">New table <span class="tool-tip" tabindex="0" data-tip="作成するテーブル名です。識別子は自動でダブルクォートされます。">?</span></span><input id="newTableName" placeholder="new_table"></label>
@@ -671,12 +645,6 @@
       </section>
 
       <section class="panel page" data-page="settings" id="settings-panel">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <p class="panel-description">現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。</p>
-          </div>
-          <span class="tool-tip" tabindex="0" data-tip="allow_* がfalseの操作はサーバ側でも拒否されます。監査ログに書けない場合も成功扱いにしません。">?</span>
-        </div>
         <div class="settings-accordion">
           <details class="settings-section" open>
             <summary>基本</summary>
@@ -783,12 +751,6 @@
       </div>
 
       <section class="panel page" data-page="help" id="help">
-        <div class="panel-header">
-          <div class="panel-heading">
-            <h2>ヘルプ</h2>
-            <p class="panel-description">詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。</p>
-          </div>
-        </div>
         <div class="help">
           <section>
             <h3>基本の考え方</h3>

@@ -576,13 +576,12 @@
         assert!(INDEX_HTML.contains(".tool-tip:hover, .tool-tip:focus { z-index:40; }"));
         assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどのDBへ実行するか"#));
         assert!(INDEX_HTML.contains(r#"data-tip="db_groups/groups に定義した対象DBのまとまりです"#));
-        assert!(INDEX_HTML
-            .contains(r#"data-tip="SQL適用は自動的にatomic transactionで実行されます"#));
+        assert!(INDEX_HTML.contains("SQL適用は可能な範囲でatomic transactionとして実行されます"));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
-        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB管理 <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
-        assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション管理 <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます"#));
+        assert!(!INDEX_HTML.contains(r#"<h2 class="panel-title">DB管理 <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains("databases: 'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。'"));
+        assert!(!INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション管理 <span class="tool-tip""#));
+        assert!(INDEX_HTML.contains("migrations: '読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。'"));
         assert!(INDEX_HTML.contains(r#"DB discovery <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="globはファイルパターンでDBを探します"#));
         assert!(INDEX_HTML.contains(r#"DB path glob <span class="tool-tip""#));
