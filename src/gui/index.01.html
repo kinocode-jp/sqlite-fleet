@@ -615,7 +615,7 @@
         <div class="setup-check-item ${item.done ? 'done' : ''}">
           <span class="setup-check-mark">${item.done ? '✓' : ''}</span>
           <span><span class="setup-check-title">${escapeHtml(item.title)}</span><br><span class="muted">${escapeHtml(item.detail)}</span></span>
-          <span><span class="pill ${item.done ? 'ok' : 'warn'}">${escapeHtml(item.done ? t('done') : t('todo'))}</span><br><button type="button" data-setup-page="${escapeHtml(item.page)}"${item.target ? ` data-setup-target="${escapeHtml(item.target)}"` : ''}>${escapeHtml(item.action)}</button></span>
+          <span class="setup-check-actions"><button type="button" data-setup-page="${escapeHtml(item.page)}"${item.target ? ` data-setup-target="${escapeHtml(item.target)}"` : ''}>${escapeHtml(item.action)}</button><span class="pill ${item.done ? 'ok' : 'warn'}">${escapeHtml(item.done ? t('done') : t('todo'))}</span></span>
         </div>
       `).join('');
     }
