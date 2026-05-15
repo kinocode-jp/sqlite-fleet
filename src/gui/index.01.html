@@ -102,6 +102,16 @@
         fileNul: 'SQLファイルにNUL文字は指定できません',
         fileLoaded: (name) => `SQLファイルを読み込みました: ${name}`,
         apply: '適用',
+        schemaNewTableLabel: '新規テーブル',
+        schemaCreateColumnsLabel: 'カラム定義',
+        schemaTargetTableLabel: '対象テーブル',
+        schemaNewColumnLabel: '追加カラム',
+        schemaColumnDefinitionLabel: 'カラム定義',
+        schemaRenameTableFromLabel: '変更前テーブル',
+        schemaRenameTableToLabel: '変更後テーブル',
+        schemaRenameColumnTableLabel: '対象テーブル',
+        schemaRenameColumnFromLabel: '変更前カラム',
+        schemaRenameColumnToLabel: '変更後カラム',
         yes: 'yes',
         no: 'no',
         table: 'テーブル',
@@ -118,7 +128,7 @@
         databases: 'DB Management',
         migrations: 'Migration Management',
         sql: 'SQL Console',
-        schema: 'Schema builder',
+        schema: 'DDL builder',
         settings: 'Settings / permissions',
         help: 'Help',
       },
@@ -130,7 +140,7 @@
         databases: 'DB管理',
         migrations: 'マイグレーション管理',
         sql: 'SQLコンソール',
-        schema: 'スキーマ作成',
+        schema: 'スキーマSQL生成',
         settings: '設定',
         help: 'ヘルプ',
       },
@@ -143,7 +153,7 @@
         databases: 'Check status, assigned Migration Groups, and pending migrations per database.',
         migrations: 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.',
         sql: 'Run ad hoc SQL outside migration history after checking it with Dry run. SQL apply runs in an atomic transaction when possible.',
-        schema: 'Generate common DDL and compare it with the current schema while editing. Generated SQL is placed in the SQL console.',
+        schema: 'This page does not change the DB directly. It generates CREATE/ALTER/RENAME SQL from form inputs and sends it to the SQL console for Dry run and apply.',
         settings: 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
         help: 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
       },
@@ -154,7 +164,7 @@
         databases: 'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。',
         migrations: '読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。',
         sql: 'マイグレーション履歴に残さないSQLを、Dry runで確認してから適用できます。SQL適用は可能な範囲でatomic transactionとして実行されます。',
-        schema: 'よく使うDDLを生成し、現在のスキーマと照らし合わせて作業できます。生成したSQLはSQLコンソールへ入ります。',
+        schema: 'DBを直接変更する画面ではありません。フォーム入力からCREATE/ALTER/RENAMEのSQLを生成し、Dry runと適用のためにSQLコンソールへ送ります。',
         settings: '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。',
         help: '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。',
       },
@@ -2286,16 +2296,16 @@
       message(t('fileLoaded', file.name));
     });
     $('generateCreateTable').addEventListener('click', () => generateSql(() => {
-      const table = requireValue('newTableName', 'New table');
-      const columns = requireValue('newTableColumns', 'Columns');
+      const table = requireValue('newTableName', t('schemaNewTableLabel'));
+      const columns = requireValue('newTableColumns', t('schemaCreateColumnsLabel'));
       return `CREATE TABLE ${quoteIdent(table)} (${columns});`;
     }));
     $('generateAddColumn').addEventListener('click', () => generateSql(() => {
-      const table = requireValue('alterTableName', 'Table');
-      const column = requireValue('newColumnName', 'New column');
-      const definition = requireValue('newColumnDefinition', 'Column definition');
+      const table = requireValue('alterTableName', t('schemaTargetTableLabel'));
+      const column = requireValue('newColumnName', t('schemaNewColumnLabel'));
+      const definition = requireValue('newColumnDefinition', t('schemaColumnDefinitionLabel'));
       return `ALTER TABLE ${quoteIdent(table)} ADD COLUMN ${quoteIdent(column)} ${definition};`;
     }));
     $('generateRenameTable').addEventListener('click', () => generateSql(() => {
-      const from = requireValue('renameTableFrom', 'Rename table from');
-      const to = requireValue('renameTableTo', 'Rename table to');
+      const from = requireValue('renameTableFrom', t('schemaRenameTableFromLabel'));
+      const to = requireValue('renameTableTo', t('schemaRenameTableToLabel'));
