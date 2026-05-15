@@ -78,13 +78,16 @@
         assert!(INDEX_HTML.contains("$('sqlDatabase').disabled = true"));
         assert!(INDEX_HTML.contains("$('sqlDatabase').disabled = activeRequests > 0"));
         assert!(INDEX_HTML.contains("clearSchema()"));
-        assert!(INDEX_HTML.contains("$('sqlDatabase').addEventListener('change', clearSchema)"));
+        assert!(INDEX_HTML
+            .contains("$('sqlDatabase').addEventListener('change', loadSchemaForSelectedDatabase)"));
         assert!(INDEX_HTML.contains("function clearSchema()"));
+        assert!(INDEX_HTML.contains("function loadSchemaForSelectedDatabase()"));
         assert!(INDEX_HTML.contains("selectDbForSchema"));
         assert!(INDEX_HTML.contains("const selected = $('sqlDatabase').value"));
         assert!(INDEX_HTML.contains(
             "schemaState && schemaState.database && schemaState.database.id !== selected"
         ));
+        assert!(!INDEX_HTML.contains(r#"<button id="loadSchema">"#));
     }
 
     #[test]
@@ -654,6 +657,7 @@
         assert!(
             INDEX_HTML.contains(r#"<button id="createMigrationFromSql">マイグレーションとして作成</button>"#)
         );
+        assert!(!INDEX_HTML.contains("スキーマを再読み込み"));
         assert!(INDEX_HTML.contains(
             "$('createMigrationFromSql').addEventListener('click', openMigrationFileModalFromSql)"
         ));

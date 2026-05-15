@@ -611,7 +611,6 @@
             <button id="createMigrationFromSql">マイグレーションとして作成</button>
             <button id="sqlDryRun" class="primary">SQL Dry run</button>
             <button id="sqlApply" class="danger">SQLを適用</button>
-            <button id="loadSchema">スキーマを再読み込み</button>
           </div>
         </div>
         <div id="schema" class="schema-list"></div>
@@ -977,7 +976,6 @@
       'SQLファイル保存': 'Save SQL file',
       'マイグレーションとして作成': 'Create as migration',
       'SQLを適用': 'Apply SQL',
-      'スキーマを再読み込み': 'Reload schema',
       '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。': 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
       '権限を保存': 'Save permissions',
       '設定変更': 'Edit settings',
@@ -1187,7 +1185,7 @@
         noRules: 'No per-DB assignments. Unassigned DBs use the main Migration Group.',
         noTables: 'No tables',
         noPathEntries: 'No entries',
-        selectDbForSchema: 'Select a DB and load schema',
+        selectDbForSchema: 'Select a DB to load schema',
         unset: 'Unset',
         saved: 'Saved',
         create: 'Create',
@@ -1346,7 +1344,7 @@
         select: '選択',
         folder: 'フォルダ',
         file: 'ファイル',
-        selectDbForSchema: 'DBを選択してスキーマを読み込んでください',
+        selectDbForSchema: 'DBを選択するとスキーマを読み込みます',
         unset: '未設定',
         saved: '保存しました',
         savedMigrationGroup: 'マイグレーショングループを保存しました',

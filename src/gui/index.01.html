@@ -289,6 +289,7 @@
         actions.hidden = actions.dataset.pageActions !== page;
       });
       updatePageHeading(page);
+      if (page === 'sql') loadSchemaForSelectedDatabase();
     }
     function navigateToPage(page, options = {}) {
       openPage(page);
@@ -492,6 +493,9 @@
       const selected = $('sqlDatabase').value;
       if (schemaState && schemaState.database && schemaState.database.id !== selected) {
         clearSchema();
+      }
+      if (activePage() === 'sql' && selected && (!schemaState || !schemaState.database || schemaState.database.id !== selected)) {
+        loadSchemaForSelectedDatabase();
       }
     }
     function renderTargetSelectors(plans) {
@@ -1758,6 +1762,13 @@
         message(error.message, true);
       }
     }
+    function loadSchemaForSelectedDatabase() {
+      if (!$('sqlDatabase').value) {
+        clearSchema();
+        return;
+      }
+      loadSchema({ showLoadedMessage: false });
+    }
     function renderSchema() {
       const tables = schemaState && schemaState.tables ? schemaState.tables : [];
       const objects = schemaState && schemaState.objects ? schemaState.objects : [];
@@ -2096,13 +2107,12 @@
     $('backupAll').addEventListener('click', () => runBackup(''));
     $('baselineAll').addEventListener('click', baselineTargets);
     $('migrateAll').addEventListener('click', () => runMigrate('', false));
-    $('loadSchema').addEventListener('click', loadSchema);
     $('insertTemplate').addEventListener('click', insertSelectedTemplate);
     $('downloadSql').addEventListener('click', downloadSqlFile);
     $('createMigrationFromSql').addEventListener('click', openMigrationFileModalFromSql);
     $('sqlDryRun').addEventListener('click', () => runSql(true));
     $('sqlApply').addEventListener('click', () => runSql(false));
-    $('sqlDatabase').addEventListener('change', clearSchema);
+    $('sqlDatabase').addEventListener('change', loadSchemaForSelectedDatabase);
     $('targetGroup').addEventListener('change', updateTargetPreview);
     $('targetDatabase').addEventListener('change', updateTargetPreview);
     $('targetLimit').addEventListener('input', updateTargetPreview);
