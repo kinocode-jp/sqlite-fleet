@@ -580,7 +580,7 @@
         assert!(INDEX_HTML.contains(r#"DB path glob <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="glob discoveryで使うDBファイルのパターンです"#));
         assert!(INDEX_HTML.contains(r#"Allowed roots <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="Sqlite FleetがDB、migration、report、backupとして参照できるディレクトリです"#));
         assert!(INDEX_HTML.contains(r#"Migration dir <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"Report path <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"Parallel <span class="tool-tip""#));

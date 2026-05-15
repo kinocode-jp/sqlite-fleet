@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>sqlite-fleet GUI</title>
+  <title>Sqlite Fleet GUI</title>
   <style nonce="__SCRIPT_NONCE__">
     :root { color-scheme:light; --app-bg:#f4f6f8; --surface:#fff; --surface-2:#f8fafc; --surface-3:#eef3f7; --text:#17212b; --muted:#667789; --line:#d8e0e8; --line-strong:#c4ced8; --accent:#0f6f8f; --accent-strong:#0b536c; --danger:#b42318; --danger-bg:#fff1f0; --ok:#157347; --ok-bg:#edf8f2; --warn:#9a5b00; --warn-bg:#fff7e6; --shadow:0 1px 2px rgba(16,24,40,.06), 0 10px 30px rgba(16,24,40,.05); }
     * { box-sizing:border-box; }
@@ -308,14 +308,14 @@
         <div class="panel-header">
           <div class="panel-heading">
             <h2>初期セットアップ</h2>
-            <p class="panel-description">sqlite-fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。</p>
+            <p class="panel-description">Sqlite Fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。</p>
           </div>
         </div>
         <div class="setup-guide">
           <section class="builder-block">
             <h3>導入手順</h3>
             <ol>
-              <li>設定ファイルを配置し、sqlite-fleetが触ってよいディレクトリをAllowed rootsに登録します。</li>
+              <li>設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリをAllowed rootsに登録します。</li>
               <li>DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。</li>
               <li>Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。</li>
               <li>Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。</li>
@@ -323,6 +323,7 @@
           </section>
           <section class="builder-block">
             <h3>開始前チェック</h3>
+            <p class="muted">現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。</p>
             <div id="setupChecklist" class="setup-checklist"></div>
           </section>
           <div class="settings-accordion">
@@ -344,7 +345,7 @@
               </div>
             </details>
             <details class="settings-section" open>
-              <summary>Allowed roots <span class="tool-tip" tabindex="0" data-tip="sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。">?</span></summary>
+              <summary>Allowed roots <span class="tool-tip" tabindex="0" data-tip="Sqlite FleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。">?</span></summary>
               <div class="settings-section-body">
                 <div id="allowedRoots" class="allowed-root-list"></div>
                 <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp" aria-label="Allowed root path"><button id="addAllowedRoot" type="button">追加</button></div>
@@ -745,7 +746,7 @@
             <div class="settings-section-body">
               <div class="settings-form">
                 <label class="field"><span class="field-label">Parallel <span class="tool-tip" tabindex="0" data-tip="複数DBに対する処理の並列数です。負荷が高い環境では小さめにします。">?</span></span><input id="settingsParallel" inputmode="numeric"></label>
-                <label class="field"><span class="field-label">Lock timeout ms <span class="tool-tip" tabindex="0" data-tip="SQLite busy_timeoutとsqlite-fleetのDB操作ロック待ち時間です。">?</span></span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
+                <label class="field"><span class="field-label">Lock timeout ms <span class="tool-tip" tabindex="0" data-tip="SQLite busy_timeoutとSqlite FleetのDB操作ロック待ち時間です。">?</span></span><input id="settingsLockTimeoutMs" inputmode="numeric"></label>
                 <label class="field"><span class="field-label">Continue on error <span class="tool-tip" tabindex="0" data-tip="一部DBで失敗しても残りのDB処理を続けます。失敗はレポートに残ります。">?</span></span><input id="settingsContinueOnError" type="checkbox"></label>
               </div>
               <div id="runtimeSettings" class="key-grid"></div>
@@ -942,13 +943,14 @@
       '設定': 'Settings',
       'ヘルプ': 'Help',
       '初期セットアップ': 'Initial Setup',
-      'sqlite-fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。': 'Before using sqlite-fleet, confirm DB discovery, allowed roots, and the migration SQL location.',
+      'Sqlite Fleetを使い始める前に、DB検出、許可ルート、マイグレーションSQLの場所を確認します。': 'Before using Sqlite Fleet, confirm DB discovery, allowed roots, and the migration SQL location.',
       '導入手順': 'Setup steps',
-      '設定ファイルを配置し、sqlite-fleetが触ってよいディレクトリをAllowed rootsに登録します。': 'Place the config file and register directories sqlite-fleet may touch in Allowed roots.',
+      '設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリをAllowed rootsに登録します。': 'Place the config file and register directories Sqlite Fleet may touch in Allowed roots.',
       'DB discoveryでDBの検出方法を選び、保存前にPreview discoveryで検出結果を確認します。': 'Choose the database discovery method and check results with Preview discovery before saving.',
       'Migration dirに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。': 'Put trusted SQL files in Migration dir and check load status in Migration Management.',
       'Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。': 'Confirm target DBs and planned changes with dry-run before moving to Migration Apply.',
       '開始前チェック': 'Preflight checklist',
+      '現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。': 'Automatically evaluated from the currently loaded settings and status. These are not manual checkboxes.',
       '対象設定': 'Target settings',
       '状態を更新': 'Refresh status',
       '状態を検査': 'Check status',
@@ -1085,7 +1087,7 @@
       'Path template': 'Path template',
       'ID columnの値からDBパスを組み立てるテンプレートです。例: ./data/tenants/{id}.db': 'Template that builds a database path from the ID column. Example: ./data/tenants/{id}.db',
       'Allowed roots': 'Allowed roots',
-      'sqlite-fleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。': 'Directories sqlite-fleet may access for databases, migrations, reports, and backups. The default . means the config file directory.',
+      'Sqlite FleetがDB、migration、report、backupとして参照できるディレクトリです。デフォルトの . は設定ファイルのディレクトリです。': 'Directories Sqlite Fleet may access for databases, migrations, reports, and backups. The default . means the config file directory.',
       'Allowed root path': 'Allowed root path',
       '追加': 'Add',
       'History table': 'History table',
@@ -1104,7 +1106,7 @@
       'Lock timeout ms': 'Lock timeout ms',
       'Parallel': 'Parallel',
       '複数DBに対する処理の並列数です。負荷が高い環境では小さめにします。': 'Parallelism for multi-database operations. Use smaller values on busy systems.',
-      'SQLite busy_timeoutとsqlite-fleetのDB操作ロック待ち時間です。': 'SQLite busy_timeout and sqlite-fleet database operation lock wait time.',
+      'SQLite busy_timeoutとSqlite FleetのDB操作ロック待ち時間です。': 'SQLite busy_timeout and Sqlite Fleet database operation lock wait time.',
       'Backup keep last': 'Backup keep last',
       'Continue on error': 'Continue on error',
       '一部DBで失敗しても残りのDB処理を続けます。失敗はレポートに残ります。': 'Continue processing remaining databases after some fail. Failures remain in reports.',
@@ -1155,6 +1157,7 @@
       'Initial Setup': '初期セットアップ',
       'Setup steps': '導入手順',
       'Preflight checklist': '開始前チェック',
+      'Automatically evaluated from the currently loaded settings and status. These are not manual checkboxes.': '現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。',
       'Migration Groups': 'マイグレーショングループ',
       'Create group': 'グループ作成',
       'Create new': '新規作成',
@@ -1280,19 +1283,19 @@
         savedDatabaseRule: 'DB assignment saved',
         savedGuiPermissions: 'GUI permissions saved',
         savedSettings: 'Settings saved',
-        done: 'Done',
-        todo: 'To do',
-        setupAllowedRootsTitle: 'Allowed roots are confirmed',
+        done: 'Configured',
+        todo: 'Needs setup',
+        setupAllowedRootsTitle: 'Allowed roots',
         setupAllowedRootsDetail: 'Keep the default . root, or add explicit external DB and migration directories.',
-        setupDiscoveryTitle: 'DB discovery is configured',
+        setupDiscoveryTitle: 'DB discovery',
         setupDiscoveryDetail: 'Choose glob or query and enter the path pattern or source query used to find DBs.',
         setupPreviewTitle: (count) => `Discovery currently finds ${count} DBs`,
         setupPreviewDetail: 'Use Preview discovery before saving or applying migrations.',
-        setupMigrationDirTitle: 'Migration directory is configured',
+        setupMigrationDirTitle: 'Migration directory',
         setupMigrationDirDetail: 'Point Migration dir at the trusted SQL directory and keep the history table name set.',
         setupMigrationFilesTitle: (count) => `${count} migration files are loaded`,
         setupMigrationFilesDetail: 'Check Migration Management if no files are loaded yet.',
-        setupDryRunTitle: 'Current status has no failed DBs',
+        setupDryRunTitle: 'Current DB status',
         setupDryRunDetail: 'Run dry-run from Migration Apply before applying changes.',
         baselineDone: (processed, failed) => `baseline complete: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'Permission changes are disabled by allow_migration_edit',
@@ -1431,19 +1434,19 @@
         savedDatabaseRule: 'DBの割当を保存しました',
         savedGuiPermissions: 'GUI権限を保存しました',
         savedSettings: '設定を保存しました',
-        done: '完了',
-        todo: '未確認',
-        setupAllowedRootsTitle: 'Allowed rootsを確認する',
+        done: '設定あり',
+        todo: '要設定',
+        setupAllowedRootsTitle: 'Allowed roots',
         setupAllowedRootsDetail: 'デフォルトの . を維持するか、外部DBやmigrationのディレクトリを明示的に追加します。',
-        setupDiscoveryTitle: 'DB検出を設定する',
+        setupDiscoveryTitle: 'DB検出',
         setupDiscoveryDetail: 'globまたはqueryを選び、DBを探すパターンや参照元クエリを入力します。',
         setupPreviewTitle: (count) => `現在 ${count} DB を検出しています`,
         setupPreviewDetail: '保存や適用の前にPreview discoveryで検出結果を確認します。',
-        setupMigrationDirTitle: 'Migration dirを設定する',
+        setupMigrationDirTitle: 'Migration dir',
         setupMigrationDirDetail: '信頼済みSQLを置いたディレクトリと履歴テーブル名を確認します。',
         setupMigrationFilesTitle: (count) => `${count} 件のmigrationファイルを読み込んでいます`,
         setupMigrationFilesDetail: '読み込まれていない場合はマイグレーション管理で状態を確認します。',
-        setupDryRunTitle: '失敗中のDBがないことを確認する',
+        setupDryRunTitle: '現在のDB状態',
         setupDryRunDetail: '適用前にマイグレーション適用ページでdry-runを実行します。',
         baselineDone: (processed, failed) => `baseline 完了: processed=${processed}, failed=${failed}`,
         permissionEditDisabled: 'allow_migration_edit が無効のため権限変更できません',

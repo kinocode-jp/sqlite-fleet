@@ -673,7 +673,7 @@
     }
     async function saveSettings() {
       try {
-        if (!confirm('この設定により sqlite-fleet が指定ディレクトリ配下の DB / migration / report を操作できるようになります。続行しますか？')) return;
+        if (!confirm('この設定により Sqlite Fleet が指定ディレクトリ配下の DB / migration / report を操作できるようになります。続行しますか？')) return;
         await postAdmin('/api/admin/settings', settingsPayload());
       } catch (error) {
         message(error.message, true);
