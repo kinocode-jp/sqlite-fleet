@@ -411,7 +411,7 @@ fn query_discovery_rejects_path_column_outside_base_dir() {
     };
 
     let error = discover_databases(&config).unwrap_err().to_string();
-    assert!(error.contains("DBパスが設定ディレクトリ外"));
+    assert!(error.contains("DBパスが許可ルート外"));
 }
 
 #[test]
@@ -442,7 +442,7 @@ fn query_discovery_rejects_absolute_path_column_outside_base_dir() {
     };
 
     let error = discover_databases(&config).unwrap_err().to_string();
-    assert!(error.contains("DBパスが設定ディレクトリ外"));
+    assert!(error.contains("DBパスが許可ルート外"));
 }
 
 #[cfg(unix)]
@@ -479,7 +479,7 @@ fn query_discovery_rejects_symlinked_path_column_outside_base_dir() {
     };
 
     let error = discover_databases(&config).unwrap_err().to_string();
-    assert!(error.contains("DBパスが設定ディレクトリ外"));
+    assert!(error.contains("DBパスが許可ルート外"));
 }
 
 #[cfg(unix)]
@@ -505,7 +505,7 @@ fn glob_discovery_rejects_symlinked_database_outside_base_dir() {
     };
 
     let error = discover_databases(&config).unwrap_err().to_string();
-    assert!(error.contains("DBパスが設定ディレクトリ外"));
+    assert!(error.contains("DBパスが許可ルート外"));
 }
 
 #[test]

@@ -164,6 +164,13 @@
     .settings-section[open] summary::after { content:"-"; }
     .settings-section-body { display:grid; gap:12px; padding:12px 14px 14px; }
     .settings-section .key-grid { margin-top:2px; }
+    .allowed-root-list { display:grid; gap:8px; }
+    .allowed-root-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:8px; align-items:start; border:1px solid var(--line); border-radius:6px; padding:8px; background:#fff; }
+    .allowed-root-path { font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; overflow-wrap:anywhere; }
+    .warning-list { color:var(--warn); font-size:12px; display:grid; gap:2px; margin-top:4px; }
+    .discovery-preview { display:grid; gap:8px; }
+    .discovery-preview table { width:100%; border-collapse:collapse; }
+    .discovery-preview th, .discovery-preview td { border-bottom:1px solid var(--line); padding:6px; text-align:left; vertical-align:top; }
     .input-action-row { display:grid; grid-template-columns:minmax(0, 1fr) auto; gap:6px; align-items:center; }
     .input-action-row button { white-space:nowrap; }
     .path-browser-toolbar { display:flex; gap:10px; align-items:center; justify-content:space-between; border:1px solid var(--line); border-radius:6px; padding:8px 10px; background:var(--surface-2); }
@@ -665,7 +672,16 @@
                 <label class="field"><span class="field-label">Path template</span><input id="settingsPathTemplate"></label>
                 <label class="field wide"><span class="field-label">Discovery query</span><textarea id="settingsQuery" rows="3"></textarea></label>
               </div>
+              <div class="actions"><button id="previewDiscovery" type="button">Preview discovery</button></div>
+              <div id="discoveryPreview" class="discovery-preview"></div>
               <div id="discoverySettings" class="key-grid"></div>
+            </div>
+          </details>
+          <details class="settings-section" open>
+            <summary>Allowed roots</summary>
+            <div class="settings-section-body">
+              <div id="allowedRoots" class="allowed-root-list"></div>
+              <div class="input-action-row"><input id="newAllowedRoot" placeholder="./data or /var/lib/myapp"><button id="addAllowedRoot" type="button">追加</button></div>
             </div>
           </details>
           <details class="settings-section">
@@ -869,6 +885,7 @@
     let pathBrowseEntries = [];
     let pathBrowseAcceptExtensions = [];
     let pathBrowseKindFilter = '';
+    let allowedRootsDraft = ['.'];
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';

@@ -536,6 +536,8 @@
       $('savePermissions').disabled = !permissions.allow_migration_edit;
       $('savePermissions').title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
       const settings = state.settings;
+      allowedRootsDraft = (settings.allowed_roots || []).map((root) => root.value || '.');
+      if (!allowedRootsDraft.length) allowedRootsDraft = ['.'];
       $('settingsProjectName').value = settings.project_name || '';
       $('settingsDiscovery').value = settings.discovery || 'glob';
       $('settingsPathGlob').value = settings.databases_path_glob || '';
@@ -556,6 +558,7 @@
       $('settingsContinueOnError').checked = Boolean(settings.continue_on_error);
       $('settingsBackupBeforeMigrate').checked = Boolean(settings.backup_before_migrate);
       $('saveSettings').disabled = !permissions.allow_migration_edit;
+      renderAllowedRoots();
       document.querySelectorAll('[data-path-browse]').forEach((button) => {
         button.disabled = !permissions.allow_migration_edit;
         button.title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
@@ -593,6 +596,45 @@
         ['audit', settings.audit_path || t('unset')],
       ]);
     }
+    function renderAllowedRoots() {
+      const detailsByValue = new Map((state.settings.allowed_roots || []).map((root) => [root.value, root]));
+      $('allowedRoots').innerHTML = allowedRootsDraft.map((value, index) => {
+        const detail = detailsByValue.get(value) || { value, resolved_path: value, exists: false, warnings: [] };
+        const warnings = (detail.warnings || []).map((warning) => `<span>${escapeHtml(warning)}</span>`).join('');
+        return `<div class="allowed-root-row">
+          <div>
+            <div class="allowed-root-path">${escapeHtml(value)}</div>
+            <div class="muted">${escapeHtml(detail.resolved_path || value)}</div>
+            ${warnings ? `<div class="warning-list">${warnings}</div>` : ''}
+          </div>
+          <button type="button" data-remove-allowed-root="${index}" ${value === '.' ? 'disabled' : ''}>削除</button>
+        </div>`;
+      }).join('');
+    }
+    function settingsPayload() {
+      return {
+        project_name: optionalInput('settingsProjectName'),
+        allowed_roots: allowedRootsDraft.slice(),
+        discovery: requireValue('settingsDiscovery', 'DB discovery'),
+        databases_path_glob: optionalInput('settingsPathGlob'),
+        databases_source: optionalInput('settingsSource'),
+        databases_query: optionalInput('settingsQuery'),
+        databases_id_column: optionalInput('settingsIdColumn'),
+        databases_path_column: optionalInput('settingsPathColumn'),
+        databases_path_template: optionalInput('settingsPathTemplate'),
+        migrations_dir: requireValue('settingsMigrationsDir', 'Migration dir'),
+        migrations_table: requireValue('settingsMigrationsTable', 'History table'),
+        report_format: requireValue('settingsReportFormat', 'Report format'),
+        report_path: optionalInput('settingsReportPath'),
+        backup_dir: requireValue('settingsBackupDir', 'Backup dir'),
+        backup_before_migrate: $('settingsBackupBeforeMigrate').checked,
+        backup_keep_last: nonNegativeIntegerValue('settingsBackupKeepLast', 'Backup keep last'),
+        audit_path: optionalInput('settingsAuditPath'),
+        parallel: positiveIntegerValue('settingsParallel', 'Parallel'),
+        lock_timeout_ms: nonNegativeIntegerValue('settingsLockTimeoutMs', 'Lock timeout ms'),
+        continue_on_error: $('settingsContinueOnError').checked,
+      };
+    }
     async function saveGuiPermissions() {
       try {
         const payload = {};
@@ -606,27 +648,28 @@
     }
     async function saveSettings() {
       try {
-        await postAdmin('/api/admin/settings', {
-          project_name: optionalInput('settingsProjectName'),
-          discovery: requireValue('settingsDiscovery', 'DB discovery'),
-          databases_path_glob: optionalInput('settingsPathGlob'),
-          databases_source: optionalInput('settingsSource'),
-          databases_query: optionalInput('settingsQuery'),
-          databases_id_column: optionalInput('settingsIdColumn'),
-          databases_path_column: optionalInput('settingsPathColumn'),
-          databases_path_template: optionalInput('settingsPathTemplate'),
-          migrations_dir: requireValue('settingsMigrationsDir', 'Migration dir'),
-          migrations_table: requireValue('settingsMigrationsTable', 'History table'),
-          report_format: requireValue('settingsReportFormat', 'Report format'),
-          report_path: optionalInput('settingsReportPath'),
-          backup_dir: requireValue('settingsBackupDir', 'Backup dir'),
-          backup_before_migrate: $('settingsBackupBeforeMigrate').checked,
-          backup_keep_last: nonNegativeIntegerValue('settingsBackupKeepLast', 'Backup keep last'),
-          audit_path: optionalInput('settingsAuditPath'),
-          parallel: positiveIntegerValue('settingsParallel', 'Parallel'),
-          lock_timeout_ms: nonNegativeIntegerValue('settingsLockTimeoutMs', 'Lock timeout ms'),
-          continue_on_error: $('settingsContinueOnError').checked,
+        if (!confirm('この設定により sqlite-fleet が指定ディレクトリ配下の DB / migration / report を操作できるようになります。続行しますか？')) return;
+        await postAdmin('/api/admin/settings', settingsPayload());
+      } catch (error) {
+        message(error.message, true);
+      }
+    }
+    async function previewDiscovery() {
+      try {
+        const result = await api('/api/admin/discovery-preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsPayload()),
         });
+        const errors = (result.errors || []).map((error) => `<div class="warning-list"><span>${escapeHtml(error)}</span></div>`).join('');
+        const rows = (result.databases || []).map((database) => `<tr>
+          <td>${escapeHtml(database.id)}</td>
+          <td>${escapeHtml(database.path)}</td>
+          <td>${database.exists ? 'yes' : 'no'}</td>
+          <td>${database.readable ? 'yes' : 'no'}</td>
+          <td>${escapeHtml(database.allowed_root || '')}</td>
+        </tr>`).join('');
+        $('discoveryPreview').innerHTML = `<div><strong>${escapeHtml(String(result.count || 0))}</strong> DB</div>${errors}<table><thead><tr><th>DB ID</th><th>Path</th><th>exists</th><th>readable</th><th>allowed root</th></tr></thead><tbody>${rows}</tbody></table>`;
       } catch (error) {
         message(error.message, true);
       }
@@ -1966,6 +2009,22 @@
     $('check').addEventListener('click', runCheck);
     $('savePermissions').addEventListener('click', saveGuiPermissions);
     $('saveSettings').addEventListener('click', saveSettings);
+    $('previewDiscovery').addEventListener('click', previewDiscovery);
+    $('addAllowedRoot').addEventListener('click', () => {
+      const value = $('newAllowedRoot').value.trim();
+      if (!value) return;
+      if (!allowedRootsDraft.includes(value)) allowedRootsDraft.push(value);
+      $('newAllowedRoot').value = '';
+      renderAllowedRoots();
+    });
+    $('allowedRoots').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-remove-allowed-root]');
+      if (!button) return;
+      const index = Number(button.dataset.removeAllowedRoot);
+      allowedRootsDraft.splice(index, 1);
+      if (!allowedRootsDraft.includes('.')) allowedRootsDraft.unshift('.');
+      renderAllowedRoots();
+    });
     $('closePathBrowser').addEventListener('click', closePathBrowser);
     $('cancelPathBrowser').addEventListener('click', closePathBrowser);
     $('pathBrowserParent').addEventListener('click', () => loadPathBrowser($('pathBrowserParent').dataset.pathParent || ''));

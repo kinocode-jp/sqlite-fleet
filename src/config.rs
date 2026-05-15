@@ -38,6 +38,8 @@ pub struct Config {
     #[serde(default)]
     pub audit: AuditConfig,
     #[serde(default)]
+    pub security: SecurityConfig,
+    #[serde(default)]
     pub gui: GuiConfig,
     #[serde(default)]
     pub groups: HashMap<String, Vec<String>>,
@@ -181,6 +183,13 @@ pub struct BackupConfig {
 #[serde(deny_unknown_fields)]
 pub struct AuditConfig {
     pub path: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct SecurityConfig {
+    #[serde(default = "default_allowed_roots")]
+    pub allowed_roots: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -382,6 +391,7 @@ impl Default for Config {
             report: ReportConfig::default(),
             backup: BackupConfig::default(),
             audit: AuditConfig::default(),
+            security: SecurityConfig::default(),
             gui: GuiConfig::default(),
             groups: HashMap::new(),
             db_groups: HashMap::new(),
@@ -438,6 +448,14 @@ impl Default for BackupConfig {
             dir: default_backup_dir(),
             before_migrate: false,
             keep_last: default_backup_keep_last(),
+        }
+    }
+}
+
+impl Default for SecurityConfig {
+    fn default() -> Self {
+        Self {
+            allowed_roots: default_allowed_roots(),
         }
     }
 }
@@ -701,6 +719,36 @@ impl Config {
         }
     }
 
+    pub fn effective_allowed_roots(&self) -> Vec<String> {
+        if self.security.allowed_roots.is_empty() {
+            return default_allowed_roots();
+        }
+        self.security.allowed_roots.clone()
+    }
+
+    pub fn resolved_allowed_roots(&self) -> Result<Vec<PathBuf>> {
+        self.effective_allowed_roots()
+            .into_iter()
+            .map(|root| {
+                if root.trim() != root {
+                    bail!("security.allowed_roots の前後に空白は使用できません: {root}");
+                }
+                if root.is_empty() {
+                    bail!("security.allowed_roots に空のパスは指定できません");
+                }
+                Ok(normalize_path_for_comparison(&self.resolve_path(root)))
+            })
+            .collect()
+    }
+
+    pub fn allowed_root_for_path(&self, path: &Path) -> Result<Option<PathBuf>> {
+        let resolved = normalize_path_for_comparison(path);
+        Ok(self
+            .resolved_allowed_roots()?
+            .into_iter()
+            .find(|root| resolved.starts_with(root)))
+    }
+
     pub fn migrations_table(&self) -> &str {
         &self.migrations.table
     }
@@ -781,17 +829,14 @@ impl Config {
         label: &str,
         path: &Path,
     ) -> Result<()> {
-        let base_dir = normalize_path_for_comparison(&self.base_dir);
         let resolved = normalize_path_for_comparison(path);
-        if !resolved.starts_with(&base_dir) {
+        let allowed_roots = self.resolved_allowed_roots()?;
+        if !allowed_roots.iter().any(|root| resolved.starts_with(root)) {
             if label == "DBパス" {
-                bail!(
-                    "DBパスが設定ディレクトリ外を指しています: {}",
-                    path.display()
-                );
+                bail!("DBパスが許可ルート外を指しています: {}", path.display());
             }
             bail!(
-                "{label} は設定ファイルのディレクトリ外を指せません: {}",
+                "{label} はsecurity.allowed_rootsの外を指せません: {}",
                 path.display()
             );
         }

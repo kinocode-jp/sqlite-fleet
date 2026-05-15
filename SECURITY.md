@@ -16,13 +16,15 @@ It assumes the following inputs are trusted and reviewed by project operators:
 - the directory containing target database files
 
 Do not allow untrusted users to write configuration, discovery queries, or migration SQL.
+Operators who can write `sqlite-fleet.toml` are trusted to choose which filesystem roots sqlite-fleet may access.
 
 ## Built-in Safeguards
 
 - Unknown TOML fields are rejected to avoid typo-driven defaults.
-- Configured paths must stay under the configuration file directory.
+- Configured paths must stay under `[security].allowed_roots`; when unset, this is equivalent to `["."]`, the configuration file directory.
+- Relative allowed roots are resolved from the configuration file directory, and absolute allowed roots are supported for operator-approved external DB or migration directories.
 - Surrounding whitespace and `..` path components are rejected for configured paths.
-- Symlink escapes are rejected for database paths, migration files, and report output.
+- Symlink escapes are rejected for database paths, migration files, report output, and backup paths.
 - Missing database files are not created by migration/status/check operations.
 - Read-only commands do not create the migration history table.
 - Migration SQL is rejected when it contains explicit transaction control, `ATTACH`, `DETACH`, `VACUUM`, selected dangerous PRAGMAs, or direct writes/DDL against the history table.
@@ -38,6 +40,8 @@ Do not allow untrusted users to write configuration, discovery queries, or migra
 - GUIはループバックホストだけをサポートします。`--host 0.0.0.0` などの非ループバックアドレスで公開する運用はサポートされません。
 - Restrict GUI operation permissions in `sqlite-fleet.toml` under `[gui]`.
 - GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で絞ってください。
+- Use `[security].allowed_roots` for "where sqlite-fleet may operate" and `[gui]` `allow_*` for "what the GUI may do"; keep both as narrow as practical.
+- GUI Settings can edit allowed roots and shows warnings for missing or broad roots such as `/`, `/Users`, `/home`, `/var`, or drive roots. Review the confirmation before saving.
 - If remote access is required, keep the GUI bound to `127.0.0.1` and configure SSH tunnels, VPN, Zero Trust access, or equivalent network controls on the user/operator side.
 - リモートアクセスが必要な場合も、GUIは `127.0.0.1` にbindしたまま、SSHトンネル、VPN、Zero Trustアクセスなどのネットワーク制御を利用者または運用者側で構成してください。
 - Store JSON reports from CI/CD runs.

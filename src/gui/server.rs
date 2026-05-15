@@ -320,6 +320,22 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 api_save_settings(state, request_body.unwrap_or_default()),
             )
         }
+        ("POST", "/api/admin/discovery-preview") => {
+            if !config.gui.allow_migration_edit {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("GUI settings edit は設定で無効化されています"),
+                );
+            }
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            write_json_result(
+                &mut stream,
+                api_preview_discovery(state, request_body.unwrap_or_default()),
+            )
+        }
         ("POST", "/api/admin/baseline") => {
             if !config.gui.allow_migrate {
                 return write_json_error(

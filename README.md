@@ -126,6 +126,13 @@ keep_last = 10
 [audit]
 path = "./sqlite-fleet-audit.jsonl"
 
+[security]
+allowed_roots = [
+  ".",
+  "./data",
+  "/var/lib/myapp"
+]
+
 [gui]
 allow_check = true
 allow_migrate = false
@@ -144,13 +151,15 @@ canary = ["tenant-a", "tenant-b"]
 
 設定ファイルでは未知フィールドを拒否します。`path_globb` のような typo は無視せずエラーになります。
 
-設定由来のパスは設定ファイルのディレクトリ配下に限定されます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる `base_dir` 外への脱出は安全側で拒否します。
+設定由来のパスはデフォルトでは設定ファイルのディレクトリ配下に限定されます。外部DBディレクトリ、外部migrationディレクトリ、外部report/backup先を使う場合は `[security].allowed_roots` に明示します。`.` は設定ファイルのディレクトリを表し、相対パスは設定ファイルのディレクトリ基準、絶対パスも指定できます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる許可ルート外への脱出は安全側で拒否します。
+
+`allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。GUI の Settings では Allowed roots を一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
 
 ## 既存プロジェクトへの導入
 
 sqlite-fleet は、新規プロジェクト専用ではなく、既存のSQLite DBと既存のmigrationファイルを取り込んで管理する前提です。
 
-DBは設定ファイルからの相対パスで検出します。DBファイルがディレクトリに並んでいる場合は `databases.discovery = "glob"` と `databases.path_glob` を使います。親DBや管理DBにtenant一覧がある場合は `databases.discovery = "query"` を使い、`source`、`query`、`id_column`、`path_column` または `path_template` で対象DBを列挙します。GUIの設定画面では、この仕組みを「DB検出」と表示しています。
+DBは設定ファイルからの相対パス、または `[security].allowed_roots` 配下の絶対パスで検出します。DBファイルがディレクトリに並んでいる場合は `databases.discovery = "glob"` と `databases.path_glob` を使います。親DBや管理DBにtenant一覧がある場合は `databases.discovery = "query"` を使い、`source`、`query`、`id_column`、`path_column` または `path_template` で対象DBを列挙します。GUIの設定画面では、この仕組みを「DB検出」と表示し、保存前の入力内容で Preview discovery を実行できます。
 
 既存のmigrationディレクトリは `migrations.dir` に指定します。複数ディレクトリに分かれている場合は、基本のディレクトリを `migrations.dir` に置き、追加ディレクトリをマイグレーショングループの `dir` として登録できます。
 

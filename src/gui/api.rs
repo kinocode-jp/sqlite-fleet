@@ -338,6 +338,51 @@ fn api_path_entries(config: &Config, dir: Option<&str>) -> Result<PathEntriesDat
     })
 }
 
+fn allowed_root_data(config: &Config) -> Vec<AllowedRootData> {
+    config
+        .effective_allowed_roots()
+        .into_iter()
+        .map(|value| {
+            let path = config.resolve_path(&value);
+            let resolved = normalize_path_for_display(&path);
+            let exists = path.exists();
+            let mut warnings = broad_root_warnings(&resolved);
+            if !exists {
+                warnings.push("root does not exist".to_string());
+            }
+            AllowedRootData {
+                value,
+                resolved_path: resolved,
+                exists,
+                warnings,
+            }
+        })
+        .collect()
+}
+
+fn normalize_path_for_display(path: &Path) -> String {
+    std::fs::canonicalize(path)
+        .unwrap_or_else(|_| path.to_path_buf())
+        .display()
+        .to_string()
+}
+
+fn broad_root_warnings(path: &str) -> Vec<String> {
+    if path == "/" {
+        return vec!["root is broad; confirm this is intentional".to_string()];
+    }
+    let normalized = path.trim_end_matches(std::path::MAIN_SEPARATOR);
+    let broad = matches!(
+        normalized,
+        "/" | "/Users" | "/home" | "/var" | "C:" | "C:\\"
+    ) || normalized.len() == 2 && normalized.ends_with(':');
+    if broad {
+        vec!["root is broad; confirm this is intentional".to_string()]
+    } else {
+        Vec::new()
+    }
+}
+
 fn relative_path_string(base_dir: &Path, path: &Path) -> Result<String> {
     let relative = path
         .strip_prefix(base_dir)
@@ -490,6 +535,7 @@ fn api_save_settings(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> 
         serde_json::from_slice(&body).context("settings request body のJSONが不正です")?;
     let mut config = locked_config(state)?;
     config.project.name = clean_optional_string(request.project_name);
+    config.security.allowed_roots = clean_path_list(request.allowed_roots)?;
     config.databases.discovery = request.discovery.trim().to_string();
     config.databases.path_glob = clean_optional_string(request.databases_path_glob);
     config.databases.source = clean_optional_string(request.databases_source);
@@ -510,6 +556,62 @@ fn api_save_settings(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> 
     config.execution.continue_on_error = request.continue_on_error;
     persist_config(state, config)?;
     Ok(AdminResult::new("settings を保存しました".to_string()))
+}
+
+fn api_preview_discovery(state: &ServerState, body: Vec<u8>) -> Result<DiscoveryPreviewData> {
+    let request: SettingsRequest =
+        serde_json::from_slice(&body).context("settings request body のJSONが不正です")?;
+    let mut config = locked_config(state)?;
+    apply_settings_request(&mut config, request)?;
+    match config.validate_discovery().and_then(|()| discover_databases(&config)) {
+        Ok(databases) => {
+            let rows = databases
+                .into_iter()
+                .map(|database| DiscoveryPreviewDatabase {
+                    allowed_root: config.allowed_root_for_path(&database.path).ok().flatten(),
+                    id: database.id,
+                    path: database.path,
+                    exists: database.exists,
+                    readable: database.readable,
+                    error: None,
+                })
+                .collect::<Vec<_>>();
+            Ok(DiscoveryPreviewData {
+                count: rows.len(),
+                databases: rows,
+                errors: Vec::new(),
+            })
+        }
+        Err(error) => Ok(DiscoveryPreviewData {
+            count: 0,
+            databases: Vec::new(),
+            errors: vec![error.to_string()],
+        }),
+    }
+}
+
+fn apply_settings_request(config: &mut Config, request: SettingsRequest) -> Result<()> {
+    config.project.name = clean_optional_string(request.project_name);
+    config.security.allowed_roots = clean_path_list(request.allowed_roots)?;
+    config.databases.discovery = request.discovery.trim().to_string();
+    config.databases.path_glob = clean_optional_string(request.databases_path_glob);
+    config.databases.source = clean_optional_string(request.databases_source);
+    config.databases.query = clean_optional_string(request.databases_query);
+    config.databases.id_column = clean_optional_string(request.databases_id_column);
+    config.databases.path_column = clean_optional_string(request.databases_path_column);
+    config.databases.path_template = clean_optional_string(request.databases_path_template);
+    config.migrations.dir = request.migrations_dir.trim().to_string();
+    config.migrations.table = request.migrations_table.trim().to_string();
+    config.report.format = request.report_format.trim().to_string();
+    config.report.path = clean_optional_string(request.report_path);
+    config.backup.dir = request.backup_dir.trim().to_string();
+    config.backup.before_migrate = request.backup_before_migrate;
+    config.backup.keep_last = request.backup_keep_last;
+    config.audit.path = clean_optional_string(request.audit_path);
+    config.execution.parallel = request.parallel;
+    config.execution.lock_timeout_ms = request.lock_timeout_ms;
+    config.execution.continue_on_error = request.continue_on_error;
+    Ok(())
 }
 
 fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {

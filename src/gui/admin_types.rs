@@ -77,6 +77,8 @@ struct GuiPermissionRequest {
 #[serde(deny_unknown_fields)]
 struct SettingsRequest {
     project_name: Option<String>,
+    #[serde(default)]
+    allowed_roots: Vec<String>,
     discovery: String,
     databases_path_glob: Option<String>,
     databases_source: Option<String>,
@@ -128,6 +130,7 @@ impl GuiPermissionData {
 #[derive(Serialize)]
 struct SettingsData {
     project_name: Option<String>,
+    allowed_roots: Vec<AllowedRootData>,
     discovery: String,
     databases_path_glob: Option<String>,
     databases_source: Option<String>,
@@ -151,10 +154,19 @@ struct SettingsData {
     continue_on_error: bool,
 }
 
+#[derive(Serialize)]
+struct AllowedRootData {
+    value: String,
+    resolved_path: String,
+    exists: bool,
+    warnings: Vec<String>,
+}
+
 impl SettingsData {
     fn from_config(config: &Config) -> Self {
         Self {
             project_name: config.project.name.clone(),
+            allowed_roots: allowed_root_data(config),
             discovery: config.databases.discovery.clone(),
             databases_path_glob: config.databases.path_glob.clone(),
             databases_source: config.databases.source.clone(),
@@ -178,6 +190,23 @@ impl SettingsData {
             continue_on_error: config.execution.continue_on_error,
         }
     }
+}
+
+#[derive(Serialize)]
+struct DiscoveryPreviewData {
+    count: usize,
+    databases: Vec<DiscoveryPreviewDatabase>,
+    errors: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct DiscoveryPreviewDatabase {
+    id: String,
+    path: PathBuf,
+    exists: bool,
+    readable: bool,
+    allowed_root: Option<PathBuf>,
+    error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -380,6 +409,23 @@ fn clean_optional_string(value: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn clean_path_list(values: Vec<String>) -> Result<Vec<String>> {
+    let mut cleaned = Vec::new();
+    for value in values {
+        let value = value.trim().to_string();
+        if value.is_empty() {
+            bail!("allowed_roots に空のパスは指定できません");
+        }
+        if !cleaned.contains(&value) {
+            cleaned.push(value);
+        }
+    }
+    if cleaned.is_empty() {
+        cleaned.push(".".to_string());
+    }
+    Ok(cleaned)
+}
+
 fn clean_list(values: Vec<String>, label: &str) -> Result<Vec<String>> {
     if values.is_empty() {
         bail!("{label} は1件以上必要です");
@@ -459,8 +505,6 @@ fn resolve_existing_or_creatable_dir(config: &Config, value: &str) -> Result<Pat
 }
 
 fn validate_path_stays_in_base(config: &Config, path: &Path, label: &str) -> Result<()> {
-    let base = std::fs::canonicalize(&config.base_dir)
-        .with_context(|| format!("base_dir を解決できません: {}", config.base_dir.display()))?;
     let parent = path
         .parent()
         .ok_or_else(|| anyhow::anyhow!("{label} の親ディレクトリが必要です"))?;
@@ -485,9 +529,9 @@ fn validate_path_stays_in_base(config: &Config, path: &Path, label: &str) -> Res
             )
         })?
     };
-    if !canonical_parent.starts_with(&base) {
+    if config.allowed_root_for_path(&canonical_parent)?.is_none() {
         bail!(
-            "{label} は設定ディレクトリ外を指せません: {}",
+            "{label} はsecurity.allowed_rootsの外を指せません: {}",
             path.display()
         );
     }

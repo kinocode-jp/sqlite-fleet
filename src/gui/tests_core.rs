@@ -441,6 +441,81 @@
     }
 
     #[test]
+    fn api_save_settings_persists_allowed_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("migrations")).unwrap();
+        std::fs::create_dir_all(dir.path().join("backups")).unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+                ..Config::default()
+            },
+            config_path.clone(),
+        );
+        let body = format!(
+            r#"{{"project_name":null,"allowed_roots":[".","{}"],"discovery":"glob","databases_path_glob":"data/*.db","databases_source":null,"databases_query":null,"databases_id_column":null,"databases_path_column":null,"databases_path_template":null,"migrations_dir":"migrations","migrations_table":"_sqlite_fleet_migrations","report_format":"json","report_path":null,"backup_dir":"backups","backup_before_migrate":false,"backup_keep_last":10,"audit_path":null,"parallel":1,"lock_timeout_ms":0,"continue_on_error":false}}"#,
+            external.path().display()
+        );
+
+        api_save_settings(&state, body.into_bytes()).unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(config.security.allowed_roots.len(), 2);
+        assert_eq!(
+            config.security.allowed_roots[1],
+            external.path().display().to_string()
+        );
+        let saved = std::fs::read_to_string(config_path).unwrap();
+        assert!(saved.contains("[security]"), "{saved}");
+        assert!(saved.contains("allowed_roots"), "{saved}");
+    }
+
+    #[test]
+    fn api_preview_discovery_uses_unsaved_allowed_roots() {
+        let dir = tempfile::tempdir().unwrap();
+        let external = tempfile::tempdir().unwrap();
+        Connection::open(external.path().join("tenant.db")).unwrap();
+        let state = test_server_state(
+            Config {
+                base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+                ..Config::default()
+            },
+            dir.path().join("sqlite-fleet.toml"),
+        );
+        let body = format!(
+            r#"{{"project_name":null,"allowed_roots":[".","{}"],"discovery":"glob","databases_path_glob":"{}","databases_source":null,"databases_query":null,"databases_id_column":null,"databases_path_column":null,"databases_path_template":null,"migrations_dir":"migrations","migrations_table":"_sqlite_fleet_migrations","report_format":"json","report_path":null,"backup_dir":"backups","backup_before_migrate":false,"backup_keep_last":10,"audit_path":null,"parallel":1,"lock_timeout_ms":0,"continue_on_error":false}}"#,
+            external.path().display(),
+            external.path().join("*.db").display()
+        );
+
+        let preview = api_preview_discovery(&state, body.into_bytes()).unwrap();
+
+        assert_eq!(preview.count, 1);
+        assert!(preview.errors.is_empty(), "{:?}", preview.errors);
+        assert_eq!(preview.databases[0].id, "tenant");
+        assert!(preview.databases[0].allowed_root.is_some());
+    }
+
+    #[test]
+    fn allowed_root_data_warns_for_broad_roots() {
+        let config = Config {
+            security: sqlite_fleet::SecurityConfig {
+                allowed_roots: vec!["/".to_string()],
+            },
+            ..Config::default()
+        };
+
+        let roots = allowed_root_data(&config);
+
+        assert!(roots[0]
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("broad")));
+    }
+
+    #[test]
     fn api_path_entries_lists_base_relative_entries() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("data/nested")).unwrap();

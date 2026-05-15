@@ -1,7 +1,7 @@
 use rusqlite::Connection;
 use sqlite_fleet::{
     discover_databases, load_migrations, write_report_json, Config, DatabasesConfig,
-    MigrationsConfig, ReportConfig,
+    MigrationsConfig, ReportConfig, SecurityConfig,
 };
 use std::fs;
 use tempfile::tempdir;
@@ -342,4 +342,73 @@ fn report_output_replaces_existing_file_atomically() {
     let text = fs::read_to_string(report_path).unwrap();
     let report: serde_json::Value = serde_json::from_str(&text).unwrap();
     assert_eq!(report["ok"], true);
+}
+
+#[test]
+fn allowed_roots_default_keeps_paths_under_config_directory() {
+    let dir = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    Connection::open(outside.path().join("tenant.db")).unwrap();
+    let config = Config {
+        base_dir: dir.path().to_path_buf(),
+        databases: DatabasesConfig {
+            discovery: "glob".to_string(),
+            path_glob: Some(outside.path().join("*.db").display().to_string()),
+            ..DatabasesConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let error = discover_databases(&config).unwrap_err().to_string();
+    assert!(error.contains("databases.path_glob"));
+    assert!(error.contains("allowed_roots"));
+}
+
+#[test]
+fn allowed_roots_absolute_path_enables_external_glob_discovery() {
+    let dir = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    Connection::open(outside.path().join("tenant.db")).unwrap();
+    let config = Config {
+        base_dir: dir.path().to_path_buf(),
+        security: SecurityConfig {
+            allowed_roots: vec![".".to_string(), outside.path().display().to_string()],
+        },
+        databases: DatabasesConfig {
+            discovery: "glob".to_string(),
+            path_glob: Some(outside.path().join("*.db").display().to_string()),
+            ..DatabasesConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let databases = discover_databases(&config).unwrap();
+    assert_eq!(databases.len(), 1);
+    assert_eq!(databases[0].id, "tenant");
+}
+
+#[cfg(unix)]
+#[test]
+fn allowed_roots_rejects_symlink_escape() {
+    use std::os::unix::fs::symlink;
+
+    let dir = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    Connection::open(outside.path().join("tenant.db")).unwrap();
+    let data = dir.path().join("data");
+    fs::create_dir(&data).unwrap();
+    symlink(outside.path().join("tenant.db"), data.join("tenant.db")).unwrap();
+    let config = Config {
+        base_dir: dir.path().to_path_buf(),
+        databases: DatabasesConfig {
+            discovery: "glob".to_string(),
+            path_glob: Some("data/*.db".to_string()),
+            ..DatabasesConfig::default()
+        },
+        ..Config::default()
+    };
+
+    let error = discover_databases(&config).unwrap_err().to_string();
+    assert!(error.contains("DBパス"));
+    assert!(error.contains("許可ルート外"));
 }

@@ -62,6 +62,9 @@ keep_last = 10
 [audit]
 path = "./sqlite-fleet-audit.jsonl"
 
+[security]
+allowed_roots = ["."]
+
 [gui]
 allow_check = true
 allow_migrate = false
@@ -130,6 +133,10 @@ fn default_backup_dir() -> String {
 
 fn default_backup_keep_last() -> usize {
     10
+}
+
+fn default_allowed_roots() -> Vec<String> {
+    vec![".".to_string()]
 }
 
 fn default_true() -> bool {
