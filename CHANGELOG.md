@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0](https://github.com/0809android/sqlite-fleet/compare/v0.2.0...v0.3.0) - 2026-05-15
+
+### Other
+
+- Update README SQL Console documentation
+- Auto-load SQL schema without refresh button
+- SQLからマイグレーションを作成する導線を追加
+- Remove DDL builder page from GUI
+- Reorder schema panel safety description
+- Localize schema SQL builder labels
+- Move create actions into page header
+- 重複するページ内見出しを整理
+- Move setup description into page heading
+- Unify GUI migration and backup terminology
+- Localize allowed roots setup text
+- Align checklist action buttons with status pills
+- Move setup controls into Settings
+- Clarify setup checklist status labels
+- Add initial setup page and checklist
+- Restore white settings section background
+- Use app background for settings sections
+- Move settings accordion indicator next to label
+- Remove duplicate project name summary
+- Allow settings tooltips to overflow and wrap
+- Add contextual settings tooltips
+- Reject parent components in allowed roots
+- Add allowed roots and discovery preview settings
+- Localize GUI validation and API errors
+- Document GUI network exposure guidance in English
+- Document GUI loopback-only access guidance
+
 ## [0.2.0](https://github.com/0809android/sqlite-fleet/compare/v0.1.3...v0.2.0) - 2026-05-14
 
 ### Changed
