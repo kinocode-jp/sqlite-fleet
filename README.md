@@ -81,9 +81,9 @@ By default, the GUI starts an HTTP server on `127.0.0.1:8765`. The GUI is intend
 - DB: DB単位で対象マイグレーショングループ、適用済み件数、未適用マイグレーション、チェックサム不一致などを確認します。DBグループはDBをまとめて操作したい場合にだけ使います。
 - オーバービュー: 最新マイグレーション、未適用があるDB、失敗・不整合の有無をまとめて確認します。
 
-画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、バックアップを実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用マイグレーションを順番に適用する操作だからです。
+画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、バックアップを実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集、設定変更、GUI権限変更は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用マイグレーションを順番に適用する操作だからです。
 
-From the GUI, you can run `check`, `migrate --dry-run`, `migrate` for one or all databases, and backup operations. By default, only the read-only `check` operation is allowed. Operations that write databases, backup, SQL apply, and migration editing are enabled only when the corresponding `[gui]` `allow_*` setting is explicitly set to `true`. Restrict GUI operation permissions to the minimum necessary in `sqlite-fleet.toml` under `[gui]`. The current GUI does not provide a restore screen, so use `sqlite-fleet restore` from the CLI for restores. The migration detail database rows do not include an "apply only this SQL" button because `migrate` applies the pending migrations for the target database in order.
+From the GUI, you can run `check`, `migrate --dry-run`, `migrate` for one or all databases, and backup operations. By default, only the read-only `check` operation is allowed. Operations that write databases, backup, SQL apply, migration editing, settings changes, and GUI permission changes are enabled only when the corresponding `[gui]` `allow_*` setting is explicitly set to `true`. Restrict GUI operation permissions to the minimum necessary in `sqlite-fleet.toml` under `[gui]`. The current GUI does not provide a restore screen, so use `sqlite-fleet restore` from the CLI for restores. The migration detail database rows do not include an "apply only this SQL" button because `migrate` applies the pending migrations for the target database in order.
 
 `SQLコンソール` では、まだマイグレーション化していないSQLを選択DBに対してDry runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、SQLファイル保存、現在のSQLからのマイグレーションファイル作成ができます。対象DBを選ぶと、そのDBのスキーマを自動表示します。GUI SQL適用は通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
@@ -142,6 +142,8 @@ allow_backup = false
 allow_restore = false
 allow_sql_apply = false
 allow_migration_edit = false
+allow_gui_permission_edit = false
+allow_config_edit = false
 
 [db_groups]
 canary = ["tenant-a", "tenant-b"]
@@ -155,7 +157,7 @@ canary = ["tenant-a", "tenant-b"]
 
 設定由来のパスはデフォルトでは設定ファイルのディレクトリ配下に限定されます。外部DBディレクトリ、外部マイグレーションディレクトリ、外部report/backup先を使う場合は `[security].allowed_roots` に明示します。`.` は設定ファイルのディレクトリを表し、相対パスは設定ファイルのディレクトリ基準、絶対パスも指定できます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる許可ルート外への脱出は安全側で拒否します。
 
-`allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。GUI の Settings では許可ルートを一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
+`allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。`allow_migration_edit` はマイグレーションファイルやグループ編集、`allow_config_edit` はDB検出や許可ルートなど通常設定の編集、`allow_gui_permission_edit` はGUI権限そのものの変更を許可します。便利にDB検出や許可ルートだけをGUIから変えたい場合は、危険操作を有効化せず `allow_config_edit = true` だけを使ってください。GUI の Settings では許可ルートを一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
 
 ## 既存プロジェクトへの導入
 

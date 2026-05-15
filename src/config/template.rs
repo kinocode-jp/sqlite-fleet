@@ -72,6 +72,8 @@ allow_backup = false
 allow_restore = false
 allow_sql_apply = false
 allow_migration_edit = false
+allow_gui_permission_edit = false
+allow_config_edit = false
 "#
 }
 

@@ -129,11 +129,11 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json(&mut stream, 200, &api_plan(&config))
         }
         ("GET", "/api/admin/path-entries") => {
-            if !config.gui.allow_migration_edit {
+            if !config.gui.allow_config_edit && !config.gui.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
-                    anyhow::anyhow!("GUI migration edit は設定で無効化されています"),
+                    anyhow::anyhow!("GUI config edit は設定で無効化されています"),
                 );
             }
             let query = match parse_query(query) {
@@ -289,7 +289,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, result)
         }
         ("POST", "/api/admin/gui-permissions") => {
-            if !config.gui.allow_migration_edit {
+            if !config.gui.allow_gui_permission_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -305,7 +305,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/settings") => {
-            if !config.gui.allow_migration_edit {
+            if !config.gui.allow_config_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -321,7 +321,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/discovery-preview") => {
-            if !config.gui.allow_migration_edit {
+            if !config.gui.allow_config_edit {
                 return write_json_error(
                     &mut stream,
                     403,

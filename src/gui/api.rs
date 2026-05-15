@@ -526,6 +526,8 @@ fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     config.gui.allow_restore = request.allow_restore;
     config.gui.allow_sql_apply = request.allow_sql_apply;
     config.gui.allow_migration_edit = request.allow_migration_edit;
+    config.gui.allow_gui_permission_edit = request.allow_gui_permission_edit;
+    config.gui.allow_config_edit = request.allow_config_edit;
     persist_config(state, config)?;
     Ok(AdminResult::new("GUI permissions を保存しました".to_string()))
 }

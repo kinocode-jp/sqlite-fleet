@@ -60,6 +60,8 @@ struct GuiPermissionData {
     allow_restore: bool,
     allow_sql_apply: bool,
     allow_migration_edit: bool,
+    allow_gui_permission_edit: bool,
+    allow_config_edit: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +73,8 @@ struct GuiPermissionRequest {
     allow_restore: bool,
     allow_sql_apply: bool,
     allow_migration_edit: bool,
+    allow_gui_permission_edit: bool,
+    allow_config_edit: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +127,8 @@ impl GuiPermissionData {
             allow_restore: config.gui.allow_restore,
             allow_sql_apply: config.gui.allow_sql_apply,
             allow_migration_edit: config.gui.allow_migration_edit,
+            allow_gui_permission_edit: config.gui.allow_gui_permission_edit,
+            allow_config_edit: config.gui.allow_config_edit,
         }
     }
 }

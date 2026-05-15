@@ -220,12 +220,16 @@
       if (!disabled && state && !selectedMigrationGroupName) {
         $('saveMigrationGroupMembership').disabled = true;
       }
-      if (!disabled && state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
-        $('savePermissions').disabled = true;
-        $('saveSettings').disabled = true;
+      if (!disabled && state && state.gui_permissions) {
+        const permissions = state.gui_permissions;
+        $('savePermissions').disabled = !permissions.allow_gui_permission_edit;
+        $('savePermissions').title = permissions.allow_gui_permission_edit ? '' : t('permissionEditDisabled');
+        $('saveSettings').disabled = !permissions.allow_config_edit;
+        $('saveSettings').title = permissions.allow_config_edit ? '' : t('configEditDisabled');
         document.querySelectorAll('[data-path-browse]').forEach((button) => {
-          button.disabled = true;
-          button.title = t('permissionEditDisabled');
+          const allowed = pathBrowseAllowed(button.dataset.pathBrowse);
+          button.disabled = !allowed;
+          button.title = allowed ? '' : pathBrowseDisabledMessage(button.dataset.pathBrowse);
         });
       } else {
         document.querySelectorAll('[data-path-browse]').forEach((button) => {
@@ -263,6 +267,14 @@
     function activePage() {
       const active = document.querySelector('.page.active[data-page]');
       return active ? active.dataset.page : 'execute';
+    }
+    function pathBrowseAllowed(targetId) {
+      const permissions = state && state.gui_permissions ? state.gui_permissions : {};
+      if (String(targetId || '').startsWith('settings')) return Boolean(permissions.allow_config_edit);
+      return Boolean(permissions.allow_config_edit || permissions.allow_migration_edit);
+    }
+    function pathBrowseDisabledMessage(targetId) {
+      return String(targetId || '').startsWith('settings') ? t('configEditDisabled') : t('migrationEditDisabled');
     }
     function pageFromHash() {
       const hash = window.location.hash;
@@ -561,15 +573,17 @@
     }
     function renderSettings() {
       const permissions = state.gui_permissions;
+      const canEditPermissions = Boolean(permissions.allow_gui_permission_edit);
+      const canEditConfig = Boolean(permissions.allow_config_edit);
       $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `
         <label class="permission-card">
           <span><strong>${escapeHtml(key)}</strong></span>
           <span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span>
-          <input type="checkbox" data-permission-key="${escapeHtml(key)}" ${value ? 'checked' : ''} ${permissions.allow_migration_edit ? '' : 'disabled'}>
+          <input type="checkbox" data-permission-key="${escapeHtml(key)}" ${value ? 'checked' : ''} ${canEditPermissions ? '' : 'disabled'}>
         </label>
       `).join('');
-      $('savePermissions').disabled = !permissions.allow_migration_edit;
-      $('savePermissions').title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
+      $('savePermissions').disabled = !canEditPermissions;
+      $('savePermissions').title = canEditPermissions ? '' : t('permissionEditDisabled');
       const settings = state.settings;
       allowedRootsDraft = (settings.allowed_roots || []).map((root) => root.value || '.');
       if (!allowedRootsDraft.length) allowedRootsDraft = ['.'];
@@ -592,11 +606,13 @@
       $('settingsBackupKeepLast').value = settings.backup_keep_last;
       $('settingsContinueOnError').checked = Boolean(settings.continue_on_error);
       $('settingsBackupBeforeMigrate').checked = Boolean(settings.backup_before_migrate);
-      $('saveSettings').disabled = !permissions.allow_migration_edit;
+      $('saveSettings').disabled = !canEditConfig;
+      $('saveSettings').title = canEditConfig ? '' : t('configEditDisabled');
       renderAllowedRoots();
       document.querySelectorAll('[data-path-browse]').forEach((button) => {
-        button.disabled = !permissions.allow_migration_edit;
-        button.title = permissions.allow_migration_edit ? '' : t('permissionEditDisabled');
+        const allowed = pathBrowseAllowed(button.dataset.pathBrowse);
+        button.disabled = !allowed;
+        button.title = allowed ? '' : pathBrowseDisabledMessage(button.dataset.pathBrowse);
       });
       $('discoverySettings').innerHTML = keyItems([
         ['discovery', settings.discovery],
@@ -754,8 +770,8 @@
       return trimmed;
     }
     async function openPathBrowser(targetId, mode = 'path', accept = '', kindFilter = '') {
-      if (state && state.gui_permissions && !state.gui_permissions.allow_migration_edit) {
-        message(t('permissionEditDisabled'), true);
+      if (state && state.gui_permissions && !pathBrowseAllowed(targetId)) {
+        message(pathBrowseDisabledMessage(targetId), true);
         return;
       }
       pathBrowseTargetId = targetId;

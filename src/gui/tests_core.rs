@@ -354,8 +354,9 @@
         assert!(response.contains("GUI backup は設定で無効化されています"));
 
         let mut config = Config::default();
-        config.gui.allow_migration_edit = false;
-        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true}"#;
+        config.gui.allow_migration_edit = true;
+        config.gui.allow_gui_permission_edit = false;
+        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#;
         let response = send_test_http_request_with_config(
             &format!(
                 "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
@@ -369,12 +370,23 @@
 
         let mut config = Config::default();
         config.gui.allow_migration_edit = false;
+        config.gui.allow_config_edit = false;
         let response = send_test_http_request_with_config(
             "GET /api/admin/path-entries HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
-        assert!(response.contains("GUI migration edit は設定で無効化されています"));
+        assert!(response.contains("GUI config edit は設定で無効化されています"));
+
+        let mut config = Config::default();
+        config.gui.allow_migration_edit = true;
+        config.gui.allow_config_edit = false;
+        let response = send_test_http_request_with_config(
+            "POST /api/admin/settings HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+            config,
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI settings edit は設定で無効化されています"));
     }
 
     #[test]
@@ -385,7 +397,7 @@
 
         api_save_gui_permissions(
             &state,
-            br#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true}"#.to_vec(),
+            br#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#.to_vec(),
         )
         .unwrap();
 
@@ -396,9 +408,13 @@
         assert!(config.gui.allow_restore);
         assert!(!config.gui.allow_sql_apply);
         assert!(config.gui.allow_migration_edit);
+        assert!(config.gui.allow_gui_permission_edit);
+        assert!(config.gui.allow_config_edit);
         let saved = std::fs::read_to_string(config_path).unwrap();
         assert!(saved.contains("allow_check = false"), "{saved}");
         assert!(saved.contains("allow_sql_apply = false"), "{saved}");
+        assert!(saved.contains("allow_gui_permission_edit = true"), "{saved}");
+        assert!(saved.contains("allow_config_edit = true"), "{saved}");
     }
 
     #[test]
@@ -1522,7 +1538,7 @@
 
         api_save_gui_permissions(
             &state,
-            br#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true}"#.to_vec(),
+            br#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#.to_vec(),
         )
         .unwrap();
 

@@ -53,6 +53,29 @@ path = "./doctor-report.json"
 }
 
 #[test]
+fn gui_partial_config_only_enables_explicit_flags() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join("sqlite-fleet.toml"),
+        r#"
+[gui]
+allow_config_edit = true
+"#,
+    )
+    .unwrap();
+
+    let config = Config::load(dir.path().join("sqlite-fleet.toml")).unwrap();
+    assert!(config.gui.allow_check);
+    assert!(config.gui.allow_config_edit);
+    assert!(!config.gui.allow_migrate);
+    assert!(!config.gui.allow_backup);
+    assert!(!config.gui.allow_restore);
+    assert!(!config.gui.allow_sql_apply);
+    assert!(!config.gui.allow_migration_edit);
+    assert!(!config.gui.allow_gui_permission_edit);
+}
+
+#[test]
 fn config_load_variants_validate_only_their_scope() {
     let dir = tempdir().unwrap();
     let data_dir = dir.path().join("data");

@@ -40,7 +40,7 @@ Operators who can write `sqlite-fleet.toml` are trusted to choose which filesyst
 - GUIはループバックホストだけをサポートします。`--host 0.0.0.0` などの非ループバックアドレスで公開する運用はサポートされません。
 - Restrict GUI operation permissions in `sqlite-fleet.toml` under `[gui]`.
 - GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で絞ってください。
-- Use `[security].allowed_roots` for "where sqlite-fleet may operate" and `[gui]` `allow_*` for "what the GUI may do"; keep both as narrow as practical.
+- Use `[security].allowed_roots` for "where sqlite-fleet may operate" and `[gui]` `allow_*` for "what the GUI may do"; keep both as narrow as practical. Keep `allow_gui_permission_edit` disabled unless the GUI operator is allowed to change other GUI permissions.
 - GUI Settings can edit allowed roots and shows warnings for missing or broad roots such as `/`, `/Users`, `/home`, `/var`, or drive roots. Review the confirmation before saving.
 - If remote access is required, keep the GUI bound to `127.0.0.1` and configure SSH tunnels, VPN, Zero Trust access, or equivalent network controls on the user/operator side.
 - リモートアクセスが必要な場合も、GUIは `127.0.0.1` にbindしたまま、SSHトンネル、VPN、Zero Trustアクセスなどのネットワーク制御を利用者または運用者側で構成してください。

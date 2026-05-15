@@ -762,7 +762,7 @@
             <h3>安全設定と監査ログ</h3>
             <ul>
               <li><code>[gui]</code>: GUI操作権限を制限します。デフォルトでは読み取り系の <code>check</code> だけを許可します。</li>
-              <li>DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集を有効にする権限: <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code></li>
+              <li>DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集、GUI権限変更、設定変更を個別に許可します: <code>allow_migrate</code>、<code>allow_backup</code>、<code>allow_sql_apply</code>、<code>allow_migration_edit</code>、<code>allow_gui_permission_edit</code>、<code>allow_config_edit</code></li>
               <li><code>allow_restore</code>: 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください: <code>sqlite-fleet restore</code></li>
               <li><code>audit.path</code> を設定すると、GUIのマイグレーション、バックアップ、SQL適用もJSONLへ記録されます。</li>
               <li>監査ログを書けない場合、GUI APIは成功扱いにしません。</li>
@@ -1053,7 +1053,7 @@
       'は単独SQLとしてだけ適用できます。': 'can only be applied as single statements.',
       ': GUI操作権限を制限します。デフォルトでは読み取り系の': ': controls GUI permissions. By default, only read-only',
       'だけを許可します。': 'is allowed.',
-      'DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集を有効にする権限:': 'Permissions that enable database-changing operations, backup, SQL apply, and migration editing:',
+      'DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集、GUI権限変更、設定変更を個別に許可します:': 'Permissions independently allow database-changing operations, backup, SQL apply, migration editing, GUI permission changes, and settings changes:',
       'GUIのマイグレーション、バックアップ、SQL適用もJSONLへ記録されます。': 'also records GUI migration, backup, and SQL apply operations to JSONL.',
       ': 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください:': ': the current GUI has no restore screen. Run restores with the CLI:',
     };
@@ -1214,7 +1214,9 @@
         openMigrations: 'Open Migration Management',
         openMigrationApply: 'Open Migration Apply',
         baselineDone: (processed, failed) => `baseline complete: processed=${processed}, failed=${failed}`,
-        permissionEditDisabled: 'Permission changes are disabled by allow_migration_edit',
+        permissionEditDisabled: 'Permission changes are disabled by allow_gui_permission_edit',
+        configEditDisabled: 'Settings changes are disabled by allow_config_edit',
+        migrationEditDisabled: 'Migration editing is disabled by allow_migration_edit',
         createdMigrationFile: 'Migration file registered',
         savedMigrationFile: 'Migration file saved',
         editMigrationTitle: 'Migration details',
@@ -1371,4 +1373,6 @@
         openMigrations: 'マイグレーション管理を開く',
         openMigrationApply: 'マイグレーション適用を開く',
         baselineDone: (processed, failed) => `baseline 完了: processed=${processed}, failed=${failed}`,
-        permissionEditDisabled: 'allow_migration_edit が無効のため権限変更できません',
+        permissionEditDisabled: 'allow_gui_permission_edit が無効のため権限変更できません',
+        configEditDisabled: 'allow_config_edit が無効のため設定変更できません',
+        migrationEditDisabled: 'allow_migration_edit が無効のためマイグレーション編集できません',

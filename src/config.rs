@@ -197,16 +197,20 @@ pub struct SecurityConfig {
 pub struct GuiConfig {
     #[serde(default = "default_true")]
     pub allow_check: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub allow_migrate: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub allow_backup: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub allow_restore: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub allow_sql_apply: bool,
-    #[serde(default = "default_true")]
+    #[serde(default)]
     pub allow_migration_edit: bool,
+    #[serde(default)]
+    pub allow_gui_permission_edit: bool,
+    #[serde(default)]
+    pub allow_config_edit: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -469,6 +473,8 @@ impl Default for GuiConfig {
             allow_restore: false,
             allow_sql_apply: false,
             allow_migration_edit: false,
+            allow_gui_permission_edit: false,
+            allow_config_edit: false,
         }
     }
 }
