@@ -237,7 +237,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 return write_json_error(
                     &mut stream,
                     403,
-                    anyhow::anyhow!("GUI SQL apply は設定で無効化されています"),
+                    anyhow::anyhow!("GUI SQL適用は設定で無効化されています"),
                 );
             }
             if let Err(error) = validate_query_keys(&query, &["dry_run", "database"]) {

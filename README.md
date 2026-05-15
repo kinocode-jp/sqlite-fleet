@@ -78,14 +78,14 @@ By default, the GUI starts an HTTP server on `127.0.0.1:8765`. The GUI is intend
 管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
 
 - マイグレーション: ファイル名単位でSQL内容、所属グループ、適用済DB、未適用DBを確認します。グループに分けたい場合だけ、画面上でマイグレーショングループを作成します。
-- DB: DB単位で対象マイグレーショングループ、適用済み件数、未適用migration、checksum不一致などを確認します。DBグループはDBをまとめて操作したい場合にだけ使います。
-- オーバービュー: 最新migration、未適用があるDB、失敗・不整合の有無をまとめて確認します。
+- DB: DB単位で対象マイグレーショングループ、適用済み件数、未適用マイグレーション、チェックサム不一致などを確認します。DBグループはDBをまとめて操作したい場合にだけ使います。
+- オーバービュー: 最新マイグレーション、未適用があるDB、失敗・不整合の有無をまとめて確認します。
 
-画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、backup を実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、backup、SQL apply、migration編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用migrationを順番に適用する操作だからです。
+画面上から `check`、`migrate --dry-run`、個別DBまたは全DBへの `migrate`、バックアップを実行できます。デフォルトでは読み取り系の `check` だけを許可し、DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集は `[gui]` の `allow_*` を明示的に `true` にした場合だけ有効になります。GUIの操作権限は `sqlite-fleet.toml` の `[gui]` で必要最小限に絞ってください。現在のGUIにはrestore実行画面はないため、復元はCLIの `sqlite-fleet restore` を使ってください。マイグレーション詳細のDB行には「そのSQLだけ適用する」ボタンは出しません。`migrate` は対象DBの未適用マイグレーションを順番に適用する操作だからです。
 
 From the GUI, you can run `check`, `migrate --dry-run`, `migrate` for one or all databases, and backup operations. By default, only the read-only `check` operation is allowed. Operations that write databases, backup, SQL apply, and migration editing are enabled only when the corresponding `[gui]` `allow_*` setting is explicitly set to `true`. Restrict GUI operation permissions to the minimum necessary in `sqlite-fleet.toml` under `[gui]`. The current GUI does not provide a restore screen, so use `sqlite-fleet restore` from the CLI for restores. The migration detail database rows do not include an "apply only this SQL" button because `migrate` applies the pending migrations for the target database in order.
 
-`新規` では、まだmigration化していないSQLを選択DBに対してdry-runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
+`新規` では、まだマイグレーション化していないSQLを選択DBに対してDry runまたは適用できます。SQLファイルの読み込み、SQLite SQLスニペットの挿入、スキーマ変更SQLの生成、SQLファイル保存もできます。GUI SQL適用は通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします。atomicにできない `VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ適用できます。外部ファイルや外部DBへ影響する `VACUUM INTO` / `ATTACH` / `DETACH` はGUI SQLでは拒否されます。実際にDBを変更する操作はブラウザ側で確認ダイアログを表示します。
 
 ## 設定例
 
@@ -151,17 +151,17 @@ canary = ["tenant-a", "tenant-b"]
 
 設定ファイルでは未知フィールドを拒否します。`path_globb` のような typo は無視せずエラーになります。
 
-設定由来のパスはデフォルトでは設定ファイルのディレクトリ配下に限定されます。外部DBディレクトリ、外部migrationディレクトリ、外部report/backup先を使う場合は `[security].allowed_roots` に明示します。`.` は設定ファイルのディレクトリを表し、相対パスは設定ファイルのディレクトリ基準、絶対パスも指定できます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる許可ルート外への脱出は安全側で拒否します。
+設定由来のパスはデフォルトでは設定ファイルのディレクトリ配下に限定されます。外部DBディレクトリ、外部マイグレーションディレクトリ、外部report/backup先を使う場合は `[security].allowed_roots` に明示します。`.` は設定ファイルのディレクトリを表し、相対パスは設定ファイルのディレクトリ基準、絶対パスも指定できます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる許可ルート外への脱出は安全側で拒否します。
 
-`allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。GUI の Settings では Allowed roots を一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
+`allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。GUI の Settings では許可ルートを一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
 
 ## 既存プロジェクトへの導入
 
-sqlite-fleet は、新規プロジェクト専用ではなく、既存のSQLite DBと既存のmigrationファイルを取り込んで管理する前提です。
+sqlite-fleet は、新規プロジェクト専用ではなく、既存のSQLite DBと既存のマイグレーションファイルを取り込んで管理する前提です。
 
-DBは設定ファイルからの相対パス、または `[security].allowed_roots` 配下の絶対パスで検出します。DBファイルがディレクトリに並んでいる場合は `databases.discovery = "glob"` と `databases.path_glob` を使います。親DBや管理DBにtenant一覧がある場合は `databases.discovery = "query"` を使い、`source`、`query`、`id_column`、`path_column` または `path_template` で対象DBを列挙します。GUIの設定画面では、この仕組みを「DB検出」と表示し、保存前の入力内容で Preview discovery を実行できます。
+DBは設定ファイルからの相対パス、または `[security].allowed_roots` 配下の絶対パスで検出します。DBファイルがディレクトリに並んでいる場合は `databases.discovery = "glob"` と `databases.path_glob` を使います。親DBや管理DBにtenant一覧がある場合は `databases.discovery = "query"` を使い、`source`、`query`、`id_column`、`path_column` または `path_template` で対象DBを列挙します。GUIの設定画面では、この仕組みを「DB検出」と表示し、保存前の入力内容でDB検出プレビューを実行できます。
 
-既存のmigrationディレクトリは `migrations.dir` に指定します。複数ディレクトリに分かれている場合は、基本のディレクトリを `migrations.dir` に置き、追加ディレクトリをマイグレーショングループの `dir` として登録できます。
+既存のマイグレーションディレクトリは `migrations.dir` に指定します。複数ディレクトリに分かれている場合は、基本のディレクトリを `migrations.dir` に置き、追加ディレクトリをマイグレーショングループの `dir` として登録できます。
 
 ```toml
 [migrations]
@@ -208,13 +208,13 @@ main = ["001_create_items.sql", "002_add_item_index.sql"]
 premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscription.sql"]
 ```
 
-`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じmigrationを含む分岐として作られ、チェックを外すことで空グループにもできます。既存ディレクトリをそのまま取り込む場合は、マイグレーショングループ作成時に `Migration dir` を指定できます。新しく整理する設定では、基本ディレクトリ + ファイル名リスト形式を推奨します。
+`[migration_groups]` を使わない設定では、`migrations.dir` 配下の全ファイルが `main` グループとして扱われます。GUIで新規グループを作ると、最初は `main` と同じマイグレーションを含む分岐として作られ、チェックを外すことで空グループにもできます。既存ディレクトリをそのまま取り込む場合は、マイグレーショングループ作成時にマイグレーションディレクトリを指定できます。新しく整理する設定では、基本ディレクトリ + ファイル名リスト形式を推奨します。
 
 古い設定向けに `001` のようなversion指定も、単一ファイルに一致する場合だけ読み込めます。同じversionのファイルが複数ある場合は曖昧として拒否されるため、新しい設定では必ず `001_create_items.sql` のようなファイル名で指定してください。
 
 各DBには `_sqlite_fleet_migrations` が作成され、適用済みファイル名、version、name、checksum、適用時刻、実行時間が保存されます。
 
-旧バージョンで作成された `version` 主キーの履歴テーブルは、`status` / `check` / `migrate --dry-run` では読み取り互換として扱います。実際に `migrate` を実行すると、全ての旧履歴がローカルmigrationファイルへ解決でき、checksum検証も通った場合だけ、`filename` 主キーの新スキーマへ自動移行します。解決できない旧履歴がある場合はDBを書き換えずに失敗します。
+旧バージョンで作成された `version` 主キーの履歴テーブルは、`status` / `check` / `migrate --dry-run` では読み取り互換として扱います。実際に `migrate` を実行すると、全ての旧履歴がローカルマイグレーションファイルへ解決でき、checksum検証も通った場合だけ、`filename` 主キーの新スキーマへ自動移行します。解決できない旧履歴がある場合はDBを書き換えずに失敗します。
 
 `status`、`plan`、`check`、`migrate --dry-run` は読み取り系コマンドとして扱い、対象DBに管理テーブルを作成しません。管理テーブルは実際に `migrate` で適用するときだけ作成します。
 
@@ -222,7 +222,7 @@ premium = ["001_create_items.sql", "002_add_item_index.sql", "101_create_subscri
 
 `report.path` を設定している場合、CLI は `status`、`plan`、`migrate`、`check`、`doctor` のJSONレポートを書き出します。
 
-`status`、`plan`、`migrate`、`check` でDB不整合やmigration失敗などの業務エラーとレポート書き込みエラーが同時に起きた場合、CLI の終了理由は業務エラーを優先します。`--json` 指定時は標準出力JSONを先に返し、その後にレポート書き込み失敗があれば非0終了します。
+`status`、`plan`、`migrate`、`check` でDB不整合やマイグレーション失敗などの業務エラーとレポート書き込みエラーが同時に起きた場合、CLI の終了理由は業務エラーを優先します。`--json` 指定時は標準出力JSONを先に返し、その後にレポート書き込み失敗があれば非0終了します。
 
 `doctor --json` は、設定ファイルの検証エラーや TOML 解析エラーも構造化されたJSONとして標準出力へ返します。`report.path` への書き込みに失敗しても、標準出力の診断結果を優先します。
 
@@ -246,7 +246,7 @@ sqlite-fleet restore --database tenant-a --from ./backups/tenant-a/1770000000000
 
 ## マイグレーショングループ、DBグループ、カナリア
 
-`[migration_groups]` で「どのmigrationファイルがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `main` が対象です。
+`[migration_groups]` で「どのマイグレーションファイルがどのグループに属するか」を定義します。`[database_migration_groups]` でDB IDまたはDBパスselectorごとに、対象マイグレーショングループを指定します。未指定DBは `main` が対象です。
 
 `[db_groups]` でDB IDまたはDBパスselectorのまとまりを定義できます。DB Groupの標準は全DBを表す `all` です。`--limit` と組み合わせるとカナリア適用に使えます。旧設定名 `[groups]` も互換のため読み込めます。
 
@@ -277,7 +277,7 @@ sqlite-fleet drift --group canary
 ## 終了コード
 
 - `0`: コマンドが成功した
-- 非0: 設定不備、DB検出失敗、migration失敗、checksum不一致、DB検査失敗、またはレポート書き込み失敗
+- 非0: 設定不備、DB検出失敗、マイグレーション失敗、チェックサム不一致、DB検査失敗、またはレポート書き込み失敗
 
 CI/CD では `migrate`、`check`、`doctor` の非0終了を失敗として扱ってください。
 
@@ -322,24 +322,24 @@ fn main() -> Result<()> {
 
 - 対象DBが存在しない場合、`migrate` はDBファイルを自動作成しません
 - `status`、`plan`、`check`、`migrate --dry-run` は対象DBに管理テーブルを作成しません
-- migration SQL 内の明示的な transaction 制御は拒否します
-- migration SQL 内の `ATTACH`、`DETACH`、`VACUUM` は拒否します
-- migration SQL とGUI SQLでは危険な `PRAGMA writable_schema` と `PRAGMA journal_mode=OFF` は拒否します
+- マイグレーションSQL内の明示的な transaction 制御は拒否します
+- マイグレーションSQL内の `ATTACH`、`DETACH`、`VACUUM` は拒否します
+- マイグレーションSQLとGUI SQLでは危険な `PRAGMA writable_schema` と `PRAGMA journal_mode=OFF` は拒否します
 - GUI SQLでは `PRAGMA foreign_keys=OFF` と `PRAGMA ignore_check_constraints=ON` も拒否します
-- GUI SQL applyは通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします
+- GUI SQL適用は通常のSQLをatomic transactionで実行し、途中で失敗した場合はrollbackします
 - GUI SQLでは明示的な transaction 制御と、外部DBへ影響しうる `ATTACH` / `DETACH` は拒否します
 - GUI SQLでは外部ファイルへ影響しうる `VACUUM INTO` を拒否し、`VACUUM` / `PRAGMA journal_mode` は単独SQLとしてだけ許可します
 - migration 管理テーブルへの直接変更やDDLは拒否します
-- discovery query は読み取り専用の `SELECT` / `WITH` 系だけを許可します
+- DB検出クエリは読み取り専用の `SELECT` / `WITH` 系だけを許可します
 - TOML 設定の未知フィールドは拒否します
 - 設定由来パスの前後空白と `..` は拒否します
 - `report.path` のシンボリックリンク脱出は拒否し、JSONレポートは一時ファイル経由で置き換えます
 
 ## セキュリティ上の前提
 
-`sqlite-fleet` は信頼済みの設定ファイルと migration SQL を運用者が管理する前提のツールです。信頼できないユーザーに設定ファイル、migration SQL、discovery query を書かせる用途は想定していません。
+`sqlite-fleet` は信頼済みの設定ファイルとマイグレーションSQLを運用者が管理する前提のツールです。信頼できないユーザーに設定ファイル、マイグレーションSQL、DB検出クエリを書かせる用途は想定していません。
 
-防御策として、設定パスの脱出、危険なSQL構文、管理テーブル改変、checksum不一致、未知フィールド typo は拒否します。ただし、migration SQL は最終的に対象DBへDDL/DMLを実行するため、レビュー済みのSQLだけを配置してください。
+防御策として、設定パスの脱出、危険なSQL構文、管理テーブル改変、チェックサム不一致、未知フィールド typo は拒否します。ただし、マイグレーションSQLは最終的に対象DBへDDL/DMLを実行するため、レビュー済みのSQLだけを配置してください。
 
 脆弱性報告やセキュリティ方針は [SECURITY.md](SECURITY.md) を参照してください。
 

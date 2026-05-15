@@ -342,7 +342,7 @@
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
-        assert!(response.contains("GUI SQL apply は設定で無効化されています"));
+        assert!(response.contains("GUI SQL適用は設定で無効化されています"));
 
         let mut config = Config::default();
         config.gui.allow_backup = false;
@@ -1331,7 +1331,7 @@
 
         assert!(error
             .to_string()
-            .contains("migration group の指定が必要です"));
+            .contains("マイグレーショングループの指定が必要です"));
         assert!(!migration_dir.join("005_untracked.sql").exists());
         let config = state.config.lock().unwrap();
         assert!(!config

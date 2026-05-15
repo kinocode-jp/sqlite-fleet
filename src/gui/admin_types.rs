@@ -453,11 +453,11 @@ fn clean_version(value: &str) -> Result<String> {
 }
 
 fn clean_migration_id(value: &str) -> Result<String> {
-    let value = clean_name(value, "migration file name")?;
+    let value = clean_name(value, "マイグレーションファイル名")?;
     if value.contains('/') || value.contains('\\') {
         let path = PathBuf::from(&value);
         let Some(filename) = path.file_name().and_then(|filename| filename.to_str()) else {
-            bail!("migration file name が不正です: {value}");
+            bail!("マイグレーションファイル名が不正です: {value}");
         };
         return clean_migration_id(filename);
     }

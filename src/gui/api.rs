@@ -490,7 +490,7 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
         bail!("危険PRAGMAはGUIでは実行できません: PRAGMA {pragma}");
     }
     if dry_run && sql_contains_statement_keyword(sql, &["ATTACH", "DETACH"]) {
-        bail!("ATTACH/DETACH を含むSQLはdry-runできません。外部DBへ影響する可能性があるため、内容を確認してから適用してください");
+        bail!("ATTACH/DETACH を含むSQLはDry runできません。外部DBへ影響する可能性があるため、内容を確認してから適用してください");
     }
     if sql_contains_vacuum_into(sql) {
         bail!("VACUUM INTO を含むSQLはGUIでは実行できません。外部ファイルを作成する可能性があるため、sqlite3などの外部ツールで実行してください");
@@ -509,7 +509,7 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
         dry_run,
         changed,
         message: if dry_run {
-            "dry-run OK".to_string()
+            "Dry run OK".to_string()
         } else {
             "SQL applied".to_string()
         },
@@ -616,8 +616,8 @@ fn apply_settings_request(config: &mut Config, request: SettingsRequest) -> Resu
 
 fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationGroupRequest =
-        serde_json::from_slice(&body).context("migration group request body のJSONが不正です")?;
-    let name = clean_name(&request.name, "Migration group name")?;
+        serde_json::from_slice(&body).context("マイグレーショングループ request body のJSONが不正です")?;
+    let name = clean_name(&request.name, "マイグレーショングループ名")?;
     let mut migrations = clean_migration_id_list(request.versions)?;
     let dir = clean_optional_string(request.dir);
     let mut config = locked_config(state)?;
@@ -659,7 +659,7 @@ fn api_save_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminR
     }
     persist_config(state, config)?;
     Ok(AdminResult::new(format!(
-        "migration group を保存しました: {name}"
+        "マイグレーショングループを保存しました: {name}"
     )))
 }
 
@@ -741,7 +741,7 @@ fn baseline_database(
         return baseline_failed_result(
             plan.database,
             pending,
-            "checksum不一致があるためbaseline登録できません".to_string(),
+            "チェックサム不一致があるためbaseline登録できません".to_string(),
         );
     }
     if pending.is_empty() {
@@ -781,7 +781,7 @@ fn baseline_database(
         return baseline_failed_result(
             plan.database,
             pending,
-            "checksum不一致があるためbaseline登録できません".to_string(),
+            "チェックサム不一致があるためbaseline登録できません".to_string(),
         );
     }
     if pending.is_empty() {
@@ -867,33 +867,33 @@ fn clean_migration_id_list(values: Vec<String>) -> Result<Vec<String>> {
 
 fn api_save_db_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: DbGroupRequest =
-        serde_json::from_slice(&body).context("DB group request body のJSONが不正です")?;
-    let name = clean_name(&request.name, "DB group name")?;
+        serde_json::from_slice(&body).context("DBグループ request body のJSONが不正です")?;
+    let name = clean_name(&request.name, "DBグループ名")?;
     let selectors = clean_list(request.selectors, "selectors")?;
     let mut config = locked_config(state)?;
     config.db_groups.insert(name.clone(), selectors);
     persist_config(state, config)?;
-    Ok(AdminResult::new(format!("DB group を保存しました: {name}")))
+    Ok(AdminResult::new(format!("DBグループを保存しました: {name}")))
 }
 
 fn api_save_database_migration_group(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: DatabaseMigrationGroupRequest = serde_json::from_slice(&body)
-        .context("database migration group request body のJSONが不正です")?;
+        .context("DB別マイグレーショングループ request body のJSONが不正です")?;
     let selector = clean_name(&request.selector, "DB selector")?;
-    let groups = clean_list_allow_empty(request.groups, "migration groups")?;
+    let groups = clean_list_allow_empty(request.groups, "マイグレーショングループ")?;
     let mut config = locked_config(state)?;
     config
         .database_migration_groups
         .insert(selector.clone(), groups);
     persist_config(state, config)?;
     Ok(AdminResult::new(format!(
-        "DBのmigration group割当を保存しました: {selector}"
+        "DBのマイグレーショングループ割当を保存しました: {selector}"
     )))
 }
 
 fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationFileRequest =
-        serde_json::from_slice(&body).context("migration file request body のJSONが不正です")?;
+        serde_json::from_slice(&body).context("マイグレーションファイル request body のJSONが不正です")?;
     let (filename, version, name) = match request.filename.as_deref() {
         Some(filename) => {
             let filename = filename.trim();
@@ -902,21 +902,21 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
         }
         None => {
             let version = clean_version(&request.version)?;
-            let name = clean_file_stem(&request.name, "migration name")?;
+            let name = clean_file_stem(&request.name, "マイグレーション名")?;
             (format!("{version}_{name}.sql"), version, name)
         }
     };
     let request_version = clean_version(&request.version)?;
-    let request_name = clean_file_stem(&request.name, "migration name")?;
+    let request_name = clean_file_stem(&request.name, "マイグレーション名")?;
     if request_version != version || request_name != name {
-        bail!("migration file name と version/name が一致しません");
+        bail!("マイグレーションファイル名と version/name が一致しません");
     }
     let sql = request.sql.trim();
     if sql.is_empty() {
-        bail!("migration SQL は空にできません");
+        bail!("マイグレーションSQLは空にできません");
     }
     if utf8_byte_len(sql) > MAX_SQL_BYTES {
-        bail!("migration SQL が大きすぎます");
+        bail!("マイグレーションSQLが大きすぎます");
     }
     let mut config = locked_config(state)?;
     let target_group = request
@@ -924,10 +924,10 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
         .as_deref()
         .map(str::trim)
         .filter(|group| !group.is_empty())
-        .map(|group| clean_name(group, "Migration group name"))
+        .map(|group| clean_name(group, "マイグレーショングループ名"))
         .transpose()?;
     if !config.migration_groups.is_empty() && target_group.is_none() {
-        bail!("明示的な migration_groups がある設定では migration group の指定が必要です");
+        bail!("明示的な migration_groups がある設定ではマイグレーショングループの指定が必要です");
     }
     let migrations_dir_value = target_group
         .as_deref()
@@ -937,13 +937,13 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
     let migrations_dir = resolve_existing_or_creatable_dir(&config, migrations_dir_value)?;
     std::fs::create_dir_all(&migrations_dir).with_context(|| {
         format!(
-            "migrations.dir を作成できません: {}",
+            "マイグレーションディレクトリを作成できません: {}",
             migrations_dir.display()
         )
     })?;
     let path = migrations_dir.join(&filename);
-    validate_path_stays_in_base(&config, &path, "migration file")?;
-    create_new_file_no_symlink(&path, sql.as_bytes(), "migration file")?;
+    validate_path_stays_in_base(&config, &path, "マイグレーションファイル")?;
+    create_new_file_no_symlink(&path, sql.as_bytes(), "マイグレーションファイル")?;
     let preserves_implicit_main =
         config.migration_groups.is_empty() && target_group.as_deref() == Some(MAIN_MIGRATION_GROUP);
     if let Some(group) = target_group.filter(|_| !preserves_implicit_main) {
@@ -965,35 +965,35 @@ fn api_create_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
         return Err(error);
     }
     Ok(AdminResult::new(format!(
-        "migration file を作成しました: {}",
+        "マイグレーションファイルを作成しました: {}",
         path.display()
     )))
 }
 
 fn api_update_migration_file(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: MigrationFileUpdateRequest =
-        serde_json::from_slice(&body).context("migration file update request body のJSONが不正です")?;
+        serde_json::from_slice(&body).context("マイグレーションファイル更新 request body のJSONが不正です")?;
     let request_version = clean_version(&request.version)?;
-    let group = clean_name(&request.group, "Migration group name")?;
+    let group = clean_name(&request.group, "マイグレーショングループ名")?;
     let sql = request.sql.trim();
     if sql.is_empty() {
-        bail!("migration SQL は空にできません");
+        bail!("マイグレーションSQLは空にできません");
     }
     if utf8_byte_len(sql) > MAX_SQL_BYTES {
-        bail!("migration SQL が大きすぎます");
+        bail!("マイグレーションSQLが大きすぎます");
     }
     let config = locked_config(state)?;
     let databases = discover_databases(&config)?;
     let migrations = load_migrations(&config)?;
     let requested_path = PathBuf::from(request.path.trim());
     if requested_path.as_os_str().is_empty() {
-        bail!("migration file path は空にできません");
+        bail!("マイグレーションファイルパスは空にできません");
     }
-    validate_path_stays_in_base(&config, &requested_path, "migration file")?;
+    validate_path_stays_in_base(&config, &requested_path, "マイグレーションファイル")?;
     let filename = requested_path
         .file_name()
         .and_then(|filename| filename.to_str())
-        .ok_or_else(|| anyhow::anyhow!("migration file name が不正です"))?;
+        .ok_or_else(|| anyhow::anyhow!("マイグレーションファイル名が不正です"))?;
     let filename = clean_migration_id(filename)?;
     let applied_databases =
         applied_databases_for_filename(&config, &databases, &migrations, &filename, true)?;
@@ -1011,21 +1011,21 @@ fn api_update_migration_file(state: &ServerState, body: Vec<u8>) -> Result<Admin
                 && migration.version == request_version
                 && paths_equal(&migration.path, &requested_path)
         })
-        .ok_or_else(|| anyhow::anyhow!("指定されたmigration fileが見つかりません"))?;
+        .ok_or_else(|| anyhow::anyhow!("指定されたマイグレーションファイルが見つかりません"))?;
     let previous_sql = std::fs::read_to_string(&migration.path).with_context(|| {
         format!(
-            "migration file の現在内容を読めません: {}",
+            "マイグレーションファイルの現在内容を読めません: {}",
             migration.path.display()
         )
     })?;
     std::fs::write(&migration.path, sql)
-        .with_context(|| format!("migration file を更新できません: {}", migration.path.display()))?;
+        .with_context(|| format!("マイグレーションファイルを更新できません: {}", migration.path.display()))?;
     if let Err(error) = load_migrations(&config) {
         let _ = std::fs::write(&migration.path, previous_sql);
         return Err(error);
     }
     Ok(AdminResult::new(format!(
-        "migration file を更新しました: {}",
+        "マイグレーションファイルを更新しました: {}",
         migration.path.display()
     )))
 }
@@ -1060,7 +1060,7 @@ fn api_create_database_file(state: &ServerState, body: Vec<u8>) -> Result<AdminR
         .map(str::trim)
         .filter(|group| !group.is_empty())
     {
-        let group = clean_name(group, "DB group name")?;
+        let group = clean_name(group, "DBグループ名")?;
         let entry = config.db_groups.entry(group).or_default();
         if !entry.iter().any(|item| item == &relative_path) {
             entry.push(relative_path.clone());

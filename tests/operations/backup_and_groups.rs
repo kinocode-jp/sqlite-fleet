@@ -355,7 +355,7 @@ fn group_selection_rejects_missing_selector_even_when_other_selectors_match() {
     .to_string();
 
     assert!(
-        error.contains("指定されたDB group selectorが見つかりません: tenant-b"),
+        error.contains("指定されたDBグループセレクタが見つかりません: tenant-b"),
         "{error}"
     );
 }

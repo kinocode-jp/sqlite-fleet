@@ -1,9 +1,9 @@
 fn execute_sql_apply(conn: &Connection, sql: &str) -> Result<u64> {
     if let Some(keyword) = sql_transaction_control_statement(sql) {
-        bail!("GUI SQL apply はatomic transactionで実行するため、transaction制御文は使用できません: {keyword}");
+        bail!("GUI SQL適用はatomic transactionで実行するため、transaction制御文は使用できません: {keyword}");
     }
     if sql_contains_statement_keyword(sql, &["ATTACH", "DETACH"]) {
-        bail!("ATTACH/DETACH を含むSQLはGUI applyできません。外部DBへ影響するため、sqlite3等で明示的に実行してください");
+        bail!("ATTACH/DETACH を含むSQLはGUI SQL適用できません。外部DBへ影響するため、sqlite3等で明示的に実行してください");
     }
     if sql_contains_journal_mode_pragma(sql) {
         if sql_statement_command_count(sql) == 1 {
@@ -33,17 +33,17 @@ fn execute_sql_apply_atomically(conn: &Connection, sql: &str) -> Result<u64> {
             if let Err(error) = conn.execute_batch("COMMIT;") {
                 let _ = conn.execute_batch("ROLLBACK;");
                 return Err(anyhow::Error::new(error))
-                    .context("GUI SQL apply transaction をcommitできません");
+                    .context("GUI SQL適用 transaction をcommitできません");
             }
             Ok(conn.total_changes().saturating_sub(before))
         }
         Err(error) => {
             if let Err(rollback_error) = conn.execute_batch("ROLLBACK;") {
                 return Err(anyhow::Error::new(error)).context(format!(
-                    "GUI SQL apply に失敗し、rollbackにも失敗しました: {rollback_error}"
+                    "GUI SQL適用に失敗し、rollbackにも失敗しました: {rollback_error}"
                 ));
             }
-            Err(anyhow::Error::new(error)).context("GUI SQL apply に失敗したためrollbackしました")
+            Err(anyhow::Error::new(error)).context("GUI SQL適用に失敗したためrollbackしました")
         }
     }
 }
@@ -94,7 +94,7 @@ fn execute_sql_on_dry_run_copy(
     lock_timeout_ms: u64,
 ) -> Result<u64> {
     let conn = Connection::open_with_flags(copy.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)
-        .with_context(|| format!("dry-run用DBコピーを開けません: {}", copy.path().display()))?;
+        .with_context(|| format!("Dry run用DBコピーを開けません: {}", copy.path().display()))?;
     configure_gui_connection(&conn, lock_timeout_ms)?;
     let before = conn.total_changes();
     conn.execute_batch(sql)
@@ -117,7 +117,7 @@ fn create_dry_run_database_copy(
         remove_sqlite_database_files(&destination);
         return Err(error).with_context(|| {
             format!(
-                "dry-run用DBコピーを作成できません: {}",
+                "Dry run用DBコピーを作成できません: {}",
                 destination.display()
             )
         });
@@ -669,4 +669,3 @@ fn skip_bracket_quoted_ident(bytes: &[u8], mut index: usize) -> usize {
     }
     index
 }
-

@@ -194,7 +194,7 @@
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
         assert!(INDEX_HTML.contains("': GUI操作権限を制限します。デフォルトでは読み取り系の': ': controls GUI permissions. By default, only read-only'"));
-        assert!(INDEX_HTML.contains("'DBを書き換える操作、backup、SQL apply、migration編集を有効にする権限:': 'Permissions that enable database-changing operations, backup, SQL apply, and migration editing:'"));
+        assert!(INDEX_HTML.contains("'DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集を有効にする権限:': 'Permissions that enable database-changing operations, backup, SQL apply, and migration editing:'"));
         assert!(INDEX_HTML.contains("': 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください:': ': the current GUI has no restore screen. Run restores with the CLI:'"));
         assert!(INDEX_HTML.contains("'Version': 'Version'"));
         assert!(INDEX_HTML.contains("'File name': 'File name'"));
@@ -441,7 +441,7 @@
         assert!(INDEX_HTML.contains(".modal.wide { width:min(1120px, calc(100vw - 36px)); }"));
         assert!(INDEX_HTML.contains(r#"<p id="migrationFileStatus" class="migration-file-status" hidden></p>"#));
         assert!(INDEX_HTML.contains(r#"<label class="field file-name-field"><span class="field-label">File name <span id="newMigrationLatestFilename" class="field-hint"></span></span><input id="newMigrationFilename" placeholder="005_add_feature_flag.sql"></label>"#));
-        assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to migration group</span><select id="newMigrationGroup"></select></label>"#));
+        assert!(INDEX_HTML.contains(r#"<label id="newMigrationGroupField" class="field" hidden><span class="field-label">Add to Migration Group</span><select id="newMigrationGroup"></select></label>"#));
         assert!(INDEX_HTML.contains(r#"<div id="migrationTemplateRow" class="sql-control-row">"#));
         assert!(INDEX_HTML.contains(r#"<span class="field-label">テンプレート</span>"#));
         assert!(INDEX_HTML.contains(r#"<input id="newMigrationTemplateSearch" list="newMigrationTemplateOptions" placeholder="テンプレート検索" aria-label="SQL template">"#));
@@ -574,22 +574,22 @@
         assert!(INDEX_HTML.contains(r#"data-tip="DBグループはどのDBへ実行するか"#));
         assert!(INDEX_HTML.contains(r#"data-tip="db_groups/groups に定義した対象DBのまとまりです"#));
         assert!(INDEX_HTML
-            .contains(r#"data-tip="SQL apply は自動的にatomic transactionで実行されます"#));
+            .contains(r#"data-tip="SQL適用は自動的にatomic transactionで実行されます"#));
         assert!(INDEX_HTML.contains(r#"data-tip="UTF-8の.sqlまたはテキストファイルを読み込みます"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">DB管理 <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します"#));
         assert!(INDEX_HTML.contains(r#"<h2 class="panel-title">マイグレーション管理 <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、checksumを確認できます"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます"#));
         assert!(INDEX_HTML.contains(r#"DB discovery <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"data-tip="globはファイルパターンでDBを探します"#));
         assert!(INDEX_HTML.contains(r#"DB path glob <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="glob discoveryで使うDBファイルのパターンです"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="glob形式のDB検出で使うDBファイルのパターンです"#));
         assert!(INDEX_HTML.contains(r#"Allowed roots <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains(r#"data-tip="Sqlite FleetがDB、migration、report、backupとして参照できるディレクトリです"#));
+        assert!(INDEX_HTML.contains(r#"data-tip="Sqlite FleetがDB、マイグレーション、レポート、バックアップとして参照できるディレクトリです"#));
         assert!(INDEX_HTML.contains(r#"Migration dir <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"Report path <span class="tool-tip""#));
         assert!(INDEX_HTML.contains(r#"Parallel <span class="tool-tip""#));
-        assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、checksumを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));
+        assert!(INDEX_HTML.contains("'読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。': 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.'"));
     }
 
     #[test]
@@ -633,8 +633,8 @@
         assert!(INDEX_HTML.contains("現在のGUIにはrestore実行画面はありません"));
         assert!(INDEX_HTML.contains("sqlite-fleet restore"));
         assert!(INDEX_HTML.contains("allow_migration_edit"));
-        assert!(INDEX_HTML.contains("基本的にはdry-runで確認してから適用してください"));
-        assert!(INDEX_HTML.contains("GUI applyは自動的にatomic transactionで実行されます"));
+        assert!(INDEX_HTML.contains("基本的にはDry runで確認してから適用してください"));
+        assert!(INDEX_HTML.contains("GUI SQL適用は自動的にatomic transactionで実行されます"));
         assert!(INDEX_HTML.contains("PRAGMA journal_modeは単独SQLとしてだけ適用できます"));
         assert!(INDEX_HTML.contains(r#"<input id="sqlTemplateSearch" list="sqlTemplateOptions""#));
         assert!(INDEX_HTML.contains(r#"<input id="sqlTemplate" type="hidden">"#));

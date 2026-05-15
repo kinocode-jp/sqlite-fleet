@@ -105,10 +105,10 @@ fn select_databases(config: &Config, selection: &DatabaseSelection) -> Result<Ve
                 .effective_db_groups()
                 .get(group)
                 .cloned()
-                .ok_or_else(|| anyhow::anyhow!("指定されたDB groupが見つかりません: {group}"))?;
+                .ok_or_else(|| anyhow::anyhow!("指定されたDBグループが見つかりません: {group}"))?;
             databases = select_group_databases(config, &databases, &selectors)?;
             if databases.is_empty() {
-                bail!("DB group に一致するDBが見つかりません: {group}");
+                bail!("DBグループに一致するDBが見つかりません: {group}");
             }
         }
     }
@@ -148,7 +148,7 @@ fn select_group_databases(
             }
         }
         if !matched {
-            bail!("指定されたDB group selectorが見つかりません: {selector}");
+            bail!("指定されたDBグループセレクタが見つかりません: {selector}");
         }
     }
     Ok(selected)
