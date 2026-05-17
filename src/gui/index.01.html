@@ -372,6 +372,9 @@
         state = await api('/api/state');
         guiUserSetupMode = Boolean(state.gui_user_setup_available);
         render();
+        if (guiUserSetupMode && !window.location.hash) {
+          navigateToPage('settings', { replace: true });
+        }
         if (showLoadedMessage) clearMessage();
       } catch (error) {
         message(error.message, true);
@@ -630,6 +633,7 @@
       $('saveSettings').disabled = !canEditConfig;
       $('saveSettings').title = canEditConfig ? '' : t('configEditDisabled');
       renderAllowedRoots();
+      $('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode);
       document.querySelectorAll('[data-path-browse]').forEach((button) => {
         const allowed = pathBrowseAllowed(button.dataset.pathBrowse);
         button.disabled = !allowed;
@@ -667,11 +671,12 @@
       renderSetupChecklist(settings);
     }
     function renderGuiUsers(canEditPermissions) {
-      if (!Array.isArray(state.gui_users) && guiUserSetupMode) state.gui_users = [];
+      if (!Array.isArray(state.gui_users) && guiUserSetupMode) state.gui_users = [defaultGuiUser(true)];
       if (!Array.isArray(state.gui_users)) {
         $('guiUsers').innerHTML = '';
         return;
       }
+      if (guiUserSetupMode && state.gui_users.length === 0) state.gui_users = [defaultGuiUser(true)];
       const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
       $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
         <div class="permission-card" data-gui-user-index="${index}">
@@ -688,6 +693,22 @@
           <button type="button" data-remove-gui-user="${index}" ${disabled}>Remove</button>
         </div>
       `).join('');
+    }
+    function defaultGuiUser(isFirstUser) {
+      return {
+        name: isFirstUser ? 'owner' : '',
+        token: '',
+        permissions: {
+          allow_check: true,
+          allow_migrate: isFirstUser,
+          allow_backup: isFirstUser,
+          allow_restore: isFirstUser,
+          allow_sql_apply: isFirstUser,
+          allow_migration_edit: isFirstUser,
+          allow_gui_permission_edit: true,
+          allow_config_edit: isFirstUser,
+        },
+      };
     }
     function renderSetupChecklist(settings) {
       const discovery = settings.discovery || 'glob';
@@ -2172,20 +2193,7 @@
     $('addGuiUser').addEventListener('click', () => {
       if (Array.isArray(state.gui_users)) syncGuiUserFormToState();
       if (!Array.isArray(state.gui_users)) state.gui_users = [];
-      state.gui_users.push({
-        name: state.gui_users.length === 0 ? 'owner' : '',
-        token: '',
-        permissions: {
-          allow_check: true,
-          allow_migrate: state.gui_users.length === 0,
-          allow_backup: state.gui_users.length === 0,
-          allow_restore: state.gui_users.length === 0,
-          allow_sql_apply: state.gui_users.length === 0,
-          allow_migration_edit: state.gui_users.length === 0,
-          allow_gui_permission_edit: true,
-          allow_config_edit: state.gui_users.length === 0,
-        },
-      });
+      state.gui_users.push(defaultGuiUser(state.gui_users.length === 0));
       renderSettings();
     });
     $('guiUsers').addEventListener('click', (event) => {

@@ -267,6 +267,16 @@
             .contains("headers['X-SQLite-Fleet-Setup-Token'] = setupToken"));
         assert!(INDEX_HTML.contains("let guiUserSetupMode = false"));
         assert!(INDEX_HTML.contains("guiUserSetupMode = Boolean(state.gui_user_setup_available)"));
+        assert!(INDEX_HTML.contains("if (guiUserSetupMode && !window.location.hash)"));
+        assert!(INDEX_HTML.contains("navigateToPage('settings', { replace: true })"));
+        assert!(INDEX_HTML.contains(r#"<details id="settingsGuiPermissionsSection" class="settings-section">"#));
+        assert!(INDEX_HTML.contains(
+            r#"<details id="settingsGuiPermissionsSection" class="settings-section">
+            <summary>GUI permissions</summary>"#
+        ));
+        assert!(INDEX_HTML.contains("$('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode)"));
+        assert!(INDEX_HTML.contains("function defaultGuiUser(isFirstUser)"));
+        assert!(INDEX_HTML.contains("state.gui_users = [defaultGuiUser(true)]"));
         assert!(INDEX_HTML.contains("const canEditPermissions = permissions.allow_gui_permission_edit || guiUserSetupMode"));
         assert!(INDEX_HTML.contains("$('savePermissions').disabled = !canEditPermissions"));
         assert!(INDEX_HTML.contains("canEditPermissions || guiUserSetupMode"));
