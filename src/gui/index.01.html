@@ -702,8 +702,15 @@
       const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
       $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
         <div class="permission-card gui-user-card" data-gui-user-index="${index}">
-          <label class="field"><span class="field-label">User</span><input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" ${disabled}></label>
-          <label class="field"><span class="field-label">Token</span><input data-gui-user-field="token" value="${escapeHtml(user.token || '')}" ${disabled}></label>
+          <label class="field">
+            <span class="field-label">${escapeHtml(t('guiUserNameLabel'))}</span>
+            <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" placeholder="${escapeHtml(t('guiUserNamePlaceholder'))}" autocomplete="off" spellcheck="false" ${disabled}>
+          </label>
+          <label class="field">
+            <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))}</span>
+            <input data-gui-user-field="token" value="${escapeHtml(user.token || '')}" placeholder="${escapeHtml(t('guiUserTokenPlaceholder'))}" autocomplete="off" spellcheck="false" ${disabled}>
+            <span class="field-hint">${escapeHtml(t('guiUserTokenHint'))}</span>
+          </label>
           <div class="permission-form permission-grid">
             ${Object.entries(user.permissions || {}).map(([key, value]) => `
               <label class="check-row">
@@ -721,7 +728,7 @@
     }
     function defaultGuiUser(isFirstUser) {
       return {
-        name: isFirstUser ? 'owner' : '',
+        name: '',
         token: '',
         permissions: {
           allow_check: true,
