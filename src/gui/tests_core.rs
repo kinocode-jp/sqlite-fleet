@@ -282,6 +282,7 @@
             config: Mutex::new(config),
             config_path: std::env::temp_dir().join("sqlite-fleet-test.toml"),
             csrf_token: "token".to_string(),
+            setup_token: "setup-token".to_string(),
             script_nonce: "nonce".to_string(),
             bind_ip: addr.ip(),
             port: addr.port(),
@@ -309,6 +310,7 @@
             config: Mutex::new(config),
             config_path,
             csrf_token: "token".to_string(),
+            setup_token: "setup-token".to_string(),
             script_nonce: "nonce".to_string(),
             bind_ip: Ipv4Addr::LOCALHOST.into(),
             port: 0,
@@ -488,6 +490,7 @@
         let json = serde_json::to_string(&state).unwrap();
 
         assert!(!json.contains("gui_users"), "{json}");
+        assert!(json.contains(r#""gui_user_setup_available":true"#), "{json}");
     }
 
     #[test]
@@ -579,28 +582,22 @@
     }
 
     #[test]
-    fn gui_allows_initial_user_creation_with_permission_edit_enabled() {
+    fn gui_allows_initial_user_creation_with_setup_token() {
         let body = r#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false,"gui_users":[{"name":"owner","token":"owner-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}]}"#;
         let response = send_test_http_request_with_config(
             &format!(
-                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-Setup-Token: setup-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 body.len(),
                 body
             ),
-            Config {
-                gui: sqlite_fleet::GuiConfig {
-                    allow_gui_permission_edit: true,
-                    ..sqlite_fleet::GuiConfig::default()
-                },
-                ..Config::default()
-            },
+            Config::default(),
         );
 
         assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
     }
 
     #[test]
-    fn gui_rejects_initial_user_creation_without_permission_edit() {
+    fn gui_rejects_initial_user_creation_without_setup_token() {
         let body = r#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false,"gui_users":[{"name":"owner","token":"owner-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}]}"#;
         let response = send_test_http_request_with_config(
             &format!(
@@ -612,7 +609,24 @@
         );
 
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
-        assert!(response.contains("GUI permission edit は設定で無効化されています"));
+        assert!(response.contains("GUI initial user setup token が不正です"));
+    }
+
+    #[test]
+    fn gui_rejects_null_gui_users_during_initial_setup() {
+        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true,"gui_users":null}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-Setup-Token: setup-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            Config::default(),
+        );
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+        assert!(response.contains(r#""ok":false"#), "{response}");
+        assert!(response.contains("gui_users は配列で指定してください"), "{response}");
     }
 
     #[test]

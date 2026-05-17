@@ -33,8 +33,7 @@ fn api_state(config: &Config, permissions: &sqlite_fleet::GuiConfig) -> ApiEnvel
                     ),
                     gui_permissions: GuiPermissionData::from_permissions(permissions),
                     gui_users: api_gui_users(config, permissions),
-                    gui_user_setup_available: config.gui_users.is_empty()
-                        && permissions.allow_gui_permission_edit,
+                    gui_user_setup_available: config.gui_users.is_empty(),
                     settings: SettingsData::from_config(config),
                     project: config.project.name.clone(),
                     status,
@@ -539,9 +538,25 @@ fn api_gui_users(
     Some(users)
 }
 
+#[cfg(test)]
 fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
-    let request: GuiPermissionRequest =
-        serde_json::from_slice(&body).context("GUI permissions request body のJSONが不正です")?;
+    let request = parse_gui_permission_request(&body)?;
+    api_save_gui_permissions_request(state, request)
+}
+
+fn parse_gui_permission_request(body: &[u8]) -> Result<GuiPermissionRequest> {
+    let value: serde_json::Value =
+        serde_json::from_slice(body).context("GUI permissions request body のJSONが不正です")?;
+    if matches!(value.get("gui_users"), Some(serde_json::Value::Null)) {
+        bail!("gui_users は配列で指定してください");
+    }
+    serde_json::from_value(value).context("GUI permissions request body のJSONが不正です")
+}
+
+fn api_save_gui_permissions_request(
+    state: &ServerState,
+    request: GuiPermissionRequest,
+) -> Result<AdminResult> {
     let mut config = locked_config(state)?;
     if let Some(gui_users) = request.gui_users {
         if gui_users.is_empty() {

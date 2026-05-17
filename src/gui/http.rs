@@ -123,6 +123,7 @@ fn parse_headers(request: &str) -> Result<HashMap<String, String>> {
             "host"
                 | "x-sqlite-fleet-token"
                 | "x-sqlite-fleet-user-token"
+                | "x-sqlite-fleet-setup-token"
                 | "content-length"
                 | "content-type"
                 | "transfer-encoding"
@@ -162,6 +163,13 @@ fn validate_api_token(headers: &HashMap<String, String>, expected: &str) -> Resu
     match headers.get("x-sqlite-fleet-token") {
         Some(actual) if constant_time_eq(actual, expected) => Ok(()),
         _ => bail!("GUI API token が不正です。画面を更新して再実行してください"),
+    }
+}
+
+fn validate_setup_token(headers: &HashMap<String, String>, expected: &str) -> Result<()> {
+    match headers.get("x-sqlite-fleet-setup-token") {
+        Some(actual) if constant_time_eq(actual, expected) => Ok(()),
+        _ => bail!("GUI initial user setup token が不正です。画面を更新して再実行してください"),
     }
 }
 

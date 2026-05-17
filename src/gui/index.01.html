@@ -222,8 +222,9 @@
       }
       if (!disabled && state && state.gui_permissions) {
         const permissions = state.gui_permissions;
-        $('savePermissions').disabled = !permissions.allow_gui_permission_edit;
-        $('savePermissions').title = permissions.allow_gui_permission_edit ? '' : t('permissionEditDisabled');
+        const canEditPermissions = permissions.allow_gui_permission_edit || guiUserSetupMode;
+        $('savePermissions').disabled = !canEditPermissions;
+        $('savePermissions').title = canEditPermissions ? '' : t('permissionEditDisabled');
         $('saveSettings').disabled = !permissions.allow_config_edit;
         $('saveSettings').title = permissions.allow_config_edit ? '' : t('configEditDisabled');
         document.querySelectorAll('[data-path-browse]').forEach((button) => {
@@ -330,6 +331,7 @@
           const headers = Object.assign({}, optionHeaders);
           headers['X-SQLite-Fleet-Token'] = apiToken;
           if (guiUserToken) headers['X-SQLite-Fleet-User-Token'] = guiUserToken;
+          if (guiUserSetupMode) headers['X-SQLite-Fleet-Setup-Token'] = setupToken;
           const response = await fetch(path, Object.assign({}, fetchOptions, { headers }));
           const contentType = response.headers.get('content-type') || '';
           const mediaType = contentType.split(';', 1)[0].trim().toLowerCase();
@@ -794,7 +796,7 @@
         $('permissions').querySelectorAll('input[data-permission-key]').forEach((input) => {
           payload[input.dataset.permissionKey] = input.checked;
         });
-        if (Array.isArray(state.gui_users) && (guiUserSetupMode || $('guiUsers').querySelector('[data-gui-user-index]'))) {
+        if (Array.isArray(state.gui_users)) {
           payload.gui_users = readGuiUserForm();
           if (guiUserSetupMode && payload.gui_users[0] && payload.gui_users[0].token) {
             guiUserToken = payload.gui_users[0].token;

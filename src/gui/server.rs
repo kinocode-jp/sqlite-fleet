@@ -7,6 +7,7 @@ struct ServerState {
     config: Mutex<Config>,
     config_path: PathBuf,
     csrf_token: String,
+    setup_token: String,
     script_nonce: String,
     bind_ip: IpAddr,
     port: u16,
@@ -21,6 +22,7 @@ pub fn serve(config: Config, config_path: PathBuf, host: &str, port: u16) -> Res
         config: Mutex::new(config),
         config_path,
         csrf_token: generate_csrf_token()?,
+        setup_token: generate_csrf_token()?,
         script_nonce: generate_csrf_token()?,
         bind_ip: addr.ip(),
         port: addr.port(),
@@ -112,6 +114,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
         ("GET", "/") => {
             let body = INDEX_HTML
                 .replace("__CSRF_TOKEN__", &state.csrf_token)
+                .replace("__SETUP_TOKEN__", &state.setup_token)
                 .replace("__SCRIPT_NONCE__", &state.script_nonce);
             write_response(
                 &mut stream,
@@ -301,20 +304,27 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, result)
         }
         ("POST", "/api/admin/gui-permissions") => {
-            if !permissions.allow_gui_permission_edit {
+            let body = request_body.unwrap_or_default();
+            if let Err(error) = validate_no_query(query) {
+                return write_json_error(&mut stream, 400, error);
+            }
+            let request = match parse_gui_permission_request(&body) {
+                Ok(request) => request,
+                Err(error) => return write_json_result::<AdminResult>(&mut stream, Err(error)),
+            };
+            let initial_user_create = config.gui_users.is_empty() && request.gui_users.is_some();
+            if initial_user_create {
+                if let Err(error) = validate_setup_token(&headers, &state.setup_token) {
+                    return write_json_error(&mut stream, 403, error);
+                }
+            } else if !permissions.allow_gui_permission_edit {
                 return write_json_error(
                     &mut stream,
                     403,
                     anyhow::anyhow!("GUI permission edit は設定で無効化されています"),
                 );
             }
-            if let Err(error) = validate_no_query(query) {
-                return write_json_error(&mut stream, 400, error);
-            }
-            write_json_result(
-                &mut stream,
-                api_save_gui_permissions(state, request_body.unwrap_or_default()),
-            )
+            write_json_result(&mut stream, api_save_gui_permissions_request(state, request))
         }
         ("POST", "/api/admin/settings") => {
             if !permissions.allow_config_edit {
