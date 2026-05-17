@@ -299,7 +299,15 @@
       $('pageDescription').textContent = description;
       $('pageDescription').hidden = !description;
     }
+    function setupAllowedPage(page) {
+      return page === 'setup' || page === 'gui-permissions';
+    }
     function openPage(page) {
+      if (guiUserSetupMode && !setupAllowedPage(page)) {
+        page = 'setup';
+        const setupHash = hashForPage(page);
+        if (window.location.hash !== setupHash) history.replaceState(null, '', setupHash);
+      }
       document.querySelectorAll('[data-page]').forEach((section) => section.classList.toggle('active', section.dataset.page === page));
       document.querySelectorAll('[data-page-link]').forEach((link) => link.classList.toggle('active', link.dataset.pageLink === page));
       document.querySelectorAll('[data-page-actions]').forEach((actions) => {
@@ -320,11 +328,19 @@
       const hasMigrationGroups = (state.migration_groups || []).some((group) => group.name !== 'main');
       const visibility = { 'migration-groups': hasMigrationGroups };
       document.querySelectorAll('[data-conditional-nav]').forEach((link) => {
-        link.hidden = !visibility[link.dataset.conditionalNav];
+        link.hidden = guiUserSetupMode ? !setupAllowedPage(link.dataset.pageLink) : !visibility[link.dataset.conditionalNav];
+      });
+      document.querySelectorAll('[data-page-link]').forEach((link) => {
+        if (link.dataset.conditionalNav) return;
+        link.hidden = guiUserSetupMode && !setupAllowedPage(link.dataset.pageLink);
       });
       $('openMigrationGroupModalFromMigrations').hidden = hasMigrationGroups;
       const page = activePage();
-      if (page === 'migration-groups' && !hasMigrationGroups) openPage('migrations');
+      if (guiUserSetupMode && !setupAllowedPage(page)) {
+        navigateToPage('setup', { replace: true });
+      } else if (page === 'migration-groups' && !hasMigrationGroups) {
+        openPage('migrations');
+      }
     }
     async function api(path, options = {}) {
       setBusy(true);
@@ -720,6 +736,17 @@
       };
     }
     function renderSetupChecklist(settings) {
+      if (guiUserSetupMode) {
+        renderSetupChecklistItems([{
+          done: false,
+          title: t('setupGuiUserTitle'),
+          detail: t('setupGuiUserDetail'),
+          page: 'gui-permissions',
+          target: 'settingsGuiPermissionsSection',
+          action: t('openGuiUsers'),
+        }]);
+        return;
+      }
       const discovery = settings.discovery || 'glob';
       const discoveryReady = discovery === 'query'
         ? Boolean(settings.databases_source && settings.databases_query && (settings.databases_path_column || settings.databases_path_template))
@@ -734,16 +761,9 @@
         { done: migrationCount > 0, title: t('setupMigrationFilesTitle', migrationCount), detail: t('setupMigrationFilesDetail'), page: 'migrations', action: t('openMigrations') },
         { done: state && state.status && state.status.failed === 0, title: t('setupDryRunTitle'), detail: t('setupDryRunDetail'), page: 'execute', action: t('openMigrationApply') },
       ];
-      if (guiUserSetupMode) {
-        items.unshift({
-          done: false,
-          title: t('setupGuiUserTitle'),
-          detail: t('setupGuiUserDetail'),
-          page: 'gui-permissions',
-          target: 'settingsGuiPermissionsSection',
-          action: t('openGuiUsers'),
-        });
-      }
+      renderSetupChecklistItems(items);
+    }
+    function renderSetupChecklistItems(items) {
       $('setupChecklist').innerHTML = items.map((item) => `
         <div class="setup-check-item ${item.done ? 'done' : ''}">
           <span class="setup-check-mark">${item.done ? '✓' : ''}</span>

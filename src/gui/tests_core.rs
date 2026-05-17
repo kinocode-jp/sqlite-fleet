@@ -134,8 +134,9 @@
 
     #[test]
     fn not_found_response_uses_api_envelope_shape() {
-        let response = send_test_http_request(
-            "GET /api/missing HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+        let response = send_test_http_request_with_config(
+            "GET /api/missing HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
+            config_with_gui_user_permissions(sqlite_fleet::GuiConfig::default()),
         );
 
         assert!(response.starts_with("HTTP/1.1 404 Not Found"), "{response}");
@@ -171,8 +172,9 @@
             "{forbidden}"
         );
 
-        let not_found = send_test_http_request(
-            "GET /api HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+        let not_found = send_test_http_request_with_config(
+            "GET /api HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
+            config_with_gui_user_permissions(sqlite_fleet::GuiConfig::default()),
         );
         assert!(
             not_found.starts_with("HTTP/1.1 404 Not Found"),
@@ -193,8 +195,9 @@
             "{forbidden}"
         );
 
-        let not_found = send_test_http_request(
-            "GET /api/ HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+        let not_found = send_test_http_request_with_config(
+            "GET /api/ HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
+            config_with_gui_user_permissions(sqlite_fleet::GuiConfig::default()),
         );
         assert!(
             not_found.starts_with("HTTP/1.1 404 Not Found"),
@@ -317,51 +320,79 @@
         }
     }
 
+    fn config_with_gui_user_permissions(permissions: sqlite_fleet::GuiConfig) -> Config {
+        with_gui_user_permissions(Config::default(), permissions)
+    }
+
+    fn with_gui_user_permissions(
+        mut config: Config,
+        permissions: sqlite_fleet::GuiConfig,
+    ) -> Config {
+        config.gui_users = HashMap::from([(
+            "admin".to_string(),
+            sqlite_fleet::GuiUserConfig {
+                token: "user-token".to_string(),
+                permissions,
+            },
+        )]);
+        config
+    }
+
     #[test]
     fn gui_post_apis_enforce_allow_flags_server_side() {
-        let mut config = Config::default();
-        config.gui.allow_check = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_check: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "POST /api/check HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "POST /api/check HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI check は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_migrate = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_migrate: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "POST /api/migrate?dry_run=true HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "POST /api/migrate?dry_run=true HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI migrate は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_sql_apply = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_sql_apply: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: 19\r\n\r\n{\"sql\":\"SELECT 1;\"}",
+            "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: 19\r\n\r\n{\"sql\":\"SELECT 1;\"}",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI SQL適用は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_backup = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_backup: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "POST /api/backup HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "POST /api/backup HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI backup は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_migration_edit = true;
-        config.gui.allow_gui_permission_edit = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_migration_edit: true,
+            allow_gui_permission_edit: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#;
         let response = send_test_http_request_with_config(
             &format!(
-                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 body.len(),
                 body
             ),
@@ -370,21 +401,25 @@
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI permission edit は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_migration_edit = false;
-        config.gui.allow_config_edit = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_migration_edit: false,
+            allow_config_edit: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "GET /api/admin/path-entries HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "GET /api/admin/path-entries HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
         assert!(response.contains("GUI config edit は設定で無効化されています"));
 
-        let mut config = Config::default();
-        config.gui.allow_migration_edit = true;
-        config.gui.allow_config_edit = false;
+        let config = config_with_gui_user_permissions(sqlite_fleet::GuiConfig {
+            allow_migration_edit: true,
+            allow_config_edit: false,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let response = send_test_http_request_with_config(
-            "POST /api/admin/settings HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
+            "POST /api/admin/settings HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: 2\r\n\r\n{}",
             config,
         );
         assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
@@ -494,7 +529,7 @@
     }
 
     #[test]
-    fn http_save_gui_permissions_in_plain_mode_does_not_require_gui_users() {
+    fn http_save_gui_permissions_without_users_requires_initial_user_setup() {
         let body = r#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#;
         let response = send_test_http_request_with_config(
             &format!(
@@ -511,8 +546,30 @@
             },
         );
 
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(
+            response.contains("GUI user を作成するまで、この操作は利用できません"),
+            "{response}"
+        );
+    }
+
+    #[test]
+    fn initial_setup_blocks_non_setup_apis() {
+        let response = send_test_http_request(
+            "GET /api/discover HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+        );
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(
+            response.contains("GUI user を作成するまで、この操作は利用できません"),
+            "{response}"
+        );
+
+        let response = send_test_http_request(
+            "GET /api/state HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+        );
         assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
-        assert!(!response.contains("GUI user は1人以上必要です"), "{response}");
+        assert!(response.contains(r#""gui_user_setup_available":true"#), "{response}");
+        assert!(response.contains(r#""database_count":0"#), "{response}");
     }
 
     #[test]
@@ -1767,7 +1824,7 @@
         let data_dir = dir.path().join("data");
         std::fs::create_dir(&data_dir).unwrap();
         Connection::open(data_dir.join("tenant.db")).unwrap();
-        let config = Config {
+        let config = with_gui_user_permissions(Config {
             base_dir: dir.path().to_path_buf(),
             databases: sqlite_fleet::DatabasesConfig {
                 discovery: "glob".to_string(),
@@ -1782,12 +1839,15 @@
                 ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
-        };
+        }, sqlite_fleet::GuiConfig {
+            allow_sql_apply: true,
+            ..sqlite_fleet::GuiConfig::default()
+        });
 
         let body = r#"{"sql":"CREATE TABLE audit_items(id INTEGER PRIMARY KEY);"}"#;
         let response = send_test_http_request_with_config(
             &format!(
-                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 body.len(),
                 body
             ),
@@ -1798,7 +1858,7 @@
         let body = r#"{"sql":"CREATE TABLE broken("}"#;
         let response = send_test_http_request_with_config(
             &format!(
-                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                "POST /api/sql?dry_run=false&database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 body.len(),
                 body
             ),
@@ -1826,7 +1886,7 @@
             "CREATE TABLE audit_items(id INTEGER PRIMARY KEY);",
         )
         .unwrap();
-        let config = Config {
+        let config = with_gui_user_permissions(Config {
             base_dir: dir.path().to_path_buf(),
             databases: sqlite_fleet::DatabasesConfig {
                 discovery: "glob".to_string(),
@@ -1845,10 +1905,13 @@
                 ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
-        };
+        }, sqlite_fleet::GuiConfig {
+            allow_migrate: true,
+            ..sqlite_fleet::GuiConfig::default()
+        });
 
         let response = send_test_http_request_with_config(
-            "POST /api/migrate?dry_run=false HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "POST /api/migrate?dry_run=false HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
 
@@ -1870,7 +1933,7 @@
             "CREATE TABLE baseline_items(id INTEGER PRIMARY KEY);",
         )
         .unwrap();
-        let config = Config {
+        let config = with_gui_user_permissions(Config {
             base_dir: dir.path().to_path_buf(),
             databases: sqlite_fleet::DatabasesConfig {
                 discovery: "glob".to_string(),
@@ -1893,12 +1956,15 @@
                 ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
-        };
+        }, sqlite_fleet::GuiConfig {
+            allow_migrate: true,
+            ..sqlite_fleet::GuiConfig::default()
+        });
         let body = r#"{"databases":["tenant"]}"#;
 
         let response = send_test_http_request_with_config(
             &format!(
-                "POST /api/admin/baseline HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                "POST /api/admin/baseline HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
                 body.len(),
                 body
             ),
@@ -1921,7 +1987,7 @@
             .unwrap()
             .execute_batch("CREATE TABLE items(id INTEGER PRIMARY KEY);")
             .unwrap();
-        let config = Config {
+        let config = with_gui_user_permissions(Config {
             base_dir: dir.path().to_path_buf(),
             databases: sqlite_fleet::DatabasesConfig {
                 discovery: "glob".to_string(),
@@ -1941,10 +2007,13 @@
                 ..sqlite_fleet::GuiConfig::default()
             },
             ..Config::default()
-        };
+        }, sqlite_fleet::GuiConfig {
+            allow_backup: true,
+            ..sqlite_fleet::GuiConfig::default()
+        });
 
         let response = send_test_http_request_with_config(
-            "POST /api/backup?database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
+            "POST /api/backup?database=tenant HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: user-token\r\n\r\n",
             config,
         );
 

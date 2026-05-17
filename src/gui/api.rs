@@ -6,6 +6,35 @@ struct ApiEnvelope<T> {
 }
 
 fn api_state(config: &Config, permissions: &sqlite_fleet::GuiConfig) -> ApiEnvelope<StateData> {
+    if config.gui_users.is_empty() {
+        return ApiEnvelope {
+            ok: true,
+            data: Some(StateData {
+                migration_groups: Vec::new(),
+                db_groups: Vec::new(),
+                database_migration_rules: Vec::new(),
+                database_migration_assignments: Vec::new(),
+                gui_permissions: GuiPermissionData::from_permissions(permissions),
+                gui_users: None,
+                gui_user_setup_available: true,
+                settings: SettingsData::from_config(config),
+                project: config.project.name.clone(),
+                status: sqlite_fleet::StatusReport {
+                    database_count: 0,
+                    latest_migration: None,
+                    up_to_date: 0,
+                    pending: 0,
+                    failed: 0,
+                    missing: 0,
+                    corrupt: 0,
+                    plans: Vec::new(),
+                },
+                databases: Vec::new(),
+                migrations: Vec::new(),
+            }),
+            error: None,
+        };
+    }
     match (
         status_report(config),
         discover_databases(config),

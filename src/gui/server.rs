@@ -109,6 +109,14 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
     } else {
         config.gui.clone()
     };
+    if is_api_path(path) && config.gui_users.is_empty() && !initial_setup_api_allowed(method, path)
+    {
+        return write_json_error(
+            &mut stream,
+            403,
+            anyhow::anyhow!("GUI user を作成するまで、この操作は利用できません"),
+        );
+    }
 
     match (method, path) {
         ("GET", "/") => {
@@ -313,9 +321,17 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Err(error) => return write_json_result::<AdminResult>(&mut stream, Err(error)),
             };
             let initial_user_create = config.gui_users.is_empty() && request.gui_users.is_some();
-            if initial_user_create {
-                if let Err(error) = validate_setup_token(&headers, &state.setup_token) {
-                    return write_json_error(&mut stream, 403, error);
+            if config.gui_users.is_empty() {
+                if initial_user_create {
+                    if let Err(error) = validate_setup_token(&headers, &state.setup_token) {
+                        return write_json_error(&mut stream, 403, error);
+                    }
+                } else {
+                    return write_json_error(
+                        &mut stream,
+                        403,
+                        anyhow::anyhow!("GUI user を作成するまで、この操作は利用できません"),
+                    );
                 }
             } else if !permissions.allow_gui_permission_edit {
                 return write_json_error(
@@ -537,4 +553,11 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
         }
         _ => write_json_error(&mut stream, 404, anyhow::anyhow!("not found")),
     }
+}
+
+fn initial_setup_api_allowed(method: &str, path: &str) -> bool {
+    matches!(
+        (method, path),
+        ("GET", "/api/state") | ("POST", "/api/admin/gui-permissions")
+    )
 }
