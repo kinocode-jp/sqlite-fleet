@@ -294,7 +294,7 @@
     function updatePageHeading(page) {
       const titles = pageTitles[currentLocale] || pageTitles.en;
       const descriptions = pageDescriptions[currentLocale] || pageDescriptions.en;
-      const description = descriptions[page] || '';
+      const description = guiUserSetupMode && page === 'setup' ? t('setupInitialDescription') : descriptions[page] || '';
       $('pageHeading').textContent = titles[page] || titles.execute;
       $('pageDescription').textContent = description;
       $('pageDescription').hidden = !description;
@@ -404,6 +404,7 @@
       $('title').textContent = 'Sqlite Fleet';
       const s = state.status;
       updateConditionalNav();
+      updatePageHeading(pageFromHash());
       renderDatabaseSelectors(s.plans);
       renderTargetSelectors(s.plans);
       $('summary').innerHTML = [
@@ -704,7 +705,7 @@
         <div class="permission-card gui-user-card" data-gui-user-index="${index}">
           <label class="field">
             <span class="field-label">${escapeHtml(t('guiUserNameLabel'))}</span>
-            <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" placeholder="${escapeHtml(t('guiUserNamePlaceholder'))}" autocomplete="off" spellcheck="false" ${disabled}>
+            <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" autocomplete="off" spellcheck="false" ${disabled}>
           </label>
           <label class="field">
             <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))} <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(t('guiUserTokenHint'))}">?</span></span>
@@ -742,6 +743,7 @@
       };
     }
     function renderSetupChecklist(settings) {
+      $('setupStepsSection').hidden = Boolean(guiUserSetupMode);
       if (guiUserSetupMode) {
         renderSetupChecklistItems([{
           done: false,

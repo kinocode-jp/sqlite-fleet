@@ -325,7 +325,7 @@
       </header>
       <section class="panel page" data-page="setup" id="setup-panel">
         <div class="setup-guide">
-          <section class="builder-block">
+          <section id="setupStepsSection" class="builder-block">
             <h3>導入手順</h3>
             <ol>
               <li>設定ファイルを配置し、Sqlite Fleetが触ってよいディレクトリを許可ルートに登録します。</li>
@@ -1218,11 +1218,11 @@
         permissionTip_allow_gui_permission_edit: 'Allows creating GUI users and changing user or GUI permissions.',
         permissionTip_allow_config_edit: 'Allows changing project settings such as discovery, paths, backup, and runtime options.',
         guiUserNameLabel: 'User name',
-        guiUserNamePlaceholder: 'your-name',
         guiUserTokenLabel: 'Sign-in token',
         guiUserTokenPlaceholder: 'enter a long random token',
         guiUserTokenHint: 'This is effectively the password for this GUI user. It is saved in the config, so use a long random value instead of a memorable password.',
         removeGuiUser: 'Remove',
+        setupInitialDescription: 'Create the first GUI user before using Sqlite Fleet.',
         setupGuiUserTitle: 'Admin user',
         setupGuiUserDetail: 'Create the first GUI user. This user can manage later users and permissions.',
         setupAllowedRootsTitle: 'Allowed roots',
@@ -1394,11 +1394,11 @@
         permissionTip_allow_gui_permission_edit: 'GUIユーザーの作成、ユーザー権限、GUI権限の変更を許可します。',
         permissionTip_allow_config_edit: 'DB検出、パス、バックアップ、実行設定などのプロジェクト設定変更を許可します。',
         guiUserNameLabel: 'ユーザー名',
-        guiUserNamePlaceholder: '自分の名前',
         guiUserTokenLabel: 'ログイントークン（パスワード相当）',
         guiUserTokenPlaceholder: '長いランダム文字列を入力',
         guiUserTokenHint: 'このGUIユーザーでサインインするためのパスワード相当の値です。設定ファイルに保存されるため、覚えやすいパスワードではなく長いランダム値にしてください。',
         removeGuiUser: '削除',
+        setupInitialDescription: 'Sqlite Fleetを使い始める前に、最初の管理ユーザーを作成します。',
         setupGuiUserTitle: '管理ユーザー作成',
         setupGuiUserDetail: '最初のGUIユーザーを作成します。このユーザーは2人目以降のユーザーと権限を管理できます。',
         setupAllowedRootsTitle: '許可ルート',
