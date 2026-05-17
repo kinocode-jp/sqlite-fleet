@@ -559,7 +559,7 @@ fn api_gui_users(
         .iter()
         .map(|(name, user)| GuiUserData {
             name: name.clone(),
-            token: user.token.clone(),
+            token: String::new(),
             permissions: GuiPermissionData::from_permissions(&user.permissions),
         })
         .collect::<Vec<_>>();
@@ -591,18 +591,44 @@ fn api_save_gui_permissions_request(
         if gui_users.is_empty() {
             bail!("GUI user は1人以上必要です");
         }
+        let mut retained_existing_users = std::collections::HashSet::new();
+        for user in &gui_users {
+            if user.token.is_empty() {
+                if !retained_existing_users.insert(existing_gui_user_name(user)?) {
+                    bail!("GUI user original_name が重複しています");
+                }
+            }
+        }
         let mut users = HashMap::new();
+        let mut submitted_tokens = std::collections::HashSet::new();
         for user in &gui_users {
             let name = clean_name(&user.name, "GUI user")?;
-            let token = clean_name(&user.token, "GUI user token")?;
+            let token = user.token.trim();
+            if token != user.token || token.chars().any(char::is_whitespace) {
+                bail!("GUI user token は空白なしの文字列である必要があります");
+            }
+            let permissions = sqlite_fleet::GuiConfig::from(user);
+            let gui_user = if token.is_empty() {
+                let existing_name = existing_gui_user_name(user)?;
+                let Some(existing) = config.gui_users.get(&existing_name) else {
+                    bail!("新しいGUI userにはtokenが必要です");
+                };
+                existing.with_upgraded_token(permissions)?
+            } else {
+                if !submitted_tokens.insert(token.to_string()) {
+                    bail!("GUI user token が重複しています");
+                }
+                if config.gui_users.iter().any(|(existing_name, existing)| {
+                    existing_name != &name
+                        && retained_existing_users.contains(existing_name.as_str())
+                        && existing.token_matches(token)
+                }) {
+                    bail!("GUI user token が重複しています");
+                }
+                sqlite_fleet::GuiUserConfig::with_hashed_token(token, permissions)?
+            };
             if users
-                .insert(
-                    name,
-                    sqlite_fleet::GuiUserConfig {
-                        token,
-                        permissions: sqlite_fleet::GuiConfig::from(user),
-                    },
-                )
+                .insert(name, gui_user)
                 .is_some()
             {
                 bail!("GUI user name が重複しています");
@@ -627,6 +653,15 @@ fn api_save_gui_permissions_request(
     }
     persist_config(state, config)?;
     Ok(AdminResult::new("GUI permissions を保存しました".to_string()))
+}
+
+fn existing_gui_user_name(user: &GuiUserRequest) -> Result<String> {
+    match user.original_name.as_deref() {
+        Some(original_name) if !original_name.trim().is_empty() => {
+            clean_name(original_name, "GUI user")
+        }
+        _ => clean_name(&user.name, "GUI user"),
+    }
 }
 
 fn api_save_settings(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {

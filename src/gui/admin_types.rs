@@ -92,6 +92,8 @@ struct GuiUserData {
 #[serde(deny_unknown_fields)]
 struct GuiUserRequest {
     name: String,
+    #[serde(default)]
+    original_name: Option<String>,
     token: String,
     allow_check: bool,
     allow_migrate: bool,

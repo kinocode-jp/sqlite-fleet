@@ -77,13 +77,15 @@ allow_config_edit = false
 
 # Optional per-user GUI permissions. When gui_users is configured, API calls
 # must include X-SQLite-Fleet-User-Token and the matching user's allow_* values
-# decide what that user can operate.
+# decide what that user can operate. The GUI stores token_hash when users are
+# created from the browser. Plain token is accepted for hand-written legacy
+# configs, but token_hash is preferred.
 # [gui_users.viewer]
-# token = "replace-with-random-token"
+# token_hash = "sha256:<salt-hex>:<hash-hex>"
 # allow_check = true
 #
 # [gui_users.operator]
-# token = "replace-with-another-random-token"
+# token_hash = "sha256:<salt-hex>:<hash-hex>"
 # allow_check = true
 # allow_migrate = true
 # allow_backup = true

@@ -331,7 +331,8 @@
         config.gui_users = HashMap::from([(
             "admin".to_string(),
             sqlite_fleet::GuiUserConfig {
-                token: "user-token".to_string(),
+                token: Some("user-token".to_string()),
+                token_hash: None,
                 permissions,
             },
         )]);
@@ -433,7 +434,8 @@
             (
                 "viewer".to_string(),
                 sqlite_fleet::GuiUserConfig {
-                    token: "viewer-token".to_string(),
+                    token: Some("viewer-token".to_string()),
+                    token_hash: None,
                     permissions: sqlite_fleet::GuiConfig {
                         allow_check: true,
                         ..sqlite_fleet::GuiConfig::default()
@@ -443,7 +445,8 @@
             (
                 "operator".to_string(),
                 sqlite_fleet::GuiUserConfig {
-                    token: "operator-token".to_string(),
+                    token: Some("operator-token".to_string()),
+                    token_hash: None,
                     permissions: sqlite_fleet::GuiConfig {
                         allow_check: true,
                         allow_migrate: true,
@@ -478,6 +481,8 @@
             response.contains(r#""allow_gui_permission_edit":true"#),
             "{response}"
         );
+        assert!(!response.contains("operator-token"), "{response}");
+        assert!(!response.contains("viewer-token"), "{response}");
 
         let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true,"gui_users":[{"name":"operator","token":"operator-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"viewer-token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#;
         let response = send_test_http_request_with_config(
@@ -581,7 +586,8 @@
                 gui_users: HashMap::from([(
                     "admin".to_string(),
                     sqlite_fleet::GuiUserConfig {
-                        token: "admin-token".to_string(),
+                        token: Some("admin-token".to_string()),
+                        token_hash: None,
                         permissions: sqlite_fleet::GuiConfig {
                             allow_gui_permission_edit: true,
                             ..sqlite_fleet::GuiConfig::default()
@@ -603,6 +609,219 @@
         assert_eq!(config.gui_users.len(), 2);
         assert!(config.gui_users["admin"].permissions.allow_migrate);
         assert!(!config.gui_users["viewer"].permissions.allow_migrate);
+        assert!(config.gui_users["admin"].token.is_none());
+        assert!(config.gui_users["admin"].token_hash.is_some());
+        assert!(config.gui_users["viewer"].token.is_none());
+        assert!(config.gui_users["viewer"].token_hash.is_some());
+        assert!(config
+            .effective_gui_permissions(Some("admin-token"))
+            .unwrap()
+            .allow_migrate);
+        assert!(!config
+            .effective_gui_permissions(Some("viewer-token"))
+            .unwrap()
+            .allow_migrate);
+        drop(config);
+
+        let saved = std::fs::read_to_string(&state.config_path).unwrap();
+        assert!(saved.contains("token_hash = \"sha256:"), "{saved}");
+        assert!(!saved.contains("admin-token"), "{saved}");
+        assert!(!saved.contains("viewer-token"), "{saved}");
+    }
+
+    #[test]
+    fn api_save_gui_permissions_rejects_token_matching_retained_hash() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([
+                    (
+                        "admin".to_string(),
+                        sqlite_fleet::GuiUserConfig::with_hashed_token(
+                            "admin-token",
+                            sqlite_fleet::GuiConfig {
+                                allow_gui_permission_edit: true,
+                                ..sqlite_fleet::GuiConfig::default()
+                            },
+                        )
+                        .unwrap(),
+                    ),
+                    (
+                        "viewer".to_string(),
+                        sqlite_fleet::GuiUserConfig::with_hashed_token(
+                            "viewer-token",
+                            sqlite_fleet::GuiConfig::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        let error = match api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false,"gui_users":[{"name":"admin","token":"","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"admin-token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#.to_vec(),
+        ) {
+            Ok(_) => panic!("duplicate token matching retained hash must be rejected"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(error.contains("GUI user token が重複しています"), "{error}");
+    }
+
+    #[test]
+    fn api_save_gui_permissions_keeps_token_when_user_is_renamed() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([(
+                    "admin".to_string(),
+                    sqlite_fleet::GuiUserConfig::with_hashed_token(
+                        "admin-token",
+                        sqlite_fleet::GuiConfig {
+                            allow_gui_permission_edit: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
+                    )
+                    .unwrap(),
+                )]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false,"gui_users":[{"name":"owner","original_name":"admin","token":"","allow_check":true,"allow_migrate":true,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false}]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert!(!config.gui_users.contains_key("admin"));
+        assert!(config.gui_users.contains_key("owner"));
+        assert!(config
+            .effective_gui_permissions(Some("admin-token"))
+            .unwrap()
+            .allow_migrate);
+    }
+
+    #[test]
+    fn api_save_gui_permissions_rejects_duplicate_original_name_retention() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([(
+                    "admin".to_string(),
+                    sqlite_fleet::GuiUserConfig {
+                        token: Some("admin-token".to_string()),
+                        token_hash: None,
+                        permissions: sqlite_fleet::GuiConfig {
+                            allow_gui_permission_edit: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
+                    },
+                )]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        let error = match api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false,"gui_users":[{"name":"owner","original_name":"admin","token":"","allow_check":true,"allow_migrate":true,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"copy","original_name":"admin","token":"","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#.to_vec(),
+        ) {
+            Ok(_) => panic!("duplicate original_name token retention must be rejected"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(
+            error.contains("GUI user original_name が重複しています"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn api_save_gui_permissions_rejects_token_with_internal_whitespace() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([(
+                    "admin".to_string(),
+                    sqlite_fleet::GuiUserConfig::with_hashed_token(
+                        "admin-token",
+                        sqlite_fleet::GuiConfig {
+                            allow_gui_permission_edit: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
+                    )
+                    .unwrap(),
+                )]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        let error = match api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false,"gui_users":[{"name":"admin","token":"","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"viewer token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#.to_vec(),
+        ) {
+            Ok(_) => panic!("token with internal whitespace must be rejected"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(
+            error.contains("GUI user token は空白なしの文字列である必要があります"),
+            "{error}"
+        );
+    }
+
+    #[test]
+    fn api_save_gui_permissions_normalizes_retained_name_for_token_check() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([
+                    (
+                        "admin".to_string(),
+                        sqlite_fleet::GuiUserConfig::with_hashed_token(
+                            "admin-token",
+                            sqlite_fleet::GuiConfig {
+                                allow_gui_permission_edit: true,
+                                ..sqlite_fleet::GuiConfig::default()
+                            },
+                        )
+                        .unwrap(),
+                    ),
+                    (
+                        "viewer".to_string(),
+                        sqlite_fleet::GuiUserConfig::with_hashed_token(
+                            "viewer-token",
+                            sqlite_fleet::GuiConfig::default(),
+                        )
+                        .unwrap(),
+                    ),
+                ]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        let error = match api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false,"gui_users":[{"name":" admin ","token":"","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"admin-token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#.to_vec(),
+        ) {
+            Ok(_) => panic!("duplicate token with spaced retained name must be rejected"),
+            Err(error) => error.to_string(),
+        };
+
+        assert!(error.contains("GUI user token が重複しています"), "{error}");
     }
 
     #[test]
@@ -614,7 +833,8 @@
                 gui_users: HashMap::from([(
                     "admin".to_string(),
                     sqlite_fleet::GuiUserConfig {
-                        token: "admin-token".to_string(),
+                        token: Some("admin-token".to_string()),
+                        token_hash: None,
                         permissions: sqlite_fleet::GuiConfig {
                             allow_gui_permission_edit: true,
                             ..sqlite_fleet::GuiConfig::default()

@@ -702,7 +702,7 @@
       if (guiUserSetupMode && state.gui_users.length === 0) state.gui_users = [defaultGuiUser(true)];
       const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
       $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
-        <div class="permission-card gui-user-card" data-gui-user-index="${index}">
+        <div class="permission-card gui-user-card" data-gui-user-index="${index}" data-gui-user-original-name="${escapeHtml(user.original_name || user.name || '')}">
           <label class="field">
             <span class="field-label">${escapeHtml(t('guiUserNameLabel'))}</span>
             <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" autocomplete="off" spellcheck="false" ${disabled}>
@@ -729,6 +729,7 @@
     function defaultGuiUser(isFirstUser) {
       return {
         name: '',
+        original_name: '',
         token: '',
         permissions: {
           allow_check: true,
@@ -833,6 +834,7 @@
       return Array.from($('guiUsers').querySelectorAll('[data-gui-user-index]')).map((row) => {
         const user = {
           name: row.querySelector('[data-gui-user-field="name"]').value.trim(),
+          original_name: row.dataset.guiUserOriginalName || '',
           token: row.querySelector('[data-gui-user-field="token"]').value.trim(),
         };
         row.querySelectorAll('input[data-gui-user-permission]').forEach((input) => {
@@ -845,6 +847,7 @@
       if (!Array.isArray(state.gui_users)) return;
       state.gui_users = readGuiUserForm().map((user) => ({
         name: user.name,
+        original_name: user.original_name || user.name,
         token: user.token,
         permissions: {
           allow_check: Boolean(user.allow_check),

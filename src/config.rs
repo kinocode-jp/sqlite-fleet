@@ -7,6 +7,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -218,9 +219,47 @@ pub struct GuiConfig {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct GuiUserConfig {
-    pub token: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub token_hash: Option<String>,
     #[serde(flatten)]
     pub permissions: GuiConfig,
+}
+
+impl GuiUserConfig {
+    pub fn with_hashed_token(token: &str, permissions: GuiConfig) -> Result<Self> {
+        Ok(Self {
+            token: None,
+            token_hash: Some(hash_gui_user_token(token)?),
+            permissions,
+        })
+    }
+
+    pub fn with_upgraded_token(&self, permissions: GuiConfig) -> Result<Self> {
+        if let Some(token_hash) = &self.token_hash {
+            return Ok(Self {
+                token: None,
+                token_hash: Some(token_hash.clone()),
+                permissions,
+            });
+        }
+        let Some(token) = &self.token else {
+            bail!("GUI user token が必要です");
+        };
+        Self::with_hashed_token(token, permissions)
+    }
+
+    pub fn token_matches(&self, token: &str) -> bool {
+        if self
+            .token_hash
+            .as_deref()
+            .is_some_and(|hash| verify_gui_user_token_hash(token, hash))
+        {
+            return true;
+        }
+        self.token.as_deref().is_some_and(|stored| stored == token)
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -875,7 +914,7 @@ impl Config {
             bail!("GUI user token が必要です");
         };
         for user in self.gui_users.values() {
-            if user.token == token {
+            if user.token_matches(token) {
                 return Ok(user.permissions.clone());
             }
         }
@@ -884,17 +923,147 @@ impl Config {
 
     fn validate_gui_users(&self) -> Result<()> {
         let mut tokens = std::collections::HashSet::new();
+        let mut plain_tokens = Vec::new();
+        let mut token_hashes = Vec::new();
         for (name, user) in &self.gui_users {
             validate_group_name("gui_users", name)?;
-            if user.token.trim().is_empty() || user.token.trim() != user.token {
-                bail!("gui_users.{name}.token は空白なしの非空文字列である必要があります");
+            match (&user.token, &user.token_hash) {
+                (Some(_), Some(_)) => {
+                    bail!("gui_users.{name} は token と token_hash を同時に指定できません");
+                }
+                (Some(token), None) => {
+                    if token.trim().is_empty() || token.trim() != token {
+                        bail!("gui_users.{name}.token は空白なしの非空文字列である必要があります");
+                    }
+                    if !tokens.insert(format!("token:{token}")) {
+                        bail!("gui_users のtokenが重複しています");
+                    }
+                    plain_tokens.push(token.as_str());
+                }
+                (None, Some(token_hash)) => {
+                    validate_gui_user_token_hash(token_hash)
+                        .with_context(|| format!("gui_users.{name}.token_hash が不正です"))?;
+                    if !tokens.insert(format!("hash:{}", token_hash.to_ascii_lowercase())) {
+                        bail!("gui_users のtoken_hashが重複しています");
+                    }
+                    token_hashes.push(token_hash.as_str());
+                }
+                (None, None) => {
+                    bail!("gui_users.{name}.token_hash または token が必要です");
+                }
             }
-            if !tokens.insert(&user.token) {
+        }
+        for token in plain_tokens {
+            if token_hashes
+                .iter()
+                .any(|token_hash| verify_gui_user_token_hash(token, token_hash))
+            {
                 bail!("gui_users のtokenが重複しています");
             }
         }
         Ok(())
     }
+}
+
+fn hash_gui_user_token(token: &str) -> Result<String> {
+    let mut salt = [0u8; 16];
+    getrandom::fill(&mut salt).context("GUI user token salt を生成できません")?;
+    let mut hasher = Sha256::new();
+    hasher.update(salt);
+    hasher.update(token.as_bytes());
+    let digest = hasher.finalize();
+    Ok(format!(
+        "sha256:{}:{}",
+        hex_encode(&salt),
+        hex_encode(&digest)
+    ))
+}
+
+fn validate_gui_user_token_hash(token_hash: &str) -> Result<()> {
+    let mut parts = token_hash.split(':');
+    let algorithm = parts.next();
+    let salt = parts.next();
+    let digest = parts.next();
+    if parts.next().is_some()
+        || algorithm != Some("sha256")
+        || !salt.is_some_and(|value| is_hex_len(value, 32))
+        || !digest.is_some_and(|value| is_hex_len(value, 64))
+    {
+        bail!("sha256:<salt>:<hash> 形式である必要があります");
+    }
+    Ok(())
+}
+
+fn verify_gui_user_token_hash(token: &str, token_hash: &str) -> bool {
+    if validate_gui_user_token_hash(token_hash).is_err() {
+        return false;
+    }
+    let mut parts = token_hash.split(':');
+    let _algorithm = parts.next();
+    let Some(salt_hex) = parts.next() else {
+        return false;
+    };
+    let Some(expected_hex) = parts.next() else {
+        return false;
+    };
+    let Some(salt) = hex_decode(salt_hex) else {
+        return false;
+    };
+    let Some(expected) = hex_decode(expected_hex) else {
+        return false;
+    };
+    let mut hasher = Sha256::new();
+    hasher.update(salt);
+    hasher.update(token.as_bytes());
+    let digest = hasher.finalize();
+    constant_time_eq(digest.as_slice(), &expected)
+}
+
+fn is_hex_len(value: &str, len: usize) -> bool {
+    value.len() == len && value.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        out.push(HEX[(byte >> 4) as usize] as char);
+        out.push(HEX[(byte & 0x0f) as usize] as char);
+    }
+    out
+}
+
+fn hex_decode(value: &str) -> Option<Vec<u8>> {
+    if value.len() % 2 != 0 {
+        return None;
+    }
+    let mut bytes = Vec::with_capacity(value.len() / 2);
+    for chunk in value.as_bytes().chunks(2) {
+        let high = hex_value(chunk[0])?;
+        let low = hex_value(chunk[1])?;
+        bytes.push((high << 4) | low);
+    }
+    Some(bytes)
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut diff = 0u8;
+    for (left, right) in left.iter().zip(right) {
+        diff |= left ^ right;
+    }
+    diff == 0
 }
 
 fn is_empty_version_migration_group(group: &MigrationGroupConfig) -> bool {

@@ -108,6 +108,73 @@ allow_backup = true
 }
 
 #[test]
+fn gui_users_config_rejects_plain_token_matching_hash() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join("sqlite-fleet.toml"),
+        r#"
+[gui_users.plain]
+token = "same-token"
+
+[gui_users.hashed]
+token_hash = "sha256:00000000000000000000000000000000:719f2a6a3ef46e0e8928e97f28bd437126bb0a5c36b0a0f5ea332e3e6eb07b57"
+"#,
+    )
+    .unwrap();
+
+    let error = Config::load(dir.path().join("sqlite-fleet.toml"))
+        .expect_err("plain token matching token_hash must be rejected")
+        .to_string();
+    assert!(
+        error.contains("gui_users のtokenが重複しています"),
+        "{error}"
+    );
+}
+
+#[test]
+fn gui_users_config_accepts_uppercase_token_hash_digest() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join("sqlite-fleet.toml"),
+        r#"
+[gui_users.viewer]
+token_hash = "sha256:00000000000000000000000000000000:719F2A6A3EF46E0E8928E97F28BD437126BB0A5C36B0A0F5EA332E3E6EB07B57"
+"#,
+    )
+    .unwrap();
+
+    let config = Config::load(dir.path().join("sqlite-fleet.toml")).unwrap();
+    let viewer = config
+        .effective_gui_permissions(Some("same-token"))
+        .unwrap();
+    assert!(viewer.allow_check);
+}
+
+#[test]
+fn gui_users_config_rejects_token_hash_case_duplicate() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join("sqlite-fleet.toml"),
+        r#"
+[gui_users.lower]
+token_hash = "sha256:00000000000000000000000000000000:719f2a6a3ef46e0e8928e97f28bd437126bb0a5c36b0a0f5ea332e3e6eb07b57"
+
+[gui_users.upper]
+token_hash = "sha256:00000000000000000000000000000000:719F2A6A3EF46E0E8928E97F28BD437126BB0A5C36B0A0F5EA332E3E6EB07B57"
+"#,
+    )
+    .unwrap();
+
+    let error = Config::load(dir.path().join("sqlite-fleet.toml"))
+        .expect_err("case-only token_hash duplicate must be rejected")
+        .to_string();
+    assert!(
+        error.contains("gui_users のtoken_hashが重複しています"),
+        "{error}"
+    );
+}
+
+#[test]
 fn config_load_variants_validate_only_their_scope() {
     let dir = tempdir().unwrap();
     let data_dir = dir.path().join("data");
