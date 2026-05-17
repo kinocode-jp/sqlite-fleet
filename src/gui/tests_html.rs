@@ -262,6 +262,12 @@
         assert!(INDEX_HTML.contains("escapeHtml(t('allowed'))"));
         assert!(INDEX_HTML.contains("escapeHtml(t('disabled'))"));
         assert!(INDEX_HTML.contains(r#"<button id="savePermissions" class="primary">権限を保存</button>"#));
+        assert!(INDEX_HTML.contains("let guiUserSetupMode = false"));
+        assert!(INDEX_HTML.contains("guiUserSetupMode = Boolean(state.gui_user_setup_available)"));
+        assert!(INDEX_HTML.contains("canEditPermissions || guiUserSetupMode"));
+        assert!(INDEX_HTML.contains("function syncGuiUserFormToState()"));
+        assert!(INDEX_HTML.contains("syncGuiUserFormToState();\n      state.gui_users.splice"));
+        assert!(INDEX_HTML.contains("localStorage.setItem('sqlite-fleet-gui-user-token', guiUserToken)"));
         assert!(INDEX_HTML.contains(r#"<button id="saveSettings" class="primary">設定を保存</button>"#));
         assert!(INDEX_HTML.contains("function renderSetupChecklist(settings)"));
         assert!(INDEX_HTML.contains("function openSetupDestination(page, target = '')"));

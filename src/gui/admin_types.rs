@@ -9,6 +9,9 @@ struct StateData {
     database_migration_rules: Vec<DatabaseMigrationRuleData>,
     database_migration_assignments: Vec<DatabaseMigrationAssignmentData>,
     gui_permissions: GuiPermissionData,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    gui_users: Option<Vec<GuiUserData>>,
+    gui_user_setup_available: bool,
     settings: SettingsData,
 }
 
@@ -75,6 +78,29 @@ struct GuiPermissionRequest {
     allow_migration_edit: bool,
     allow_gui_permission_edit: bool,
     allow_config_edit: bool,
+    gui_users: Option<Vec<GuiUserRequest>>,
+}
+
+#[derive(Serialize)]
+struct GuiUserData {
+    name: String,
+    token: String,
+    permissions: GuiPermissionData,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct GuiUserRequest {
+    name: String,
+    token: String,
+    allow_check: bool,
+    allow_migrate: bool,
+    allow_backup: bool,
+    allow_restore: bool,
+    allow_sql_apply: bool,
+    allow_migration_edit: bool,
+    allow_gui_permission_edit: bool,
+    allow_config_edit: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -129,6 +155,21 @@ impl GuiPermissionData {
             allow_migration_edit: permissions.allow_migration_edit,
             allow_gui_permission_edit: permissions.allow_gui_permission_edit,
             allow_config_edit: permissions.allow_config_edit,
+        }
+    }
+}
+
+impl From<&GuiUserRequest> for sqlite_fleet::GuiConfig {
+    fn from(request: &GuiUserRequest) -> Self {
+        Self {
+            allow_check: request.allow_check,
+            allow_migrate: request.allow_migrate,
+            allow_backup: request.allow_backup,
+            allow_restore: request.allow_restore,
+            allow_sql_apply: request.allow_sql_apply,
+            allow_migration_edit: request.allow_migration_edit,
+            allow_gui_permission_edit: request.allow_gui_permission_edit,
+            allow_config_edit: request.allow_config_edit,
         }
     }
 }

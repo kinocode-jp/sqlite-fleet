@@ -368,6 +368,7 @@
       const showLoadedMessage = options.showLoadedMessage !== false;
       try {
         state = await api('/api/state');
+        guiUserSetupMode = Boolean(state.gui_user_setup_available);
         render();
         if (showLoadedMessage) clearMessage();
       } catch (error) {
@@ -597,8 +598,11 @@
           <input type="checkbox" data-permission-key="${escapeHtml(key)}" ${value ? 'checked' : ''} ${canEditPermissions ? '' : 'disabled'}>
         </label>
       `).join('');
-      $('savePermissions').disabled = !canEditPermissions;
-      $('savePermissions').title = canEditPermissions ? '' : t('permissionEditDisabled');
+      renderGuiUsers(canEditPermissions);
+      $('addGuiUser').hidden = !Array.isArray(state.gui_users) && !guiUserSetupMode;
+      $('addGuiUser').disabled = !canEditPermissions && !guiUserSetupMode;
+      $('savePermissions').disabled = !canEditPermissions && !guiUserSetupMode;
+      $('savePermissions').title = canEditPermissions || guiUserSetupMode ? '' : t('permissionEditDisabled');
       const settings = state.settings;
       allowedRootsDraft = (settings.allowed_roots || []).map((root) => root.value || '.');
       if (!allowedRootsDraft.length) allowedRootsDraft = ['.'];
@@ -659,6 +663,29 @@
         ['audit', settings.audit_path || t('unset')],
       ]);
       renderSetupChecklist(settings);
+    }
+    function renderGuiUsers(canEditPermissions) {
+      if (!Array.isArray(state.gui_users) && guiUserSetupMode) state.gui_users = [];
+      if (!Array.isArray(state.gui_users)) {
+        $('guiUsers').innerHTML = '';
+        return;
+      }
+      const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
+      $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
+        <div class="permission-card" data-gui-user-index="${index}">
+          <label class="field"><span class="field-label">User</span><input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" ${disabled}></label>
+          <label class="field"><span class="field-label">Token</span><input data-gui-user-field="token" value="${escapeHtml(user.token || '')}" ${disabled}></label>
+          <div class="permission-form">
+            ${Object.entries(user.permissions || {}).map(([key, value]) => `
+              <label class="check-row">
+                <input type="checkbox" data-gui-user-permission="${escapeHtml(key)}" ${value ? 'checked' : ''} ${disabled}>
+                <span>${escapeHtml(key)}</span>
+              </label>
+            `).join('')}
+          </div>
+          <button type="button" data-remove-gui-user="${index}" ${disabled}>Remove</button>
+        </div>
+      `).join('');
     }
     function renderSetupChecklist(settings) {
       const discovery = settings.discovery || 'glob';
@@ -732,12 +759,48 @@
         continue_on_error: $('settingsContinueOnError').checked,
       };
     }
+    function readGuiUserForm() {
+      return Array.from($('guiUsers').querySelectorAll('[data-gui-user-index]')).map((row) => {
+        const user = {
+          name: row.querySelector('[data-gui-user-field="name"]').value.trim(),
+          token: row.querySelector('[data-gui-user-field="token"]').value.trim(),
+        };
+        row.querySelectorAll('input[data-gui-user-permission]').forEach((input) => {
+          user[input.dataset.guiUserPermission] = input.checked;
+        });
+        return user;
+      });
+    }
+    function syncGuiUserFormToState() {
+      if (!Array.isArray(state.gui_users)) return;
+      state.gui_users = readGuiUserForm().map((user) => ({
+        name: user.name,
+        token: user.token,
+        permissions: {
+          allow_check: Boolean(user.allow_check),
+          allow_migrate: Boolean(user.allow_migrate),
+          allow_backup: Boolean(user.allow_backup),
+          allow_restore: Boolean(user.allow_restore),
+          allow_sql_apply: Boolean(user.allow_sql_apply),
+          allow_migration_edit: Boolean(user.allow_migration_edit),
+          allow_gui_permission_edit: Boolean(user.allow_gui_permission_edit),
+          allow_config_edit: Boolean(user.allow_config_edit),
+        },
+      }));
+    }
     async function saveGuiPermissions() {
       try {
         const payload = {};
         $('permissions').querySelectorAll('input[data-permission-key]').forEach((input) => {
           payload[input.dataset.permissionKey] = input.checked;
         });
+        if (Array.isArray(state.gui_users) && (guiUserSetupMode || $('guiUsers').querySelector('[data-gui-user-index]'))) {
+          payload.gui_users = readGuiUserForm();
+          if (guiUserSetupMode && payload.gui_users[0] && payload.gui_users[0].token) {
+            guiUserToken = payload.gui_users[0].token;
+            localStorage.setItem('sqlite-fleet-gui-user-token', guiUserToken);
+          }
+        }
         await postAdmin('/api/admin/gui-permissions', payload);
       } catch (error) {
         message(error.message, true);
@@ -2104,6 +2167,32 @@
     });
     $('refresh').addEventListener('click', load);
     $('check').addEventListener('click', runCheck);
+    $('addGuiUser').addEventListener('click', () => {
+      if (Array.isArray(state.gui_users)) syncGuiUserFormToState();
+      if (!Array.isArray(state.gui_users)) state.gui_users = [];
+      state.gui_users.push({
+        name: state.gui_users.length === 0 ? 'owner' : '',
+        token: '',
+        permissions: {
+          allow_check: true,
+          allow_migrate: state.gui_users.length === 0,
+          allow_backup: state.gui_users.length === 0,
+          allow_restore: state.gui_users.length === 0,
+          allow_sql_apply: state.gui_users.length === 0,
+          allow_migration_edit: state.gui_users.length === 0,
+          allow_gui_permission_edit: true,
+          allow_config_edit: state.gui_users.length === 0,
+        },
+      });
+      renderSettings();
+    });
+    $('guiUsers').addEventListener('click', (event) => {
+      const button = event.target.closest('button[data-remove-gui-user]');
+      if (!button || !Array.isArray(state.gui_users)) return;
+      syncGuiUserFormToState();
+      state.gui_users.splice(Number(button.dataset.removeGuiUser), 1);
+      renderSettings();
+    });
     $('savePermissions').addEventListener('click', saveGuiPermissions);
     $('saveSettings').addEventListener('click', saveSettings);
     $('previewDiscovery').addEventListener('click', previewDiscovery);

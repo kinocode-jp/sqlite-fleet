@@ -31,9 +31,10 @@ fn api_state(config: &Config, permissions: &sqlite_fleet::GuiConfig) -> ApiEnvel
                     database_migration_assignments: api_database_migration_assignments(
                         config, &databases,
                     ),
-                    gui_permissions: GuiPermissionData::from_permissions(
-                        &state_gui_permissions(config, permissions),
-                    ),
+                    gui_permissions: GuiPermissionData::from_permissions(permissions),
+                    gui_users: api_gui_users(config, permissions),
+                    gui_user_setup_available: config.gui_users.is_empty()
+                        && permissions.allow_gui_permission_edit,
                     settings: SettingsData::from_config(config),
                     project: config.project.name.clone(),
                     status,
@@ -518,32 +519,68 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
     })
 }
 
-fn state_gui_permissions(
+fn api_gui_users(
     config: &Config,
     permissions: &sqlite_fleet::GuiConfig,
-) -> sqlite_fleet::GuiConfig {
-    let mut permissions = permissions.clone();
-    if !config.gui_users.is_empty() {
-        permissions.allow_gui_permission_edit = false;
+) -> Option<Vec<GuiUserData>> {
+    if config.gui_users.is_empty() || !permissions.allow_gui_permission_edit {
+        return None;
     }
-    permissions
+    let mut users = config
+        .gui_users
+        .iter()
+        .map(|(name, user)| GuiUserData {
+            name: name.clone(),
+            token: user.token.clone(),
+            permissions: GuiPermissionData::from_permissions(&user.permissions),
+        })
+        .collect::<Vec<_>>();
+    users.sort_by(|left, right| left.name.cmp(&right.name));
+    Some(users)
 }
 
 fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: GuiPermissionRequest =
         serde_json::from_slice(&body).context("GUI permissions request body のJSONが不正です")?;
     let mut config = locked_config(state)?;
-    if !config.gui_users.is_empty() {
-        bail!("gui_users 有効時はGUIから権限を保存できません。設定ファイルの [gui_users] を編集してください");
+    if let Some(gui_users) = request.gui_users {
+        if gui_users.is_empty() {
+            bail!("GUI user は1人以上必要です");
+        }
+        let mut users = HashMap::new();
+        for user in &gui_users {
+            let name = clean_name(&user.name, "GUI user")?;
+            let token = clean_name(&user.token, "GUI user token")?;
+            if users
+                .insert(
+                    name,
+                    sqlite_fleet::GuiUserConfig {
+                        token,
+                        permissions: sqlite_fleet::GuiConfig::from(user),
+                    },
+                )
+                .is_some()
+            {
+                bail!("GUI user name が重複しています");
+            }
+        }
+        if !users
+            .values()
+            .any(|user| user.permissions.allow_gui_permission_edit)
+        {
+            bail!("少なくとも1人のGUI userに allow_gui_permission_edit が必要です");
+        }
+        config.gui_users = users;
+    } else {
+        config.gui.allow_check = request.allow_check;
+        config.gui.allow_migrate = request.allow_migrate;
+        config.gui.allow_backup = request.allow_backup;
+        config.gui.allow_restore = request.allow_restore;
+        config.gui.allow_sql_apply = request.allow_sql_apply;
+        config.gui.allow_migration_edit = request.allow_migration_edit;
+        config.gui.allow_gui_permission_edit = request.allow_gui_permission_edit;
+        config.gui.allow_config_edit = request.allow_config_edit;
     }
-    config.gui.allow_check = request.allow_check;
-    config.gui.allow_migrate = request.allow_migrate;
-    config.gui.allow_backup = request.allow_backup;
-    config.gui.allow_restore = request.allow_restore;
-    config.gui.allow_sql_apply = request.allow_sql_apply;
-    config.gui.allow_migration_edit = request.allow_migration_edit;
-    config.gui.allow_gui_permission_edit = request.allow_gui_permission_edit;
-    config.gui.allow_config_edit = request.allow_config_edit;
     persist_config(state, config)?;
     Ok(AdminResult::new("GUI permissions を保存しました".to_string()))
 }

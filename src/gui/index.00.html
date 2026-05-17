@@ -689,6 +689,8 @@
             <summary>GUI permissions</summary>
             <div class="settings-section-body">
               <div id="permissions" class="permission-form"></div>
+              <div id="guiUsers" class="permission-form"></div>
+              <div class="actions settings-actions"><button id="addGuiUser" type="button">ユーザーを追加</button></div>
               <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
             </div>
           </details>
@@ -848,6 +850,7 @@
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
     let guiUserToken = localStorage.getItem('sqlite-fleet-gui-user-token') || '';
+    let guiUserSetupMode = false;
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
     const sqlCompletionWords = [
       'ADD', 'ALTER', 'AND', 'AS', 'BEGIN', 'BY', 'CASCADE', 'CHECK', 'COLUMN', 'COMMIT',

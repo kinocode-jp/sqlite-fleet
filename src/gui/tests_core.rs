@@ -438,11 +438,11 @@
         assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
         assert!(response.contains(r#""allow_migrate":true"#), "{response}");
         assert!(
-            response.contains(r#""allow_gui_permission_edit":false"#),
+            response.contains(r#""allow_gui_permission_edit":true"#),
             "{response}"
         );
 
-        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#;
+        let body = r#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true,"gui_users":[{"name":"operator","token":"operator-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"viewer-token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#;
         let response = send_test_http_request_with_config(
             &format!(
                 "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nX-SQLite-Fleet-User-Token: operator-token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
@@ -451,8 +451,7 @@
             ),
             config,
         );
-        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
-        assert!(response.contains("gui_users 有効時はGUIから権限を保存できません"));
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
     }
 
     #[test]
@@ -484,7 +483,70 @@
     }
 
     #[test]
-    fn api_save_gui_permissions_rejects_user_permission_mode() {
+    fn api_state_omits_gui_users_in_plain_permission_mode() {
+        let state = api_state(&Config::default(), &sqlite_fleet::GuiConfig::default());
+        let json = serde_json::to_string(&state).unwrap();
+
+        assert!(!json.contains("gui_users"), "{json}");
+    }
+
+    #[test]
+    fn http_save_gui_permissions_in_plain_mode_does_not_require_gui_users() {
+        let body = r#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            Config {
+                gui: sqlite_fleet::GuiConfig {
+                    allow_gui_permission_edit: true,
+                    ..sqlite_fleet::GuiConfig::default()
+                },
+                ..Config::default()
+            },
+        );
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+        assert!(!response.contains("GUI user は1人以上必要です"), "{response}");
+    }
+
+    #[test]
+    fn api_save_gui_permissions_updates_user_permission_mode() {
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("sqlite-fleet.toml");
+        let state = test_server_state(
+            Config {
+                gui_users: HashMap::from([(
+                    "admin".to_string(),
+                    sqlite_fleet::GuiUserConfig {
+                        token: "admin-token".to_string(),
+                        permissions: sqlite_fleet::GuiConfig {
+                            allow_gui_permission_edit: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
+                    },
+                )]),
+                ..Config::default()
+            },
+            config_path,
+        );
+
+        api_save_gui_permissions(
+            &state,
+            br#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true,"gui_users":[{"name":"admin","token":"admin-token","allow_check":true,"allow_migrate":true,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":true,"allow_config_edit":false},{"name":"viewer","token":"viewer-token","allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false}]}"#.to_vec(),
+        )
+        .unwrap();
+
+        let config = state.config.lock().unwrap();
+        assert_eq!(config.gui_users.len(), 2);
+        assert!(config.gui_users["admin"].permissions.allow_migrate);
+        assert!(!config.gui_users["viewer"].permissions.allow_migrate);
+    }
+
+    #[test]
+    fn api_save_gui_permissions_rejects_empty_user_list() {
         let dir = tempfile::tempdir().unwrap();
         let config_path = dir.path().join("sqlite-fleet.toml");
         let state = test_server_state(
@@ -506,13 +568,51 @@
 
         let error = match api_save_gui_permissions(
             &state,
-            br#"{"allow_check":false,"allow_migrate":true,"allow_backup":false,"allow_restore":true,"allow_sql_apply":false,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}"#.to_vec(),
+            br#"{"allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true,"gui_users":[]}"#.to_vec(),
         ) {
-            Ok(_) => panic!("gui_users mode must reject GUI permission saves"),
+            Ok(_) => panic!("empty GUI user list must be rejected"),
             Err(error) => error.to_string(),
         };
 
-        assert!(error.contains("gui_users 有効時はGUIから権限を保存できません"));
+        assert!(error.contains("GUI user は1人以上必要です"));
+        assert_eq!(state.config.lock().unwrap().gui_users.len(), 1);
+    }
+
+    #[test]
+    fn gui_allows_initial_user_creation_with_permission_edit_enabled() {
+        let body = r#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false,"gui_users":[{"name":"owner","token":"owner-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}]}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            Config {
+                gui: sqlite_fleet::GuiConfig {
+                    allow_gui_permission_edit: true,
+                    ..sqlite_fleet::GuiConfig::default()
+                },
+                ..Config::default()
+            },
+        );
+
+        assert!(response.starts_with("HTTP/1.1 200 OK"), "{response}");
+    }
+
+    #[test]
+    fn gui_rejects_initial_user_creation_without_permission_edit() {
+        let body = r#"{"allow_check":true,"allow_migrate":false,"allow_backup":false,"allow_restore":false,"allow_sql_apply":false,"allow_migration_edit":false,"allow_gui_permission_edit":false,"allow_config_edit":false,"gui_users":[{"name":"owner","token":"owner-token","allow_check":true,"allow_migrate":true,"allow_backup":true,"allow_restore":true,"allow_sql_apply":true,"allow_migration_edit":true,"allow_gui_permission_edit":true,"allow_config_edit":true}]}"#;
+        let response = send_test_http_request_with_config(
+            &format!(
+                "POST /api/admin/gui-permissions HTTP/1.1\r\nHost: 127.0.0.1:{{port}}\r\nX-SQLite-Fleet-Token: token\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                body.len(),
+                body
+            ),
+            Config::default(),
+        );
+
+        assert!(response.starts_with("HTTP/1.1 403 Forbidden"), "{response}");
+        assert!(response.contains("GUI permission edit は設定で無効化されています"));
     }
 
     #[test]

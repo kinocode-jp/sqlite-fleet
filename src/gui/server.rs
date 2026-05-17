@@ -301,13 +301,6 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, result)
         }
         ("POST", "/api/admin/gui-permissions") => {
-            if !config.gui_users.is_empty() {
-                return write_json_error(
-                    &mut stream,
-                    403,
-                    anyhow::anyhow!("gui_users 有効時はGUIから権限を保存できません。設定ファイルの [gui_users] を編集してください"),
-                );
-            }
             if !permissions.allow_gui_permission_edit {
                 return write_json_error(
                     &mut stream,
