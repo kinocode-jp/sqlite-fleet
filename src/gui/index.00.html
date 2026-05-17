@@ -150,10 +150,13 @@
     .info-card { display:grid; gap:8px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
     .info-card strong { font-size:14px; overflow-wrap:anywhere; }
     .permission-form { display:grid; gap:10px; }
+    .permission-grid { grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px; }
     .permission-card { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+    .permission-card.gui-user-card { display:grid; grid-template-columns:repeat(2, minmax(160px, 1fr)) auto; align-items:end; }
+    .permission-card.gui-user-card .permission-grid { grid-column:1 / -1; }
     .permission-card strong { font-size:14px; overflow-wrap:anywhere; }
     .permission-card .pill { min-width:48px; justify-content:center; }
-    .permission-card input { width:18px; height:18px; }
+    .permission-card input[type="checkbox"] { width:18px; height:18px; }
     .settings-form { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; }
     .settings-form .wide { grid-column:1 / -1; }
     .settings-actions { margin-top:10px; }
@@ -272,6 +275,7 @@
     @media (max-width:1120px) { .summary, .topology-grid { grid-template-columns:repeat(3, minmax(0, 1fr)); } .topbar { display:grid; } .message { max-width:none; width:100%; } }
     @media (max-width:900px) { .topology-grid, .migration-group-editor, .migration-assignment-editor { grid-template-columns:1fr; } }
     @media (max-width:820px) { .layout { display:block; } .sidebar { position:static; height:auto; border-right:0; border-bottom:1px solid var(--line); } .content { padding:16px; } .summary, .form-grid, .help, .migration-file-form, .settings-form { grid-template-columns:1fr; } .form-grid .wide, .migration-file-form .wide, .settings-form .wide { grid-column:auto; } .sql-control-row, .sql-snippet-toolbar { grid-template-columns:1fr 1fr; } .sql-control-row .field-label { grid-column:1 / -1; } .sql-control-row input, .sql-control-row select { grid-column:1 / -1; } .path-browser-toolbar { display:grid; } .path-browser-row, .path-browser-header { grid-template-columns:24px minmax(0, 1fr) 112px; } .path-browser-row .path-browser-path, .path-browser-row .path-browser-kind, .path-browser-header .path-browser-path, .path-browser-header .path-browser-kind { display:none; } .topbar { margin-bottom:14px; } th:nth-child(6), td:nth-child(6) { display:none; } }
+    @media (max-width:820px) { .permission-card.gui-user-card { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -688,7 +692,7 @@
           <details id="settingsGuiPermissionsSection" class="settings-section">
             <summary>GUI permissions</summary>
             <div class="settings-section-body">
-              <div id="permissions" class="permission-form"></div>
+              <div id="permissions" class="permission-form permission-grid"></div>
               <div id="guiUsers" class="permission-form"></div>
               <div class="actions settings-actions"><button id="addGuiUser" type="button">ユーザーを追加</button></div>
               <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
@@ -1202,6 +1206,14 @@
         savedSettings: 'Settings saved',
         done: 'Configured',
         todo: 'Needs setup',
+        permissionTip_allow_check: 'Allows status checks, plans, schema browsing, and other read-only checks.',
+        permissionTip_allow_migrate: 'Allows applying migrations and marking migrations as already applied.',
+        permissionTip_allow_backup: 'Allows creating database backups from the GUI.',
+        permissionTip_allow_restore: 'Allows restoring a database from a backup file.',
+        permissionTip_allow_sql_apply: 'Allows applying ad hoc SQL from the SQL Console after dry run.',
+        permissionTip_allow_migration_edit: 'Allows creating and editing migration SQL files from the GUI.',
+        permissionTip_allow_gui_permission_edit: 'Allows creating GUI users and changing user or GUI permissions.',
+        permissionTip_allow_config_edit: 'Allows changing project settings such as discovery, paths, backup, and runtime options.',
         setupGuiUserTitle: 'Admin user',
         setupGuiUserDetail: 'Create the first GUI user. This user can manage later users and permissions.',
         setupAllowedRootsTitle: 'Allowed roots',
@@ -1364,6 +1376,14 @@
         savedSettings: '設定を保存しました',
         done: '設定あり',
         todo: '要設定',
+        permissionTip_allow_check: '状態確認、plan、スキーマ閲覧などの読み取り系チェックを許可します。',
+        permissionTip_allow_migrate: 'マイグレーション適用と、未適用マイグレーションを読み取り済みにする操作を許可します。',
+        permissionTip_allow_backup: 'GUIからDBバックアップを作成する操作を許可します。',
+        permissionTip_allow_restore: 'バックアップファイルからDBを復元する操作を許可します。',
+        permissionTip_allow_sql_apply: 'SQLコンソールでDry run後に任意SQLを適用する操作を許可します。',
+        permissionTip_allow_migration_edit: 'GUIからマイグレーションSQLファイルを作成・編集する操作を許可します。',
+        permissionTip_allow_gui_permission_edit: 'GUIユーザーの作成、ユーザー権限、GUI権限の変更を許可します。',
+        permissionTip_allow_config_edit: 'DB検出、パス、バックアップ、実行設定などのプロジェクト設定変更を許可します。',
         setupGuiUserTitle: '管理ユーザー作成',
         setupGuiUserDetail: '最初のGUIユーザーを作成します。このユーザーは2人目以降のユーザーと権限を管理できます。',
         setupAllowedRootsTitle: '許可ルート',

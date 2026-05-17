@@ -277,6 +277,12 @@
         assert!(INDEX_HTML.contains("$('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode)"));
         assert!(INDEX_HTML.contains("$('permissions').hidden = Boolean(guiUserSetupMode)"));
         assert!(INDEX_HTML.contains("$('permissions').innerHTML = Object.entries(permissions).map"));
+        assert!(INDEX_HTML.contains(r#"<div id="permissions" class="permission-form permission-grid"></div>"#));
+        assert!(INDEX_HTML.contains(".permission-grid { grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px; }"));
+        assert!(INDEX_HTML.contains(r#"data-tip="${escapeHtml(permissionTip(key))}""#));
+        assert!(INDEX_HTML.contains("function permissionTip(key)"));
+        assert!(INDEX_HTML.contains("permissionTip_allow_gui_permission_edit: 'GUIユーザーの作成"));
+        assert!(INDEX_HTML.contains(r#"<div class="permission-card gui-user-card" data-gui-user-index="${index}">"#));
         assert!(INDEX_HTML.contains("function defaultGuiUser(isFirstUser)"));
         assert!(INDEX_HTML.contains("state.gui_users = [defaultGuiUser(true)]"));
         assert!(INDEX_HTML.contains("const canEditPermissions = permissions.allow_gui_permission_edit || guiUserSetupMode"));

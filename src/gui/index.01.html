@@ -599,7 +599,7 @@
       $('permissions').hidden = Boolean(guiUserSetupMode);
       $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `
         <label class="permission-card">
-          <span><strong>${escapeHtml(key)}</strong></span>
+          <span><strong>${escapeHtml(key)}</strong> <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(permissionTip(key))}">?</span></span>
           <span class="pill ${value ? 'ok' : 'bad'}">${value ? escapeHtml(t('allowed')) : escapeHtml(t('disabled'))}</span>
           <input type="checkbox" data-permission-key="${escapeHtml(key)}" ${value ? 'checked' : ''} ${canEditPermissions ? '' : 'disabled'}>
         </label>
@@ -680,20 +680,23 @@
       if (guiUserSetupMode && state.gui_users.length === 0) state.gui_users = [defaultGuiUser(true)];
       const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
       $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
-        <div class="permission-card" data-gui-user-index="${index}">
+        <div class="permission-card gui-user-card" data-gui-user-index="${index}">
           <label class="field"><span class="field-label">User</span><input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" ${disabled}></label>
           <label class="field"><span class="field-label">Token</span><input data-gui-user-field="token" value="${escapeHtml(user.token || '')}" ${disabled}></label>
-          <div class="permission-form">
+          <div class="permission-form permission-grid">
             ${Object.entries(user.permissions || {}).map(([key, value]) => `
               <label class="check-row">
                 <input type="checkbox" data-gui-user-permission="${escapeHtml(key)}" ${value ? 'checked' : ''} ${disabled}>
-                <span>${escapeHtml(key)}</span>
+                <span><strong>${escapeHtml(key)}</strong> <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(permissionTip(key))}">?</span></span>
               </label>
             `).join('')}
           </div>
           <button type="button" data-remove-gui-user="${index}" ${disabled}>Remove</button>
         </div>
       `).join('');
+    }
+    function permissionTip(key) {
+      return t(`permissionTip_${key}`);
     }
     function defaultGuiUser(isFirstUser) {
       return {
