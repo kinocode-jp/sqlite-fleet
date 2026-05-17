@@ -170,7 +170,9 @@
     .settings-section[open] summary::after { content:"-"; }
     .settings-section-body { display:grid; gap:12px; padding:12px 14px 14px; }
     .settings-section .key-grid { margin-top:2px; }
-    .setup-guide { display:grid; gap:14px; }
+    .setup-guide { display:grid; gap:12px; }
+    .setup-check-block { gap:8px; padding:10px 12px; }
+    .setup-check-block h3 { margin:0; }
     .setup-checklist { display:grid; gap:8px; }
     .setup-check-item { display:grid; grid-template-columns:24px minmax(0, 1fr) auto; gap:10px; align-items:start; padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
     .setup-check-mark { display:grid; place-items:center; width:20px; height:20px; border:1px solid var(--line-strong); border-radius:50%; color:var(--muted); font-size:12px; font-weight:900; }
@@ -334,9 +336,8 @@
               <li>Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。</li>
             </ol>
           </section>
-          <section class="builder-block">
+          <section class="builder-block setup-check-block">
             <h3>開始前チェック</h3>
-            <p class="muted">現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。</p>
             <div id="setupChecklist" class="setup-checklist"></div>
           </section>
         </div>
@@ -887,7 +888,6 @@
       'マイグレーションディレクトリに信頼済みのSQLファイルを置き、マイグレーション管理で読み込み状態を確認します。': 'Put trusted SQL files in the migration directory and check load status in Migration Management.',
       'Dry runで対象DBと適用予定を確認してから、マイグレーション適用へ進みます。': 'Confirm target DBs and planned changes with Dry run before moving to Migration Apply.',
       '開始前チェック': 'Preflight checklist',
-      '現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。': 'Automatically evaluated from the currently loaded settings and status. These are not manual checkboxes.',
       '対象設定': 'Target settings',
       '状態を更新': 'Refresh status',
       '状態を検査': 'Check status',
@@ -1080,7 +1080,6 @@
       'Initial Setup': '初期セットアップ',
       'Setup steps': '導入手順',
       'Preflight checklist': '開始前チェック',
-      'Automatically evaluated from the currently loaded settings and status. These are not manual checkboxes.': '現在読み込まれている設定と状態から自動判定しています。手動チェックではありません。',
       'Migration Groups': 'マイグレーショングループ',
       'Create group': 'グループ作成',
       'Create new': '新規作成',
