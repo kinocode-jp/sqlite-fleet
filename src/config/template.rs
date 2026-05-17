@@ -74,6 +74,19 @@ allow_sql_apply = false
 allow_migration_edit = false
 allow_gui_permission_edit = false
 allow_config_edit = false
+
+# Optional per-user GUI permissions. When gui_users is configured, API calls
+# must include X-SQLite-Fleet-User-Token and the matching user's allow_* values
+# decide what that user can operate.
+# [gui_users.viewer]
+# token = "replace-with-random-token"
+# allow_check = true
+#
+# [gui_users.operator]
+# token = "replace-with-another-random-token"
+# allow_check = true
+# allow_migrate = true
+# allow_backup = true
 "#
 }
 

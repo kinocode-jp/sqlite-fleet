@@ -847,6 +847,7 @@
     let allowedRootsDraft = ['.'];
     let activeRequests = 0;
     let currentLocale = localStorage.getItem('sqlite-fleet-locale') === 'ja' ? 'ja' : 'en';
+    let guiUserToken = localStorage.getItem('sqlite-fleet-gui-user-token') || '';
     const migrationSnippetStorageKey = 'sqlite-fleet-migration-sql-snippets';
     const sqlCompletionWords = [
       'ADD', 'ALTER', 'AND', 'AS', 'BEGIN', 'BY', 'CASCADE', 'CHECK', 'COLUMN', 'COMMIT',

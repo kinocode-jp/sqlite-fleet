@@ -76,6 +76,38 @@ allow_config_edit = true
 }
 
 #[test]
+fn gui_users_config_assigns_permissions_by_token() {
+    let dir = tempdir().unwrap();
+    fs::write(
+        dir.path().join("sqlite-fleet.toml"),
+        r#"
+[gui_users.viewer]
+token = "viewer-token"
+
+[gui_users.operator]
+token = "operator-token"
+allow_migrate = true
+allow_backup = true
+"#,
+    )
+    .unwrap();
+
+    let config = Config::load(dir.path().join("sqlite-fleet.toml")).unwrap();
+    let viewer = config
+        .effective_gui_permissions(Some("viewer-token"))
+        .unwrap();
+    let operator = config
+        .effective_gui_permissions(Some("operator-token"))
+        .unwrap();
+    assert!(viewer.allow_check);
+    assert!(!viewer.allow_migrate);
+    assert!(operator.allow_check);
+    assert!(operator.allow_migrate);
+    assert!(operator.allow_backup);
+    assert!(config.effective_gui_permissions(Some("missing")).is_err());
+}
+
+#[test]
 fn config_load_variants_validate_only_their_scope() {
     let dir = tempdir().unwrap();
     let data_dir = dir.path().join("data");

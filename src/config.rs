@@ -42,6 +42,8 @@ pub struct Config {
     #[serde(default)]
     pub gui: GuiConfig,
     #[serde(default)]
+    pub gui_users: HashMap<String, GuiUserConfig>,
+    #[serde(default)]
     pub groups: HashMap<String, Vec<String>>,
     #[serde(default)]
     pub db_groups: HashMap<String, Vec<String>>,
@@ -211,6 +213,14 @@ pub struct GuiConfig {
     pub allow_gui_permission_edit: bool,
     #[serde(default)]
     pub allow_config_edit: bool,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct GuiUserConfig {
+    pub token: String,
+    #[serde(flatten)]
+    pub permissions: GuiConfig,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -397,6 +407,7 @@ impl Default for Config {
             audit: AuditConfig::default(),
             security: SecurityConfig::default(),
             gui: GuiConfig::default(),
+            gui_users: HashMap::new(),
             groups: HashMap::new(),
             db_groups: HashMap::new(),
             base_dir: PathBuf::from("."),
@@ -583,6 +594,7 @@ impl Config {
             bail!("execution.parallel は1以上が必要です");
         }
         self.validate_extended_runtime()?;
+        self.validate_gui_users()?;
         Ok(())
     }
 
@@ -851,6 +863,35 @@ impl Config {
                 "{label} はsecurity.allowed_rootsの外を指せません: {}",
                 path.display()
             );
+        }
+        Ok(())
+    }
+
+    pub fn effective_gui_permissions(&self, user: Option<&str>) -> Result<GuiConfig> {
+        if self.gui_users.is_empty() {
+            return Ok(self.gui.clone());
+        }
+        let Some(token) = user else {
+            bail!("GUI user token が必要です");
+        };
+        for user in self.gui_users.values() {
+            if user.token == token {
+                return Ok(user.permissions.clone());
+            }
+        }
+        bail!("GUI user token が不正です")
+    }
+
+    fn validate_gui_users(&self) -> Result<()> {
+        let mut tokens = std::collections::HashSet::new();
+        for (name, user) in &self.gui_users {
+            validate_group_name("gui_users", name)?;
+            if user.token.trim().is_empty() || user.token.trim() != user.token {
+                bail!("gui_users.{name}.token は空白なしの非空文字列である必要があります");
+            }
+            if !tokens.insert(&user.token) {
+                bail!("gui_users のtokenが重複しています");
+            }
         }
         Ok(())
     }

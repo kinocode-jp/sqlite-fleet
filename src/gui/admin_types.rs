@@ -119,16 +119,16 @@ struct PathEntriesData {
 }
 
 impl GuiPermissionData {
-    fn from_config(config: &Config) -> Self {
+    fn from_permissions(permissions: &sqlite_fleet::GuiConfig) -> Self {
         Self {
-            allow_check: config.gui.allow_check,
-            allow_migrate: config.gui.allow_migrate,
-            allow_backup: config.gui.allow_backup,
-            allow_restore: config.gui.allow_restore,
-            allow_sql_apply: config.gui.allow_sql_apply,
-            allow_migration_edit: config.gui.allow_migration_edit,
-            allow_gui_permission_edit: config.gui.allow_gui_permission_edit,
-            allow_config_edit: config.gui.allow_config_edit,
+            allow_check: permissions.allow_check,
+            allow_migrate: permissions.allow_migrate,
+            allow_backup: permissions.allow_backup,
+            allow_restore: permissions.allow_restore,
+            allow_sql_apply: permissions.allow_sql_apply,
+            allow_migration_edit: permissions.allow_migration_edit,
+            allow_gui_permission_edit: permissions.allow_gui_permission_edit,
+            allow_config_edit: permissions.allow_config_edit,
         }
     }
 }

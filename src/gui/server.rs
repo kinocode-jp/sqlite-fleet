@@ -95,6 +95,18 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
     };
+    let permissions = if is_api_path(path) {
+        match config.effective_gui_permissions(
+            headers
+                .get("x-sqlite-fleet-user-token")
+                .map(String::as_str),
+        ) {
+            Ok(permissions) => permissions,
+            Err(error) => return write_json_error(&mut stream, 403, error),
+        }
+    } else {
+        config.gui.clone()
+    };
 
     match (method, path) {
         ("GET", "/") => {
@@ -114,7 +126,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             if let Err(error) = validate_no_query(query) {
                 return write_json_error(&mut stream, 400, error);
             }
-            write_json(&mut stream, 200, &api_state(&config))
+            write_json(&mut stream, 200, &api_state(&config, &permissions))
         }
         ("GET", "/api/discover") => {
             if let Err(error) = validate_no_query(query) {
@@ -129,7 +141,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json(&mut stream, 200, &api_plan(&config))
         }
         ("GET", "/api/admin/path-entries") => {
-            if !config.gui.allow_config_edit && !config.gui.allow_migration_edit {
+            if !permissions.allow_config_edit && !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -171,7 +183,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, api_schema(&config, database))
         }
         ("POST", "/api/check") => {
-            if !config.gui.allow_check {
+            if !permissions.allow_check {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -184,7 +196,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json(&mut stream, 200, &api_check(&config))
         }
         ("POST", "/api/backup") => {
-            if !config.gui.allow_backup {
+            if !permissions.allow_backup {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -233,7 +245,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Ok(dry_run) => dry_run,
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
-            if !dry_run && !config.gui.allow_sql_apply {
+            if !dry_run && !permissions.allow_sql_apply {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -289,7 +301,14 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, result)
         }
         ("POST", "/api/admin/gui-permissions") => {
-            if !config.gui.allow_gui_permission_edit {
+            if !config.gui_users.is_empty() {
+                return write_json_error(
+                    &mut stream,
+                    403,
+                    anyhow::anyhow!("gui_users 有効時はGUIから権限を保存できません。設定ファイルの [gui_users] を編集してください"),
+                );
+            }
+            if !permissions.allow_gui_permission_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -305,7 +324,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/settings") => {
-            if !config.gui.allow_config_edit {
+            if !permissions.allow_config_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -321,7 +340,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/discovery-preview") => {
-            if !config.gui.allow_config_edit {
+            if !permissions.allow_config_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -337,7 +356,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/baseline") => {
-            if !config.gui.allow_migrate {
+            if !permissions.allow_migrate {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -362,7 +381,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             write_json_result(&mut stream, result)
         }
         ("POST", "/api/admin/migration-group") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -378,7 +397,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/db-group") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -394,7 +413,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/database-migration-group") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -410,7 +429,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/migration-file") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -426,7 +445,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/migration-file/update") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -442,7 +461,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
             )
         }
         ("POST", "/api/admin/database-file") => {
-            if !config.gui.allow_migration_edit {
+            if !permissions.allow_migration_edit {
                 return write_json_error(
                     &mut stream,
                     403,
@@ -466,7 +485,7 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
                 Ok(dry_run) => dry_run,
                 Err(error) => return write_json_error(&mut stream, 400, error),
             };
-            if !config.gui.allow_migrate {
+            if !permissions.allow_migrate {
                 return write_json_error(
                     &mut stream,
                     403,

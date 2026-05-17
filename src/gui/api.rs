@@ -5,7 +5,7 @@ struct ApiEnvelope<T> {
     error: Option<String>,
 }
 
-fn api_state(config: &Config) -> ApiEnvelope<StateData> {
+fn api_state(config: &Config, permissions: &sqlite_fleet::GuiConfig) -> ApiEnvelope<StateData> {
     match (
         status_report(config),
         discover_databases(config),
@@ -31,7 +31,9 @@ fn api_state(config: &Config) -> ApiEnvelope<StateData> {
                     database_migration_assignments: api_database_migration_assignments(
                         config, &databases,
                     ),
-                    gui_permissions: GuiPermissionData::from_config(config),
+                    gui_permissions: GuiPermissionData::from_permissions(
+                        &state_gui_permissions(config, permissions),
+                    ),
                     settings: SettingsData::from_config(config),
                     project: config.project.name.clone(),
                     status,
@@ -516,10 +518,24 @@ fn api_sql(config: &Config, database_id: &str, dry_run: bool, body: &[u8]) -> Re
     })
 }
 
+fn state_gui_permissions(
+    config: &Config,
+    permissions: &sqlite_fleet::GuiConfig,
+) -> sqlite_fleet::GuiConfig {
+    let mut permissions = permissions.clone();
+    if !config.gui_users.is_empty() {
+        permissions.allow_gui_permission_edit = false;
+    }
+    permissions
+}
+
 fn api_save_gui_permissions(state: &ServerState, body: Vec<u8>) -> Result<AdminResult> {
     let request: GuiPermissionRequest =
         serde_json::from_slice(&body).context("GUI permissions request body のJSONが不正です")?;
     let mut config = locked_config(state)?;
+    if !config.gui_users.is_empty() {
+        bail!("gui_users 有効時はGUIから権限を保存できません。設定ファイルの [gui_users] を編集してください");
+    }
     config.gui.allow_check = request.allow_check;
     config.gui.allow_migrate = request.allow_migrate;
     config.gui.allow_backup = request.allow_backup;

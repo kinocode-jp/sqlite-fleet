@@ -122,6 +122,7 @@ fn parse_headers(request: &str) -> Result<HashMap<String, String>> {
             key.as_str(),
             "host"
                 | "x-sqlite-fleet-token"
+                | "x-sqlite-fleet-user-token"
                 | "content-length"
                 | "content-type"
                 | "transfer-encoding"

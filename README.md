@@ -145,6 +145,16 @@ allow_migration_edit = false
 allow_gui_permission_edit = false
 allow_config_edit = false
 
+[gui_users.viewer]
+token = "replace-with-random-viewer-token"
+allow_check = true
+
+[gui_users.operator]
+token = "replace-with-random-operator-token"
+allow_check = true
+allow_migrate = true
+allow_backup = true
+
 [db_groups]
 canary = ["tenant-a", "tenant-b"]
 ```
@@ -158,6 +168,8 @@ canary = ["tenant-a", "tenant-b"]
 設定由来のパスはデフォルトでは設定ファイルのディレクトリ配下に限定されます。外部DBディレクトリ、外部マイグレーションディレクトリ、外部report/backup先を使う場合は `[security].allowed_roots` に明示します。`.` は設定ファイルのディレクトリを表し、相対パスは設定ファイルのディレクトリ基準、絶対パスも指定できます。前後空白、親ディレクトリ成分 `..`、シンボリックリンクによる許可ルート外への脱出は安全側で拒否します。
 
 `allowed_roots` は「どこを触れるか」を決める設定です。`allow_sql_apply`、`allow_migrate`、`allow_restore` など `[gui]` の `allow_*` は「何をできるか」を決める設定で、互いに独立しています。`allow_migration_edit` はマイグレーションファイルやグループ編集、`allow_config_edit` はDB検出や許可ルートなど通常設定の編集、`allow_gui_permission_edit` はGUI権限そのものの変更を許可します。便利にDB検出や許可ルートだけをGUIから変えたい場合は、危険操作を有効化せず `allow_config_edit = true` だけを使ってください。GUI の Settings では許可ルートを一覧、追加、削除でき、resolved path、存在しないroot、広すぎるrootの警告を表示します。保存時には、指定ディレクトリ配下の DB / migration / report を操作できるようになることを確認します。
+
+ユーザーごとにGUI操作を分けたい場合は `[gui_users.<name>]` を追加します。`gui_users` が未設定なら従来どおり `[gui]` の権限だけを使います。`gui_users` を1件以上設定した場合、GUI APIは `X-SQLite-Fleet-User-Token` を要求し、トークンに一致したユーザーの `allow_*` だけで操作可否を判定します。ブラウザGUIでは初回APIアクセス時にGUI user tokenを入力し、以後はブラウザのlocalStorageから同じトークンを送ります。
 
 ## 既存プロジェクトへの導入
 
