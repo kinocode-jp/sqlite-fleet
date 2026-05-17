@@ -287,6 +287,9 @@
         assert!(INDEX_HTML.contains(r#"<button id="saveSettings" class="primary">設定を保存</button>"#));
         assert!(INDEX_HTML.contains("function renderSetupChecklist(settings)"));
         assert!(INDEX_HTML.contains("function openSetupDestination(page, target = '')"));
+        assert!(INDEX_HTML.contains("setupGuiUserTitle: '管理ユーザー作成'"));
+        assert!(INDEX_HTML.contains("target: 'settingsGuiPermissionsSection'"));
+        assert!(INDEX_HTML.contains("action: t('openGuiUsers')"));
         assert!(INDEX_HTML.contains("setupDiscoveryTitle"));
         assert!(INDEX_HTML.contains("title: t('setupPreviewTitle', databaseCount)"));
         assert!(INDEX_HTML.contains("title: t('setupMigrationFilesTitle', migrationCount)"));

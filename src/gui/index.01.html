@@ -725,6 +725,16 @@
         { done: migrationCount > 0, title: t('setupMigrationFilesTitle', migrationCount), detail: t('setupMigrationFilesDetail'), page: 'migrations', action: t('openMigrations') },
         { done: state && state.status && state.status.failed === 0, title: t('setupDryRunTitle'), detail: t('setupDryRunDetail'), page: 'execute', action: t('openMigrationApply') },
       ];
+      if (guiUserSetupMode) {
+        items.unshift({
+          done: false,
+          title: t('setupGuiUserTitle'),
+          detail: t('setupGuiUserDetail'),
+          page: 'settings',
+          target: 'settingsGuiPermissionsSection',
+          action: t('openGuiUsers'),
+        });
+      }
       $('setupChecklist').innerHTML = items.map((item) => `
         <div class="setup-check-item ${item.done ? 'done' : ''}">
           <span class="setup-check-mark">${item.done ? '✓' : ''}</span>
