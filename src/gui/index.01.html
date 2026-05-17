@@ -596,6 +596,7 @@
       const permissions = state.gui_permissions;
       const canEditPermissions = Boolean(permissions.allow_gui_permission_edit);
       const canEditConfig = Boolean(permissions.allow_config_edit);
+      $('permissions').hidden = Boolean(guiUserSetupMode);
       $('permissions').innerHTML = Object.entries(permissions).map(([key, value]) => `
         <label class="permission-card">
           <span><strong>${escapeHtml(key)}</strong></span>

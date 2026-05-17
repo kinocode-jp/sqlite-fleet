@@ -275,6 +275,8 @@
             <summary>GUI permissions</summary>"#
         ));
         assert!(INDEX_HTML.contains("$('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode)"));
+        assert!(INDEX_HTML.contains("$('permissions').hidden = Boolean(guiUserSetupMode)"));
+        assert!(INDEX_HTML.contains("$('permissions').innerHTML = Object.entries(permissions).map"));
         assert!(INDEX_HTML.contains("function defaultGuiUser(isFirstUser)"));
         assert!(INDEX_HTML.contains("state.gui_users = [defaultGuiUser(true)]"));
         assert!(INDEX_HTML.contains("const canEditPermissions = permissions.allow_gui_permission_edit || guiUserSetupMode"));
