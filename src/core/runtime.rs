@@ -312,7 +312,8 @@ pub fn acquire_database_operation_lock(
                 writeln!(file, "operation={operation}")?;
                 writeln!(file, "database={}", database_path.display())?;
                 writeln!(file, "token={token}")?;
-                file.sync_all()?;
+                sync_operation_lock_file(&file)
+                    .with_context(|| format!("DB操作ロックを保存できません: {}", lock_path.display()))?;
                 return Ok(DatabaseOperationLock {
                     path: lock_path,
                     token,
@@ -336,6 +337,23 @@ pub fn acquire_database_operation_lock(
             }
         }
     }
+}
+
+fn sync_operation_lock_file(file: &File) -> Result<()> {
+    for _ in 0..3 {
+        match file.sync_all() {
+            Ok(()) => return Ok(()),
+            Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(25));
+            }
+            Err(error) => return Err(error.into()),
+        }
+    }
+    // Some external/macOS volumes can report EAGAIN for fsync even after the
+    // lock file has been created and written. The lock is advisory and scoped
+    // to this process lifecycle, so do not fail the operation solely because
+    // the durability flush could not complete immediately.
+    Ok(())
 }
 
 fn database_operation_lock_path(database_path: &Path) -> Result<PathBuf> {
