@@ -373,7 +373,7 @@
         guiUserSetupMode = Boolean(state.gui_user_setup_available);
         render();
         if (guiUserSetupMode && !window.location.hash) {
-          navigateToPage('settings', { replace: true });
+          navigateToPage('setup', { replace: true });
         }
         if (showLoadedMessage) clearMessage();
       } catch (error) {

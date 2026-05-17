@@ -268,7 +268,7 @@
         assert!(INDEX_HTML.contains("let guiUserSetupMode = false"));
         assert!(INDEX_HTML.contains("guiUserSetupMode = Boolean(state.gui_user_setup_available)"));
         assert!(INDEX_HTML.contains("if (guiUserSetupMode && !window.location.hash)"));
-        assert!(INDEX_HTML.contains("navigateToPage('settings', { replace: true })"));
+        assert!(INDEX_HTML.contains("navigateToPage('setup', { replace: true })"));
         assert!(INDEX_HTML.contains(r#"<details id="settingsGuiPermissionsSection" class="settings-section">"#));
         assert!(INDEX_HTML.contains(
             r#"<details id="settingsGuiPermissionsSection" class="settings-section">
