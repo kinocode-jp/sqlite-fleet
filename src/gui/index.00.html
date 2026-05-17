@@ -292,6 +292,7 @@
         <a href='#migrations-panel' data-page-link="migrations"><span class="nav-icon">MIG</span>マイグレーション管理</a>
         <a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>
         <a href='#sql-panel' data-page-link="sql"><span class="nav-icon">SQL</span>SQLコンソール</a>
+        <a href='#gui-permissions-panel' data-page-link="gui-permissions"><span class="nav-icon">USR</span>GUI権限</a>
         <a href='#settings-panel' data-page-link="settings"><span class="nav-icon">CFG</span>設定</a>
         <a href='#help' data-page-link="help"><span class="nav-icon">?</span>ヘルプ</a>
       </nav>
@@ -689,16 +690,17 @@
             </div>
           </details>
           <div class="actions settings-actions"><button id="saveSettings" class="primary">設定を保存</button></div>
-          <details id="settingsGuiPermissionsSection" class="settings-section">
-            <summary>GUI permissions</summary>
-            <div class="settings-section-body">
-              <div id="permissions" class="permission-form permission-grid"></div>
-              <div id="guiUsers" class="permission-form"></div>
-              <div class="actions settings-actions"><button id="addGuiUser" type="button">ユーザーを追加</button></div>
-              <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
-            </div>
-          </details>
         </div>
+      </section>
+
+      <section class="panel page" data-page="gui-permissions" id="gui-permissions-panel">
+        <section id="settingsGuiPermissionsSection" class="builder-block">
+          <h3>GUI permissions</h3>
+          <div id="permissions" class="permission-form permission-grid"></div>
+          <div id="guiUsers" class="permission-form"></div>
+          <div class="actions settings-actions"><button id="addGuiUser" type="button">ユーザーを追加</button></div>
+          <div class="actions settings-actions"><button id="savePermissions" class="primary">権限を保存</button></div>
+        </section>
       </section>
 
       <div id="pathBrowserModal" class="modal-backdrop" hidden>

@@ -117,7 +117,8 @@
         databases: 'DB Management',
         migrations: 'Migration Management',
         sql: 'SQL Console',
-        settings: 'Settings / permissions',
+        'gui-permissions': 'GUI permissions',
+        settings: 'Settings',
         help: 'Help',
       },
       ja: {
@@ -128,6 +129,7 @@
         databases: 'DB管理',
         migrations: 'マイグレーション管理',
         sql: 'SQLコンソール',
+        'gui-permissions': 'GUI権限',
         settings: '設定',
         help: 'ヘルプ',
       },
@@ -140,7 +142,8 @@
         databases: 'Check status, assigned Migration Groups, and pending migrations per database.',
         migrations: 'Review loaded migration files, target DBs, and checksums. Click a file name to open details.',
         sql: 'Run ad hoc SQL outside migration history after checking it with Dry run. SQL apply runs in an atomic transaction when possible.',
-        settings: 'Review and change the current project name, output paths, backup, and GUI operation permissions.',
+        'gui-permissions': 'Create GUI users and control which operations each user can run.',
+        settings: 'Review and change the current project name, output paths, backup, and runtime options.',
         help: 'Reference material for details. Day-to-day guidance is also available in field tooltips.',
       },
       ja: {
@@ -150,7 +153,8 @@
         databases: 'DBごとの状態、対象マイグレーショングループ、未適用のマイグレーションを確認します。',
         migrations: '読み込まれているマイグレーションファイル、対象DB、チェックサムを確認できます。ファイル名をクリックすると詳細を表示します。',
         sql: 'マイグレーション履歴に残さないSQLを、Dry runで確認してから適用できます。SQL適用は可能な範囲でatomic transactionとして実行されます。',
-        settings: '現在のプロジェクト名、出力先、バックアップ、GUI操作権限を確認・変更できます。',
+        'gui-permissions': 'GUIユーザーを作成し、ユーザーごとに実行できる操作を管理します。',
+        settings: '現在のプロジェクト名、出力先、バックアップ、実行設定を確認・変更できます。',
         help: '詳細を読みたい時のリファレンスです。日常操作の要点は各項目のツールチップにも分散しています。',
       },
     };
@@ -634,7 +638,8 @@
       $('saveSettings').disabled = !canEditConfig;
       $('saveSettings').title = canEditConfig ? '' : t('configEditDisabled');
       renderAllowedRoots();
-      $('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode);
+      const guiPermissionsSection = $('settingsGuiPermissionsSection');
+      if (guiPermissionsSection.tagName === 'DETAILS') guiPermissionsSection.open = Boolean(guiUserSetupMode);
       document.querySelectorAll('[data-path-browse]').forEach((button) => {
         const allowed = pathBrowseAllowed(button.dataset.pathBrowse);
         button.disabled = !allowed;
@@ -734,7 +739,7 @@
           done: false,
           title: t('setupGuiUserTitle'),
           detail: t('setupGuiUserDetail'),
-          page: 'settings',
+          page: 'gui-permissions',
           target: 'settingsGuiPermissionsSection',
           action: t('openGuiUsers'),
         });

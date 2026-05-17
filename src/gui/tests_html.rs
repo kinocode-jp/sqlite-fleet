@@ -141,6 +141,8 @@
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
         assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#gui-permissions-panel' data-page-link="gui-permissions"><span class="nav-icon">USR</span>GUI権限</a>"#));
+        assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="gui-permissions" id="gui-permissions-panel">"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
         let migration_group_nav = INDEX_HTML
             .find(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#)
@@ -269,12 +271,12 @@
         assert!(INDEX_HTML.contains("guiUserSetupMode = Boolean(state.gui_user_setup_available)"));
         assert!(INDEX_HTML.contains("if (guiUserSetupMode && !window.location.hash)"));
         assert!(INDEX_HTML.contains("navigateToPage('setup', { replace: true })"));
-        assert!(INDEX_HTML.contains(r#"<details id="settingsGuiPermissionsSection" class="settings-section">"#));
+        assert!(INDEX_HTML.contains(r#"<section id="settingsGuiPermissionsSection" class="builder-block">"#));
         assert!(INDEX_HTML.contains(
-            r#"<details id="settingsGuiPermissionsSection" class="settings-section">
-            <summary>GUI permissions</summary>"#
+            r#"<section id="settingsGuiPermissionsSection" class="builder-block">
+          <h3>GUI permissions</h3>"#
         ));
-        assert!(INDEX_HTML.contains("$('settingsGuiPermissionsSection').open = Boolean(guiUserSetupMode)"));
+        assert!(INDEX_HTML.contains("if (guiPermissionsSection.tagName === 'DETAILS') guiPermissionsSection.open = Boolean(guiUserSetupMode)"));
         assert!(INDEX_HTML.contains("$('permissions').hidden = Boolean(guiUserSetupMode)"));
         assert!(INDEX_HTML.contains("$('permissions').innerHTML = Object.entries(permissions).map"));
         assert!(INDEX_HTML.contains(r#"<div id="permissions" class="permission-form permission-grid"></div>"#));
@@ -296,6 +298,7 @@
         assert!(INDEX_HTML.contains("function renderSetupChecklist(settings)"));
         assert!(INDEX_HTML.contains("function openSetupDestination(page, target = '')"));
         assert!(INDEX_HTML.contains("setupGuiUserTitle: '管理ユーザー作成'"));
+        assert!(INDEX_HTML.contains("page: 'gui-permissions'"));
         assert!(INDEX_HTML.contains("target: 'settingsGuiPermissionsSection'"));
         assert!(INDEX_HTML.contains("action: t('openGuiUsers')"));
         assert!(INDEX_HTML.contains("setupDiscoveryTitle"));
@@ -310,7 +313,7 @@
         assert!(INDEX_HTML.contains(r#"<details id="settingsAllowedRootsSection" class="settings-section" open>"#));
         assert!(INDEX_HTML.contains(r#"<details id="settingsMigrationSection" class="settings-section">"#));
         assert!(INDEX_HTML.contains(r#"<summary>DB検出</summary>"#));
-        assert!(INDEX_HTML.contains(r#"<summary>GUI permissions</summary>"#));
+        assert!(INDEX_HTML.contains(r#"<h3>GUI permissions</h3>"#));
         assert!(INDEX_HTML.contains(".settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:visible; }"));
         assert!(INDEX_HTML.contains(".settings-section[open] summary"));
         assert!(INDEX_HTML.contains(r#"<button id="baselineAll">対象を読み取り済みにする</button>"#));
