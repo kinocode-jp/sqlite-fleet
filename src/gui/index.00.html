@@ -152,8 +152,9 @@
     .permission-form { display:grid; gap:10px; }
     .permission-grid { grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:8px; }
     .permission-card { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
-    .permission-card.gui-user-card { display:grid; grid-template-columns:repeat(2, minmax(160px, 1fr)) auto; align-items:end; }
+    .permission-card.gui-user-card { display:grid; grid-template-columns:repeat(2, minmax(160px, 1fr)) auto; align-items:start; }
     .permission-card.gui-user-card .permission-grid { grid-column:1 / -1; }
+    .gui-user-remove { justify-self:end; align-self:start; }
     .permission-card strong { font-size:14px; overflow-wrap:anywhere; }
     .permission-card .pill { min-width:48px; justify-content:center; }
     .permission-card input[type="checkbox"] { width:18px; height:18px; }
@@ -1218,9 +1219,10 @@
         permissionTip_allow_config_edit: 'Allows changing project settings such as discovery, paths, backup, and runtime options.',
         guiUserNameLabel: 'User name',
         guiUserNamePlaceholder: 'your-name',
-        guiUserTokenLabel: 'User token',
+        guiUserTokenLabel: 'Sign-in token',
         guiUserTokenPlaceholder: 'enter a long random token',
-        guiUserTokenHint: 'This is the token used to sign in to this GUI. It is saved in the config, so use a long random value.',
+        guiUserTokenHint: 'This is effectively the password for this GUI user. It is saved in the config, so use a long random value instead of a memorable password.',
+        removeGuiUser: 'Remove',
         setupGuiUserTitle: 'Admin user',
         setupGuiUserDetail: 'Create the first GUI user. This user can manage later users and permissions.',
         setupAllowedRootsTitle: 'Allowed roots',
@@ -1393,9 +1395,10 @@
         permissionTip_allow_config_edit: 'DB検出、パス、バックアップ、実行設定などのプロジェクト設定変更を許可します。',
         guiUserNameLabel: 'ユーザー名',
         guiUserNamePlaceholder: '自分の名前',
-        guiUserTokenLabel: 'ユーザートークン',
+        guiUserTokenLabel: 'ログイントークン（パスワード相当）',
         guiUserTokenPlaceholder: '長いランダム文字列を入力',
-        guiUserTokenHint: 'このGUIに入るためのトークンです。設定ファイルに保存されるため、パスワードではなく長いランダム値として扱ってください。',
+        guiUserTokenHint: 'このGUIユーザーでサインインするためのパスワード相当の値です。設定ファイルに保存されるため、覚えやすいパスワードではなく長いランダム値にしてください。',
+        removeGuiUser: '削除',
         setupGuiUserTitle: '管理ユーザー作成',
         setupGuiUserDetail: '最初のGUIユーザーを作成します。このユーザーは2人目以降のユーザーと権限を管理できます。',
         setupAllowedRootsTitle: '許可ルート',

@@ -707,10 +707,10 @@
             <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" placeholder="${escapeHtml(t('guiUserNamePlaceholder'))}" autocomplete="off" spellcheck="false" ${disabled}>
           </label>
           <label class="field">
-            <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))}</span>
-            <input data-gui-user-field="token" value="${escapeHtml(user.token || '')}" placeholder="${escapeHtml(t('guiUserTokenPlaceholder'))}" autocomplete="off" spellcheck="false" ${disabled}>
-            <span class="field-hint">${escapeHtml(t('guiUserTokenHint'))}</span>
+            <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))} <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(t('guiUserTokenHint'))}">?</span></span>
+            <input data-gui-user-field="token" type="password" value="${escapeHtml(user.token || '')}" placeholder="${escapeHtml(t('guiUserTokenPlaceholder'))}" autocomplete="new-password" spellcheck="false" ${disabled}>
           </label>
+          ${state.gui_users.length > 1 ? `<button class="gui-user-remove" type="button" data-remove-gui-user="${index}" ${disabled}>${escapeHtml(t('removeGuiUser'))}</button>` : ''}
           <div class="permission-form permission-grid">
             ${Object.entries(user.permissions || {}).map(([key, value]) => `
               <label class="check-row">
@@ -719,7 +719,6 @@
               </label>
             `).join('')}
           </div>
-          <button type="button" data-remove-gui-user="${index}" ${disabled}>Remove</button>
         </div>
       `).join('');
     }
