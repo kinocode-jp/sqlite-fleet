@@ -11,13 +11,21 @@ struct ServerState {
     script_nonce: String,
     bind_ip: IpAddr,
     port: u16,
+    allow_remote_host: bool,
 }
 
-pub fn serve(config: Config, config_path: PathBuf, host: &str, port: u16) -> Result<()> {
-    validate_gui_host(host)?;
+pub fn serve(
+    config: Config,
+    config_path: PathBuf,
+    host: &str,
+    port: u16,
+    allow_remote: bool,
+) -> Result<()> {
+    validate_gui_host(host, allow_remote)?;
     let listener = TcpListener::bind((host, port))
         .with_context(|| format!("GUIサーバを起動できません: {host}:{port}"))?;
     let addr = listener.local_addr()?;
+    let allow_remote_host = allow_remote && !addr.ip().is_loopback();
     let state = ServerState {
         config: Mutex::new(config),
         config_path,
@@ -26,6 +34,7 @@ pub fn serve(config: Config, config_path: PathBuf, host: &str, port: u16) -> Res
         script_nonce: generate_csrf_token()?,
         bind_ip: addr.ip(),
         port: addr.port(),
+        allow_remote_host,
     };
     println!("GUI: http://{addr}/");
     println!("停止するには Ctrl+C を押してください");
@@ -66,7 +75,9 @@ fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
         Ok(headers) => headers,
         Err(error) => return write_json_error(&mut stream, 400, error),
     };
-    if let Err(error) = validate_host_header(&headers, state.bind_ip, state.port) {
+    if let Err(error) =
+        validate_host_header(&headers, state.bind_ip, state.port, state.allow_remote_host)
+    {
         return write_json_error(&mut stream, 403, error);
     }
     if is_api_path(path) {

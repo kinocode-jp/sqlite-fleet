@@ -289,6 +289,7 @@
             script_nonce: "nonce".to_string(),
             bind_ip: addr.ip(),
             port: addr.port(),
+            allow_remote_host: false,
         };
 
         let server = std::thread::spawn(move || {
@@ -317,6 +318,7 @@
             script_nonce: "nonce".to_string(),
             bind_ip: Ipv4Addr::LOCALHOST.into(),
             port: 0,
+            allow_remote_host: false,
         }
     }
 

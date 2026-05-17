@@ -5,6 +5,7 @@ use sqlite_fleet::{
     migrate_with_options, restore, schema_drift, status_report, write_audit_event,
     write_report_json, Config, DatabaseSelection, MigrateOptions, DEFAULT_CONFIG_PATH,
 };
+use std::net::ToSocketAddrs;
 use std::path::{Path, PathBuf};
 
 mod gui;
@@ -74,6 +75,8 @@ enum Commands {
         host: String,
         #[arg(long, default_value_t = 8765)]
         port: u16,
+        #[arg(long)]
+        allow_remote: bool,
     },
 }
 
@@ -434,9 +437,14 @@ fn main() -> Result<()> {
                 bail!("doctor で問題を検出しました");
             }
         }
-        Commands::Gui { host, port } => {
+        Commands::Gui {
+            host,
+            port,
+            allow_remote,
+        } => {
             let loaded_config = load_config_with_overrides(&config, parallel)?;
-            gui::serve(loaded_config, config.clone(), &host, port)?;
+            validate_gui_remote_startup(&loaded_config, &host, allow_remote)?;
+            gui::serve(loaded_config, config.clone(), &host, port, allow_remote)?;
         }
     }
 
@@ -482,6 +490,37 @@ fn fail_if_report_write_failed(error: Option<Error>) -> Result<()> {
     }
 }
 
+fn validate_gui_remote_startup(config: &Config, host: &str, allow_remote: bool) -> Result<()> {
+    if !gui_host_is_remote(host)? {
+        return Ok(());
+    }
+    if !allow_remote {
+        bail!("GUI host が外部公開アドレスです。外部公開する場合は --allow-remote を指定してください: {host}");
+    }
+    if config.gui_users.is_empty() {
+        bail!("外部公開するGUIでは gui_users の初期管理ユーザーが必要です");
+    }
+    if !config
+        .gui_users
+        .values()
+        .any(|user| user.permissions.allow_gui_permission_edit)
+    {
+        bail!("外部公開するGUIでは allow_gui_permission_edit を持つGUIユーザーが1人以上必要です");
+    }
+    Ok(())
+}
+
+fn gui_host_is_remote(host: &str) -> Result<bool> {
+    let addrs = (host, 0)
+        .to_socket_addrs()
+        .map_err(|error| anyhow::anyhow!("GUI host を解決できません: {host}: {error}"))?
+        .collect::<Vec<_>>();
+    if addrs.is_empty() {
+        bail!("GUI host を解決できません: {host}");
+    }
+    Ok(!addrs.iter().all(|addr| addr.ip().is_loopback()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -491,9 +530,14 @@ mod tests {
         let cli = Cli::parse_from(["sqlite-fleet", "gui"]);
 
         match cli.command {
-            Commands::Gui { host, port } => {
+            Commands::Gui {
+                host,
+                port,
+                allow_remote,
+            } => {
                 assert_eq!(host, "127.0.0.1");
                 assert_eq!(port, 8765);
+                assert!(!allow_remote);
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -511,11 +555,73 @@ mod tests {
         ]);
 
         match cli.command {
-            Commands::Gui { host, port } => {
+            Commands::Gui {
+                host,
+                port,
+                allow_remote,
+            } => {
                 assert_eq!(host, "localhost");
                 assert_eq!(port, 18782);
+                assert!(!allow_remote);
             }
             other => panic!("unexpected command: {other:?}"),
         }
+    }
+
+    #[test]
+    fn gui_command_accepts_explicit_remote_flag() {
+        let cli = Cli::parse_from(["sqlite-fleet", "gui", "--host", "0.0.0.0", "--allow-remote"]);
+
+        match cli.command {
+            Commands::Gui {
+                host, allow_remote, ..
+            } => {
+                assert_eq!(host, "0.0.0.0");
+                assert!(allow_remote);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn remote_gui_startup_requires_explicit_flag_and_admin_user() {
+        let config = Config::default();
+        let error = validate_gui_remote_startup(&config, "0.0.0.0", false)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("--allow-remote"), "{error}");
+
+        let error = validate_gui_remote_startup(&config, "0.0.0.0", true)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("gui_users の初期管理ユーザー"), "{error}");
+
+        let mut config = Config::default();
+        config.gui_users.insert(
+            "viewer".to_string(),
+            sqlite_fleet::GuiUserConfig::with_hashed_token(
+                "viewer-token",
+                sqlite_fleet::GuiConfig::default(),
+            )
+            .unwrap(),
+        );
+        let error = validate_gui_remote_startup(&config, "0.0.0.0", true)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("allow_gui_permission_edit"), "{error}");
+
+        config.gui_users.insert(
+            "owner".to_string(),
+            sqlite_fleet::GuiUserConfig::with_hashed_token(
+                "owner-token",
+                sqlite_fleet::GuiConfig {
+                    allow_gui_permission_edit: true,
+                    ..sqlite_fleet::GuiConfig::default()
+                },
+            )
+            .unwrap(),
+        );
+        validate_gui_remote_startup(&config, "0.0.0.0", true).unwrap();
+        validate_gui_remote_startup(&Config::default(), "127.0.0.1", false).unwrap();
     }
 }

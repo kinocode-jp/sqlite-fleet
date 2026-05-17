@@ -487,20 +487,20 @@
         let mut headers = HashMap::new();
         let bind_ip = "127.0.0.1".parse().unwrap();
         headers.insert("host".to_string(), "127.0.0.1:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_ok());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_ok());
 
         headers.insert("host".to_string(), "localhost:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_ok());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_ok());
 
         headers.insert("host".to_string(), "localhost.:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_ok());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_ok());
 
         let ipv6_bind_ip = "::1".parse().unwrap();
         headers.insert("host".to_string(), "localhost:8765".to_string());
-        assert!(validate_host_header(&headers, ipv6_bind_ip, 8765).is_ok());
+        assert!(validate_host_header(&headers, ipv6_bind_ip, 8765, false).is_ok());
 
         headers.insert("host".to_string(), "[::1]:8765".to_string());
-        assert!(validate_host_header(&headers, ipv6_bind_ip, 8765).is_ok());
+        assert!(validate_host_header(&headers, ipv6_bind_ip, 8765, false).is_ok());
     }
 
     #[test]
@@ -508,54 +508,69 @@
         let mut headers = HashMap::new();
         let bind_ip = "127.0.0.1".parse().unwrap();
         headers.insert("host".to_string(), "example.com:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "127.0.0.1:9000".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "127.0.0.1:08765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "127.0.0.1:87x5".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), ":8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "[]:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "[localhost]:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "[127.0.0.1]:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "127.0.0.1".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "127.0.0.1.:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         headers.insert("host".to_string(), "[::1]:8765".to_string());
-        assert!(validate_host_header(&headers, bind_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, bind_ip, 8765, false).is_err());
 
         let ipv6_bind_ip = "::1".parse().unwrap();
         headers.insert("host".to_string(), "::1".to_string());
-        assert!(validate_host_header(&headers, ipv6_bind_ip, 80).is_err());
+        assert!(validate_host_header(&headers, ipv6_bind_ip, 80, false).is_err());
 
         let alternate_loopback_ip = "127.0.0.2".parse().unwrap();
         headers.insert("host".to_string(), "localhost:8765".to_string());
-        assert!(validate_host_header(&headers, alternate_loopback_ip, 8765).is_err());
+        assert!(validate_host_header(&headers, alternate_loopback_ip, 8765, false).is_err());
 
-        assert!(validate_host_header(&HashMap::new(), bind_ip, 8765).is_err());
+        assert!(validate_host_header(&HashMap::new(), bind_ip, 8765, false).is_err());
+    }
+
+    #[test]
+    fn remote_host_header_allows_proxy_hosts_when_enabled() {
+        let mut headers = HashMap::new();
+        let bind_ip = "0.0.0.0".parse().unwrap();
+        headers.insert("host".to_string(), "example.com".to_string());
+        assert!(validate_host_header(&headers, bind_ip, 8765, true).is_ok());
+
+        headers.insert("host".to_string(), "example.com:443".to_string());
+        assert!(validate_host_header(&headers, bind_ip, 8765, true).is_ok());
+
+        headers.insert("host".to_string(), "[]:8765".to_string());
+        assert!(validate_host_header(&headers, bind_ip, 8765, true).is_err());
     }
 
     #[test]
     fn gui_host_must_be_loopback() {
-        assert!(validate_gui_host("127.0.0.1").is_ok());
-        assert!(validate_gui_host("localhost").is_ok());
-        assert!(validate_gui_host("0.0.0.0").is_err());
+        assert!(validate_gui_host("127.0.0.1", false).is_ok());
+        assert!(validate_gui_host("localhost", false).is_ok());
+        assert!(validate_gui_host("0.0.0.0", false).is_err());
+        assert!(validate_gui_host("0.0.0.0", true).is_ok());
     }
 
     #[test]

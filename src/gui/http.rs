@@ -266,11 +266,15 @@ fn validate_host_header(
     headers: &HashMap<String, String>,
     bind_ip: IpAddr,
     port: u16,
+    allow_remote: bool,
 ) -> Result<()> {
     let Some(host) = headers.get("host") else {
         bail!("Host header が必要です");
     };
     let (hostname, header_port) = parse_host_header(host)?;
+    if allow_remote {
+        return Ok(());
+    }
     match header_port {
         Some(header_port) if header_port == port => {}
         Some(_) => bail!("Host header のportが不正です"),
@@ -466,7 +470,7 @@ fn percent_decode(value: &str) -> Result<String> {
     String::from_utf8(decoded).context("query parameter はUTF-8である必要があります")
 }
 
-fn validate_gui_host(host: &str) -> Result<()> {
+fn validate_gui_host(host: &str, allow_remote: bool) -> Result<()> {
     let addrs = (host, 0)
         .to_socket_addrs()
         .with_context(|| format!("GUI host を解決できません: {host}"))?
@@ -474,10 +478,10 @@ fn validate_gui_host(host: &str) -> Result<()> {
     if addrs.is_empty() {
         bail!("GUI host を解決できません: {host}");
     }
-    if addrs.iter().all(|addr| addr.ip().is_loopback()) {
+    if allow_remote || addrs.iter().all(|addr| addr.ip().is_loopback()) {
         Ok(())
     } else {
-        bail!("GUI host はループバックアドレスのみ指定できます: {host}");
+        bail!("GUI host が外部公開アドレスです。外部公開する場合は --allow-remote を指定してください: {host}");
     }
 }
 
