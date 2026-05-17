@@ -141,7 +141,7 @@
             r#"<section class="panel page active" data-page="execute" id="command-center">"#
         ));
         assert!(INDEX_HTML.contains(r#"<a href='#databases-panel' data-page-link="databases"><span class="nav-icon">DB</span>DB管理</a>"#));
-        assert!(INDEX_HTML.contains(r#"<a href='#gui-permissions-panel' data-page-link="gui-permissions"><span class="nav-icon">USR</span>GUI権限</a>"#));
+        assert!(INDEX_HTML.contains(r#"<a href='#gui-permissions-panel' data-page-link="gui-permissions"><span class="nav-icon">USR</span>ユーザー権限</a>"#));
         assert!(INDEX_HTML.contains(r#"<section class="panel page" data-page="gui-permissions" id="gui-permissions-panel">"#));
         assert!(INDEX_HTML.contains(r#"<a href='#migration-groups-panel' data-page-link="migration-groups" data-conditional-nav="migration-groups">"#));
         let migration_group_nav = INDEX_HTML
@@ -202,7 +202,7 @@
         assert!(INDEX_HTML.contains("'新規作成': 'Create new'"));
         assert!(INDEX_HTML.contains("'新規マイグレーション': 'New migration'"));
         assert!(INDEX_HTML.contains("': GUI操作権限を制限します。デフォルトでは読み取り系の': ': controls GUI permissions. By default, only read-only'"));
-        assert!(INDEX_HTML.contains("'DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集、GUI権限変更、設定変更を個別に許可します:': 'Permissions independently allow database-changing operations, backup, SQL apply, migration editing, GUI permission changes, and settings changes:'"));
+        assert!(INDEX_HTML.contains("'DBを書き換える操作、バックアップ、SQL適用、マイグレーション編集、ユーザー権限変更、設定変更を個別に許可します:': 'Permissions independently allow database-changing operations, backup, SQL apply, migration editing, user permission changes, and settings changes:'"));
         assert!(INDEX_HTML.contains("': 現在のGUIにはrestore実行画面はありません。復元はCLIで実行してください:': ': the current GUI has no restore screen. Run restores with the CLI:'"));
         assert!(INDEX_HTML.contains("'Version': 'Version'"));
         assert!(INDEX_HTML.contains("'File name': 'File name'"));
@@ -274,7 +274,7 @@
         assert!(INDEX_HTML.contains(r#"<section id="settingsGuiPermissionsSection" class="builder-block">"#));
         assert!(INDEX_HTML.contains(
             r#"<section id="settingsGuiPermissionsSection" class="builder-block">
-          <h3>GUI permissions</h3>"#
+          <h3>User permissions</h3>"#
         ));
         assert!(INDEX_HTML.contains("if (guiPermissionsSection.tagName === 'DETAILS') guiPermissionsSection.open = Boolean(guiUserSetupMode)"));
         assert!(INDEX_HTML.contains("$('permissions').hidden = Boolean(guiUserSetupMode)"));
@@ -284,7 +284,9 @@
         assert!(INDEX_HTML.contains(r#"data-tip="${escapeHtml(permissionTip(key))}""#));
         assert!(INDEX_HTML.contains("function permissionTip(key)"));
         assert!(INDEX_HTML.contains("permissionTip_allow_gui_permission_edit: 'GUIユーザーの作成"));
-        assert!(INDEX_HTML.contains(r#"<div class="permission-card gui-user-card" data-gui-user-index="${index}" data-gui-user-original-name="${escapeHtml(user.original_name || user.name || '')}">"#));
+        assert!(INDEX_HTML.contains(r#"<div id="guiUsers" class="gui-user-editor"></div>"#));
+        assert!(INDEX_HTML.contains(r#"class="gui-user-select ${index === selectedGuiUserIndex ? 'active' : ''}""#));
+        assert!(INDEX_HTML.contains(r#"<div class="gui-user-detail" data-gui-user-index="${selectedGuiUserIndex}" data-gui-user-original-name="${escapeHtml(selectedUser.original_name || selectedUser.name || '')}">"#));
         assert!(INDEX_HTML.contains("function defaultGuiUser(isFirstUser)"));
         assert!(INDEX_HTML.contains("state.gui_users = [defaultGuiUser(true)]"));
         assert!(INDEX_HTML.contains("const canEditPermissions = permissions.allow_gui_permission_edit || guiUserSetupMode"));
@@ -313,7 +315,7 @@
         assert!(INDEX_HTML.contains(r#"<details id="settingsAllowedRootsSection" class="settings-section" open>"#));
         assert!(INDEX_HTML.contains(r#"<details id="settingsMigrationSection" class="settings-section">"#));
         assert!(INDEX_HTML.contains(r#"<summary>DB検出</summary>"#));
-        assert!(INDEX_HTML.contains(r#"<h3>GUI permissions</h3>"#));
+        assert!(INDEX_HTML.contains(r#"<h3>User permissions</h3>"#));
         assert!(INDEX_HTML.contains(".settings-section { border:1px solid var(--line); border-radius:8px; background:#fff; overflow:visible; }"));
         assert!(INDEX_HTML.contains(".settings-section[open] summary"));
         assert!(INDEX_HTML.contains(r#"<button id="baselineAll">対象を読み取り済みにする</button>"#));

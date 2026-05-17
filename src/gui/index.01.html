@@ -117,7 +117,7 @@
         databases: 'DB Management',
         migrations: 'Migration Management',
         sql: 'SQL Console',
-        'gui-permissions': 'GUI permissions',
+        'gui-permissions': 'User permissions',
         settings: 'Settings',
         help: 'Help',
       },
@@ -129,7 +129,7 @@
         databases: 'DB管理',
         migrations: 'マイグレーション管理',
         sql: 'SQLコンソール',
-        'gui-permissions': 'GUI権限',
+        'gui-permissions': 'ユーザー権限',
         settings: '設定',
         help: 'ヘルプ',
       },
@@ -701,19 +701,38 @@
       }
       if (guiUserSetupMode && state.gui_users.length === 0) state.gui_users = [defaultGuiUser(true)];
       const disabled = canEditPermissions || guiUserSetupMode ? '' : 'disabled';
-      $('guiUsers').innerHTML = state.gui_users.map((user, index) => `
-        <div class="permission-card gui-user-card" data-gui-user-index="${index}" data-gui-user-original-name="${escapeHtml(user.original_name || user.name || '')}">
-          <label class="field">
-            <span class="field-label">${escapeHtml(t('guiUserNameLabel'))}</span>
-            <input data-gui-user-field="name" value="${escapeHtml(user.name || '')}" autocomplete="off" spellcheck="false" ${disabled}>
-          </label>
-          <label class="field">
-            <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))} <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(t('guiUserTokenHint'))}">?</span></span>
-            <input data-gui-user-field="token" type="password" value="${escapeHtml(user.token || '')}" placeholder="${escapeHtml(t('guiUserTokenPlaceholder'))}" autocomplete="new-password" spellcheck="false" ${disabled}>
-          </label>
-          ${state.gui_users.length > 1 ? `<button class="gui-user-remove" type="button" data-remove-gui-user="${index}" ${disabled}>${escapeHtml(t('removeGuiUser'))}</button>` : ''}
-          <div class="permission-form permission-grid">
-            ${Object.entries(user.permissions || {}).map(([key, value]) => `
+      if (selectedGuiUserIndex >= state.gui_users.length) selectedGuiUserIndex = Math.max(0, state.gui_users.length - 1);
+      if (selectedGuiUserIndex < 0) selectedGuiUserIndex = 0;
+      const selectedUser = state.gui_users[selectedGuiUserIndex];
+      const userLabel = (user, index) => user.name || user.original_name || `${t('untitledGuiUser')} ${index + 1}`;
+      $('guiUsers').innerHTML = `
+        <div class="gui-user-sidebar">
+          <span class="field-label">${escapeHtml(t('guiUsersLabel'))}</span>
+          <div class="gui-user-list">
+            ${state.gui_users.map((user, index) => `
+              <div class="gui-user-list-row">
+                <button class="gui-user-select ${index === selectedGuiUserIndex ? 'active' : ''}" type="button" data-select-gui-user="${index}">
+                  ${escapeHtml(userLabel(user, index))}
+                </button>
+                ${state.gui_users.length > 1 ? `<button class="gui-user-remove" type="button" data-remove-gui-user="${index}" title="${escapeHtml(t('removeGuiUser'))}" ${disabled}>${escapeHtml(t('removeGuiUser'))}</button>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        <div class="gui-user-detail" data-gui-user-index="${selectedGuiUserIndex}" data-gui-user-original-name="${escapeHtml(selectedUser.original_name || selectedUser.name || '')}">
+          <div class="gui-user-fields">
+            <label class="field">
+              <span class="field-label">${escapeHtml(t('guiUserNameLabel'))}</span>
+              <input data-gui-user-field="name" value="${escapeHtml(selectedUser.name || '')}" autocomplete="off" spellcheck="false" ${disabled}>
+            </label>
+            <label class="field">
+              <span class="field-label">${escapeHtml(t('guiUserTokenLabel'))} <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(t('guiUserTokenHint'))}">?</span></span>
+              <input data-gui-user-field="token" type="password" value="${escapeHtml(selectedUser.token || '')}" placeholder="${escapeHtml(t('guiUserTokenPlaceholder'))}" autocomplete="new-password" spellcheck="false" ${disabled}>
+            </label>
+          </div>
+          <span class="field-label">${escapeHtml(t('guiUserPermissionsLabel'))}</span>
+          <div class="gui-user-permissions">
+            ${Object.entries(selectedUser.permissions || {}).map(([key, value]) => `
               <label class="check-row">
                 <input type="checkbox" data-gui-user-permission="${escapeHtml(key)}" ${value ? 'checked' : ''} ${disabled}>
                 <span><strong>${escapeHtml(key)}</strong> <span class="tool-tip" tabindex="0" data-tip="${escapeHtml(permissionTip(key))}">?</span></span>
@@ -721,7 +740,7 @@
             `).join('')}
           </div>
         </div>
-      `).join('');
+      `;
     }
     function permissionTip(key) {
       return t(`permissionTip_${key}`);
@@ -831,7 +850,23 @@
       };
     }
     function readGuiUserForm() {
-      return Array.from($('guiUsers').querySelectorAll('[data-gui-user-index]')).map((row) => {
+      if (!Array.isArray(state.gui_users)) return [];
+      const users = state.gui_users.map((user) => ({
+        name: user.name || '',
+        original_name: user.original_name || user.name || '',
+        token: user.token || '',
+        allow_check: Boolean(user.permissions && user.permissions.allow_check),
+        allow_migrate: Boolean(user.permissions && user.permissions.allow_migrate),
+        allow_backup: Boolean(user.permissions && user.permissions.allow_backup),
+        allow_restore: Boolean(user.permissions && user.permissions.allow_restore),
+        allow_sql_apply: Boolean(user.permissions && user.permissions.allow_sql_apply),
+        allow_migration_edit: Boolean(user.permissions && user.permissions.allow_migration_edit),
+        allow_gui_permission_edit: Boolean(user.permissions && user.permissions.allow_gui_permission_edit),
+        allow_config_edit: Boolean(user.permissions && user.permissions.allow_config_edit),
+      }));
+      const row = $('guiUsers').querySelector('.gui-user-detail[data-gui-user-index]');
+      if (row) {
+        const index = Number(row.dataset.guiUserIndex);
         const user = {
           name: row.querySelector('[data-gui-user-field="name"]').value.trim(),
           original_name: row.dataset.guiUserOriginalName || '',
@@ -840,8 +875,9 @@
         row.querySelectorAll('input[data-gui-user-permission]').forEach((input) => {
           user[input.dataset.guiUserPermission] = input.checked;
         });
-        return user;
-      });
+        users[index] = user;
+      }
+      return users;
     }
     function syncGuiUserFormToState() {
       if (!Array.isArray(state.gui_users)) return;
@@ -2244,13 +2280,22 @@
       if (Array.isArray(state.gui_users)) syncGuiUserFormToState();
       if (!Array.isArray(state.gui_users)) state.gui_users = [];
       state.gui_users.push(defaultGuiUser(state.gui_users.length === 0));
+      selectedGuiUserIndex = state.gui_users.length - 1;
       renderSettings();
     });
     $('guiUsers').addEventListener('click', (event) => {
+      const selectButton = event.target.closest('button[data-select-gui-user]');
+      if (selectButton && Array.isArray(state.gui_users)) {
+        syncGuiUserFormToState();
+        selectedGuiUserIndex = Number(selectButton.dataset.selectGuiUser);
+        renderSettings();
+        return;
+      }
       const button = event.target.closest('button[data-remove-gui-user]');
       if (!button || !Array.isArray(state.gui_users)) return;
       syncGuiUserFormToState();
       state.gui_users.splice(Number(button.dataset.removeGuiUser), 1);
+      selectedGuiUserIndex = Math.min(selectedGuiUserIndex, Math.max(0, state.gui_users.length - 1));
       renderSettings();
     });
     $('savePermissions').addEventListener('click', saveGuiPermissions);
