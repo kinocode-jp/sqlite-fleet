@@ -593,10 +593,8 @@ fn api_save_gui_permissions_request(
         }
         let mut retained_existing_users = std::collections::HashSet::new();
         for user in &gui_users {
-            if user.token.is_empty() {
-                if !retained_existing_users.insert(existing_gui_user_name(user)?) {
-                    bail!("GUI user original_name が重複しています");
-                }
+            if user.token.is_empty() && !retained_existing_users.insert(existing_gui_user_name(user)?) {
+                bail!("GUI user original_name が重複しています");
             }
         }
         let mut users = HashMap::new();

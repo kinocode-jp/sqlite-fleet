@@ -431,33 +431,35 @@
 
     #[test]
     fn gui_user_tokens_select_effective_permissions() {
-        let mut config = Config::default();
-        config.gui_users = HashMap::from([
-            (
-                "viewer".to_string(),
-                sqlite_fleet::GuiUserConfig {
-                    token: Some("viewer-token".to_string()),
-                    token_hash: None,
-                    permissions: sqlite_fleet::GuiConfig {
-                        allow_check: true,
-                        ..sqlite_fleet::GuiConfig::default()
+        let config = Config {
+            gui_users: HashMap::from([
+                (
+                    "viewer".to_string(),
+                    sqlite_fleet::GuiUserConfig {
+                        token: Some("viewer-token".to_string()),
+                        token_hash: None,
+                        permissions: sqlite_fleet::GuiConfig {
+                            allow_check: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
                     },
-                },
-            ),
-            (
-                "operator".to_string(),
-                sqlite_fleet::GuiUserConfig {
-                    token: Some("operator-token".to_string()),
-                    token_hash: None,
-                    permissions: sqlite_fleet::GuiConfig {
-                        allow_check: true,
-                        allow_migrate: true,
-                        allow_gui_permission_edit: true,
-                        ..sqlite_fleet::GuiConfig::default()
+                ),
+                (
+                    "operator".to_string(),
+                    sqlite_fleet::GuiUserConfig {
+                        token: Some("operator-token".to_string()),
+                        token_hash: None,
+                        permissions: sqlite_fleet::GuiConfig {
+                            allow_check: true,
+                            allow_migrate: true,
+                            allow_gui_permission_edit: true,
+                            ..sqlite_fleet::GuiConfig::default()
+                        },
                     },
-                },
-            ),
-        ]);
+                ),
+            ]),
+            ..Default::default()
+        };
 
         let response = send_test_http_request_with_config(
             "POST /api/migrate?dry_run=true HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nX-SQLite-Fleet-Token: token\r\n\r\n",
