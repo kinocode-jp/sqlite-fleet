@@ -574,6 +574,79 @@
     }
 
     #[test]
+    fn ssh_tunnel_command_uses_placeholders_by_default() {
+        let command = build_ssh_tunnel_command(
+            8765,
+            8765,
+            &GuiAccessOptions {
+                ssh_user: None,
+                ssh_host: None,
+                ssh_port: None,
+                local_port: None,
+            },
+        );
+
+        assert_eq!(
+            command,
+            "ssh -N -L 127.0.0.1:8765:127.0.0.1:8765 <user>@<server>"
+        );
+    }
+
+    #[test]
+    fn ssh_tunnel_command_uses_operator_options() {
+        let command = build_ssh_tunnel_command(
+            8765,
+            9876,
+            &GuiAccessOptions {
+                ssh_user: Some("ubuntu".to_string()),
+                ssh_host: Some("161.33.9.53".to_string()),
+                ssh_port: Some(2222),
+                local_port: Some(9876),
+            },
+        );
+
+        assert_eq!(
+            command,
+            "ssh -p 2222 -N -L 127.0.0.1:9876:127.0.0.1:8765 ubuntu@161.33.9.53"
+        );
+    }
+
+    #[test]
+    fn ssh_tunnel_hint_options_reject_unsafe_values() {
+        let options = GuiAccessOptions {
+            ssh_user: Some("bad user".to_string()),
+            ssh_host: Some("server.example".to_string()),
+            ssh_port: None,
+            local_port: None,
+        };
+        assert!(options.validate().unwrap_err().to_string().contains("--ssh-user"));
+
+        let options = GuiAccessOptions {
+            ssh_user: Some("ubuntu".to_string()),
+            ssh_host: Some("server.example;rm".to_string()),
+            ssh_port: None,
+            local_port: None,
+        };
+        assert!(options.validate().unwrap_err().to_string().contains("--ssh-host"));
+
+        let options = GuiAccessOptions {
+            ssh_user: Some("ubuntu".to_string()),
+            ssh_host: Some("server.example".to_string()),
+            ssh_port: Some(0),
+            local_port: None,
+        };
+        assert!(options.validate().unwrap_err().to_string().contains("--ssh-port"));
+
+        let options = GuiAccessOptions {
+            ssh_user: Some("ubuntu".to_string()),
+            ssh_host: Some("server.example".to_string()),
+            ssh_port: None,
+            local_port: Some(0),
+        };
+        assert!(options.validate().unwrap_err().to_string().contains("--local-port"));
+    }
+
+    #[test]
     fn csrf_token_is_hex_256_bits() {
         let token = generate_csrf_token().unwrap();
 
