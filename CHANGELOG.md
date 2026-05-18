@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0](https://github.com/0809android/sqlite-fleet/compare/v0.4.0...v0.5.0) - 2026-05-18
+
+### Other
+
+- Make GUI permission test self contained
+- Fix clippy warnings in GUI permission tests
+- Require explicit approval for remote GUI binding
+- 権限管理UIをユーザー別編集レイアウトに更新
+- Tighten setup preflight checklist spacing
+- Hash GUI user tokens in saved permissions
+- Hide setup guide before first GUI user
+- Mask GUI user token and hide single-user removal
+- GUI初回ユーザー作成フォームの表示文言を調整
+- Require initial GUI user setup before GUI APIs
+- Move GUI permissions to dedicated page
+- Add GUI permission tooltips
+- Hide global permissions during GUI user setup
+- Add GUI user setup entry to setup checklist
+- Route initial GUI user setup to setup page
+- Retry lockfile fsync on WouldBlock
+- Move GUI permissions anchor to permissions section
+- Allow initial GUI user setup with setup token
+- Add GUI user management to permissions API
+- Add per-user GUI permission tokens
+
 ## [0.4.0](https://github.com/0809android/sqlite-fleet/compare/v0.3.0...v0.4.0) - 2026-05-15
 
 ### Other
