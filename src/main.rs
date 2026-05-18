@@ -77,6 +77,14 @@ enum Commands {
         port: u16,
         #[arg(long)]
         allow_remote: bool,
+        #[arg(long)]
+        ssh_user: Option<String>,
+        #[arg(long)]
+        ssh_host: Option<String>,
+        #[arg(long)]
+        ssh_port: Option<u16>,
+        #[arg(long)]
+        local_port: Option<u16>,
     },
 }
 
@@ -441,10 +449,26 @@ fn main() -> Result<()> {
             host,
             port,
             allow_remote,
+            ssh_user,
+            ssh_host,
+            ssh_port,
+            local_port,
         } => {
             let loaded_config = load_config_with_overrides(&config, parallel)?;
             validate_gui_remote_startup(&loaded_config, &host, allow_remote)?;
-            gui::serve(loaded_config, config.clone(), &host, port, allow_remote)?;
+            gui::serve(
+                loaded_config,
+                config.clone(),
+                &host,
+                port,
+                allow_remote,
+                gui::GuiAccessOptions {
+                    ssh_user,
+                    ssh_host,
+                    ssh_port,
+                    local_port,
+                },
+            )?;
         }
     }
 
@@ -534,10 +558,18 @@ mod tests {
                 host,
                 port,
                 allow_remote,
+                ssh_user,
+                ssh_host,
+                ssh_port,
+                local_port,
             } => {
                 assert_eq!(host, "127.0.0.1");
                 assert_eq!(port, 8765);
                 assert!(!allow_remote);
+                assert_eq!(ssh_user, None);
+                assert_eq!(ssh_host, None);
+                assert_eq!(ssh_port, None);
+                assert_eq!(local_port, None);
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -559,10 +591,18 @@ mod tests {
                 host,
                 port,
                 allow_remote,
+                ssh_user,
+                ssh_host,
+                ssh_port,
+                local_port,
             } => {
                 assert_eq!(host, "localhost");
                 assert_eq!(port, 18782);
                 assert!(!allow_remote);
+                assert_eq!(ssh_user, None);
+                assert_eq!(ssh_host, None);
+                assert_eq!(ssh_port, None);
+                assert_eq!(local_port, None);
             }
             other => panic!("unexpected command: {other:?}"),
         }
@@ -578,6 +618,38 @@ mod tests {
             } => {
                 assert_eq!(host, "0.0.0.0");
                 assert!(allow_remote);
+            }
+            other => panic!("unexpected command: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn gui_command_accepts_ssh_tunnel_hint_options() {
+        let cli = Cli::parse_from([
+            "sqlite-fleet",
+            "gui",
+            "--ssh-user",
+            "ubuntu",
+            "--ssh-host",
+            "161.33.9.53",
+            "--ssh-port",
+            "2222",
+            "--local-port",
+            "9876",
+        ]);
+
+        match cli.command {
+            Commands::Gui {
+                ssh_user,
+                ssh_host,
+                ssh_port,
+                local_port,
+                ..
+            } => {
+                assert_eq!(ssh_user.as_deref(), Some("ubuntu"));
+                assert_eq!(ssh_host.as_deref(), Some("161.33.9.53"));
+                assert_eq!(ssh_port, Some(2222));
+                assert_eq!(local_port, Some(9876));
             }
             other => panic!("unexpected command: {other:?}"),
         }

@@ -75,6 +75,14 @@ sqlite-fleet --config sqlite-fleet.toml gui
 
 By default, the GUI starts an HTTP server on `127.0.0.1:8765`. The GUI is intended for local operation, so start it only when needed and prefer `--host 127.0.0.1` to keep it bound to a loopback address. `--host` only accepts loopback addresses, and publishing the GUI with `--host 0.0.0.0` or another non-loopback address is not supported. If remote access is required, keep the GUI bound locally and configure SSH tunnels, VPN, Zero Trust access, or equivalent controls on the user/operator side.
 
+サーバー上でGUIを起動した場合、起動ログにローカル待受URLとSSHトンネル例が表示されます。接続先を明示したい場合は `--ssh-user` / `--ssh-host` / `--ssh-port` / `--local-port` を指定します。sqlite-fleet はSSHトンネル自体は作成せず、管理者がローカル端末で実行するためのコマンドを表示します。
+
+```bash
+sqlite-fleet --config sqlite-fleet.toml gui --ssh-user ubuntu --ssh-host 161.33.9.53 --local-port 9876
+
+ssh -N -L 127.0.0.1:9876:127.0.0.1:8765 ubuntu@161.33.9.53
+```
+
 管理画面は「何を適用するか」と「どこへ適用するか」を分けて表示します。
 
 - マイグレーション: ファイル名単位でSQL内容、所属グループ、適用済DB、未適用DBを確認します。グループに分けたい場合だけ、画面上でマイグレーショングループを作成します。

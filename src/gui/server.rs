@@ -14,13 +14,44 @@ struct ServerState {
     allow_remote_host: bool,
 }
 
+pub struct GuiAccessOptions {
+    pub ssh_user: Option<String>,
+    pub ssh_host: Option<String>,
+    pub ssh_port: Option<u16>,
+    pub local_port: Option<u16>,
+}
+
+impl GuiAccessOptions {
+    pub fn validate(&self) -> Result<()> {
+        if let Some(user) = &self.ssh_user {
+            validate_ssh_hint_token("--ssh-user", user, |c| {
+                c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-')
+            })?;
+        }
+        if let Some(host) = &self.ssh_host {
+            validate_ssh_hint_token("--ssh-host", host, |c| {
+                c.is_ascii_alphanumeric() || matches!(c, '.' | '_' | '-' | ':' | '[' | ']')
+            })?;
+        }
+        if self.ssh_port == Some(0) {
+            bail!("--ssh-port は1以上が必要です");
+        }
+        if self.local_port == Some(0) {
+            bail!("--local-port は1以上が必要です");
+        }
+        Ok(())
+    }
+}
+
 pub fn serve(
     config: Config,
     config_path: PathBuf,
     host: &str,
     port: u16,
     allow_remote: bool,
+    access_options: GuiAccessOptions,
 ) -> Result<()> {
+    access_options.validate()?;
     validate_gui_host(host, allow_remote)?;
     let listener = TcpListener::bind((host, port))
         .with_context(|| format!("GUIサーバを起動できません: {host}:{port}"))?;
@@ -36,7 +67,7 @@ pub fn serve(
         port: addr.port(),
         allow_remote_host,
     };
-    println!("GUI: http://{addr}/");
+    print_gui_access_help(&addr, &access_options);
     println!("停止するには Ctrl+C を押してください");
 
     for stream in listener.incoming() {
@@ -50,6 +81,61 @@ pub fn serve(
         }
     }
     Ok(())
+}
+
+fn validate_ssh_hint_token<F>(name: &str, value: &str, allowed: F) -> Result<()>
+where
+    F: Fn(char) -> bool,
+{
+    if value.is_empty() {
+        bail!("{name} は空にできません");
+    }
+    if !value.chars().all(allowed) {
+        bail!("{name} に使用できない文字が含まれています");
+    }
+    Ok(())
+}
+
+fn print_gui_access_help(addr: &std::net::SocketAddr, options: &GuiAccessOptions) {
+    let listen_url = format!("http://{}", addr);
+    println!("GUI listening on {listen_url}");
+
+    if addr.ip().is_loopback() {
+        let local_port = options.local_port.unwrap_or(addr.port());
+        let local_url = format!("http://127.0.0.1:{local_port}");
+        println!();
+        println!("If this is running on a remote server, run this on your local machine:");
+        println!();
+        println!(
+            "  {}",
+            build_ssh_tunnel_command(addr.port(), local_port, options)
+        );
+        println!();
+        println!("Then open:");
+        println!();
+        println!("  {local_url}");
+    } else {
+        println!();
+        println!("WARNING: GUI is bound to a non-loopback address.");
+        println!("This can expose database administration controls to the network.");
+        println!("Use this only behind trusted network controls and GUI user authentication.");
+    }
+}
+
+fn build_ssh_tunnel_command(remote_port: u16, local_port: u16, options: &GuiAccessOptions) -> String {
+    let destination = match (&options.ssh_user, &options.ssh_host) {
+        (Some(user), Some(host)) => format!("{user}@{host}"),
+        (Some(user), None) => format!("{user}@<server>"),
+        (None, Some(host)) => format!("<user>@{host}"),
+        (None, None) => "<user>@<server>".to_string(),
+    };
+    let port = options
+        .ssh_port
+        .map(|port| format!(" -p {port}"))
+        .unwrap_or_default();
+    format!(
+        "ssh{port} -N -L 127.0.0.1:{local_port}:127.0.0.1:{remote_port} {destination}"
+    )
 }
 
 fn handle_connection(mut stream: TcpStream, state: &ServerState) -> Result<()> {
