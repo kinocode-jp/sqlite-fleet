@@ -431,7 +431,18 @@
 
     #[test]
     fn gui_user_tokens_select_effective_permissions() {
+        let dir = tempfile::tempdir().unwrap();
+        let data_dir = dir.path().join("data");
+        std::fs::create_dir(&data_dir).unwrap();
+        std::fs::create_dir(dir.path().join("migrations")).unwrap();
+        Connection::open(data_dir.join("tenant.db")).unwrap();
+
         let config = Config {
+            base_dir: std::fs::canonicalize(dir.path()).unwrap(),
+            databases: sqlite_fleet::DatabasesConfig {
+                path_glob: Some("data/*.db".to_string()),
+                ..sqlite_fleet::DatabasesConfig::default()
+            },
             gui_users: HashMap::from([
                 (
                     "viewer".to_string(),
