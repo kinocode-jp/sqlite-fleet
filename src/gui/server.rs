@@ -108,7 +108,7 @@ fn print_gui_access_help(addr: &std::net::SocketAddr, options: &GuiAccessOptions
         println!();
         println!(
             "  {}",
-            build_ssh_tunnel_command(addr.port(), local_port, options)
+            build_ssh_tunnel_command(addr.ip(), addr.port(), local_port, options)
         );
         println!();
         println!("Then open:");
@@ -122,7 +122,12 @@ fn print_gui_access_help(addr: &std::net::SocketAddr, options: &GuiAccessOptions
     }
 }
 
-fn build_ssh_tunnel_command(remote_port: u16, local_port: u16, options: &GuiAccessOptions) -> String {
+fn build_ssh_tunnel_command(
+    remote_ip: IpAddr,
+    remote_port: u16,
+    local_port: u16,
+    options: &GuiAccessOptions,
+) -> String {
     let destination = match (&options.ssh_user, &options.ssh_host) {
         (Some(user), Some(host)) => format!("{user}@{host}"),
         (Some(user), None) => format!("{user}@<server>"),
@@ -133,8 +138,12 @@ fn build_ssh_tunnel_command(remote_port: u16, local_port: u16, options: &GuiAcce
         .ssh_port
         .map(|port| format!(" -p {port}"))
         .unwrap_or_default();
+    let remote_host = match remote_ip {
+        IpAddr::V4(ip) => ip.to_string(),
+        IpAddr::V6(ip) => format!("[{ip}]"),
+    };
     format!(
-        "ssh{port} -N -L 127.0.0.1:{local_port}:127.0.0.1:{remote_port} {destination}"
+        "ssh{port} -N -L 127.0.0.1:{local_port}:{remote_host}:{remote_port} {destination}"
     )
 }
 

@@ -576,6 +576,7 @@
     #[test]
     fn ssh_tunnel_command_uses_placeholders_by_default() {
         let command = build_ssh_tunnel_command(
+            "127.0.0.1".parse().unwrap(),
             8765,
             8765,
             &GuiAccessOptions {
@@ -595,6 +596,7 @@
     #[test]
     fn ssh_tunnel_command_uses_operator_options() {
         let command = build_ssh_tunnel_command(
+            "127.0.0.2".parse().unwrap(),
             8765,
             9876,
             &GuiAccessOptions {
@@ -607,7 +609,27 @@
 
         assert_eq!(
             command,
-            "ssh -p 2222 -N -L 127.0.0.1:9876:127.0.0.1:8765 ubuntu@161.33.9.53"
+            "ssh -p 2222 -N -L 127.0.0.1:9876:127.0.0.2:8765 ubuntu@161.33.9.53"
+        );
+    }
+
+    #[test]
+    fn ssh_tunnel_command_brackets_ipv6_remote_host() {
+        let command = build_ssh_tunnel_command(
+            "::1".parse().unwrap(),
+            8765,
+            8765,
+            &GuiAccessOptions {
+                ssh_user: None,
+                ssh_host: None,
+                ssh_port: None,
+                local_port: None,
+            },
+        );
+
+        assert_eq!(
+            command,
+            "ssh -N -L 127.0.0.1:8765:[::1]:8765 <user>@<server>"
         );
     }
 
