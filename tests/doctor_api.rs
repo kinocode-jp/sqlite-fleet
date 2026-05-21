@@ -53,6 +53,39 @@ path = "./doctor-report.json"
 }
 
 #[test]
+fn doctor_reports_config_base_dir_for_runtime_path_errors() {
+    let dir = tempdir().unwrap();
+    let config_dir = dir.path().join("data");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::write(
+        config_dir.join("sqlite-fleet.toml"),
+        r#"
+[databases]
+discovery = "query"
+source = "./data/shared.db"
+query = "SELECT id FROM tenants"
+id_column = "id"
+path_template = "./data/tenants/{id}.db"
+
+[migrations]
+dir = "./backend/migrations/fleet/users"
+"#,
+    )
+    .unwrap();
+
+    let report = doctor(config_dir.join("sqlite-fleet.toml"));
+
+    assert!(report.config_ok);
+    assert!(!report.discovery_ok);
+    assert!(!report.migrations_ok);
+    assert!(report
+        .errors
+        .iter()
+        .any(|error| error.contains("設定基準ディレクトリ")
+            && error.contains(&config_dir.display().to_string())));
+}
+
+#[test]
 fn gui_partial_config_only_enables_explicit_flags() {
     let dir = tempdir().unwrap();
     fs::write(
