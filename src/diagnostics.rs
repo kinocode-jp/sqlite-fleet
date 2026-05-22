@@ -81,7 +81,7 @@ pub fn doctor_config(config: &Config) -> DoctorReport {
             true
         }
         Err(error) => {
-            errors.push(error_with_config_base_dir(&config, error));
+            errors.push(error_with_config_base_dir(config, error));
             false
         }
     };
@@ -92,7 +92,7 @@ pub fn doctor_config(config: &Config) -> DoctorReport {
             true
         }
         Err(error) => {
-            errors.push(error_with_config_base_dir(&config, error));
+            errors.push(error_with_config_base_dir(config, error));
             false
         }
     };
