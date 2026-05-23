@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.5.1](https://github.com/0809android/sqlite-fleet/compare/v0.5.0...v0.5.1) - 2026-05-18
+## [0.5.1](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.5.0...v0.5.1) - 2026-05-18
 
 ### Other
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add safe GUI access hints
 - Add SSH tunnel GUI tests
 
-## [0.5.0](https://github.com/0809android/sqlite-fleet/compare/v0.4.0...v0.5.0) - 2026-05-18
+## [0.5.0](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.4.0...v0.5.0) - 2026-05-18
 
 ### Other
 
@@ -40,13 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add GUI user management to permissions API
 - Add per-user GUI permission tokens
 
-## [0.4.0](https://github.com/0809android/sqlite-fleet/compare/v0.3.0...v0.4.0) - 2026-05-15
+## [0.4.0](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.3.0...v0.4.0) - 2026-05-15
 
 ### Other
 
 - Split GUI settings and permission edit flags
 
-## [0.3.0](https://github.com/0809android/sqlite-fleet/compare/v0.2.0...v0.3.0) - 2026-05-15
+## [0.3.0](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.2.0...v0.3.0) - 2026-05-15
 
 ### Other
 
@@ -77,7 +77,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Document GUI network exposure guidance in English
 - Document GUI loopback-only access guidance
 
-## [0.2.0](https://github.com/0809android/sqlite-fleet/compare/v0.1.3...v0.2.0) - 2026-05-14
+## [0.2.0](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.1.3...v0.2.0) - 2026-05-14
 
 ### Changed
 
@@ -91,14 +91,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Disable destructive GUI permissions by default and document that GUI restore is not currently available.
 - Declare Rust 1.85 as the minimum supported Rust version.
 
-## [0.1.3](https://github.com/0809android/sqlite-fleet/compare/v0.1.1...v0.1.3) - 2026-05-09
+## [0.1.3](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.1.1...v0.1.3) - 2026-05-09
 
 ### Other
 
 - release v0.1.3
 - Add local GUI database manager
 
-## [0.1.1](https://github.com/0809android/sqlite-fleet/compare/v0.1.0...v0.1.1) - 2026-05-09
+## [0.1.1](https://github.com/kinocode-jp/sqlite-fleet/compare/v0.1.0...v0.1.1) - 2026-05-09
 
 ### Other
 
