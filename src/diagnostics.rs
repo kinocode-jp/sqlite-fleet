@@ -81,7 +81,7 @@ pub fn doctor_config(config: &Config) -> DoctorReport {
             true
         }
         Err(error) => {
-            errors.push(error.to_string());
+            errors.push(error_with_config_base_dir(config, error));
             false
         }
     };
@@ -92,7 +92,7 @@ pub fn doctor_config(config: &Config) -> DoctorReport {
             true
         }
         Err(error) => {
-            errors.push(error.to_string());
+            errors.push(error_with_config_base_dir(config, error));
             false
         }
     };
@@ -105,6 +105,14 @@ pub fn doctor_config(config: &Config) -> DoctorReport {
         migration_count,
         errors,
     }
+}
+
+fn error_with_config_base_dir(config: &Config, error: impl ToString) -> String {
+    format!(
+        "{}（設定基準ディレクトリ: {}）",
+        error.to_string(),
+        config.base_dir.display()
+    )
 }
 
 pub fn write_report_json<T: Serialize>(config: &Config, value: &T) -> Result<Option<PathBuf>> {
